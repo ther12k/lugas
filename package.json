@@ -8,7 +8,8 @@
     "versions": "bun --version && tsc --version",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "verify:docs": "bun run scripts/verify-okf.ts"
+    "verify:docs": "bun run scripts/verify-okf.ts",
+    "verify": "bun run scripts/verify.ts"
   },
   "devDependencies": {
     "@types/bun": "1.4.0",
