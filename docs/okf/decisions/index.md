@@ -1,0 +1,18 @@
+# Architecture Decisions
+
+1. [ADR-0001 — Product Name: LugasJS](0001-product-name-lugasjs.md)
+2. [ADR-0002 — Bun-Only Native Runtime](0002-bun-only-native-runtime.md)
+3. [ADR-0003 — Minimal Explicit and Agent-Friendly API](0003-minimal-explicit-agent-friendly-api.md)
+4. [ADR-0004 — Bun Native Router Is Authoritative](0004-bun-native-router-authoritative.md)
+5. [ADR-0005 — Native-Style Full-Path Route Maps](0005-native-style-full-path-route-maps.md)
+6. [ADR-0006 — Native Response with Typed Helpers](0006-native-response-typed-helpers.md)
+7. [ADR-0007 — Minimal Validation–Guard–Handler Lifecycle](0007-minimal-request-lifecycle.md)
+8. [ADR-0008 — Optional Standard Schema Validation](0008-optional-standard-schema.md)
+9. [ADR-0009 — Own Explicit Typed Fetch Client](0009-own-explicit-typed-client.md)
+10. [ADR-0010 — RFC 9457 Problem Details](0010-rfc9457-problem-details.md)
+11. [ADR-0011 — Explicit Services and Guard Enrichment](0011-explicit-services-guard-enrichment.md)
+12. [ADR-0012 — One Package with Subpath Exports](0012-one-package-subpath-exports.md)
+13. [ADR-0013 — No AOT Application Compiler in 0.x](0013-no-aot-compiler-0x.md)
+14. [ADR-0014 — Separate Compile-Time Contract and Runtime Manifest](0014-contract-manifest-separation.md)
+15. [ADR-0015 — Named Modules Have No Hidden Scope or Prefix](0015-named-modules-no-hidden-scope.md)
+16. [ADR-0016 — Evidence-Gated Performance and Release Claims](0016-evidence-gated-claims.md)

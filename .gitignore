@@ -1,0 +1,25 @@
+# Worktrees (one per issue; never commit them)
+.worktrees/
+
+# Dependencies and lock-adjacent state
+node_modules/
+
+# Build output and coverage
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Raw benchmark artifacts (results are reported, not committed raw)
+benchmarks/**/*.local.json
+benchmarks/**/results/
+
+# Secrets and local environment
+.env
+.env.*
+*.pem
+*.key
+
+# Editor and OS debris
+.DS_Store
+Thumbs.db
