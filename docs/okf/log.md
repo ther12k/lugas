@@ -15,3 +15,9 @@
 - Bundle imported byte-identical under `docs/okf/` at commit `e056397`; archive digest recorded in `docs/SOURCE-BASELINE.md`.
 - Open owner decisions registered in `docs/open-decisions.md`; package identity, license, publication, performance messaging, and post-beta scope remain owner-blocked.
 - Known design uncertainties mapped to their deciding issues (M0-006, M0-009, M2-001, M3-017, M4-010, M5-002/M5-003).
+
+## 2026-08-21 — M0 gate passed
+
+- M0-001 through M0-011 merged with evidence; clean checkout verification passed (`bun run verify`: typecheck, 29 tests, OKF validator, diff hygiene).
+- M0-009 recommends stateless bound type definitions with explicit generic escape hatch for M1.
+- M1 implementation is authorized; owner-blocked package/license/publication decisions remain unchanged.
