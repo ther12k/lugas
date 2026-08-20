@@ -9,3 +9,9 @@
 - Added architecture, engineering, security, testing, performance, release, and governance documents.
 - Added a dependency-checked GitHub issue backlog designed for one issue per subagent worktree.
 - Generated a local bundle report and structural validation. Local validation is not certification by Google or another third party.
+
+## 2026-08-21 — Implementation baseline frozen (M0-001)
+
+- Bundle imported byte-identical under `docs/okf/` at commit `e056397`; archive digest recorded in `docs/SOURCE-BASELINE.md`.
+- Open owner decisions registered in `docs/open-decisions.md`; package identity, license, publication, performance messaging, and post-beta scope remain owner-blocked.
+- Known design uncertainties mapped to their deciding issues (M0-006, M0-009, M2-001, M3-017, M4-010, M5-002/M5-003).
