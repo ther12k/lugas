@@ -1,0 +1,17 @@
+{
+  "name": "lugas",
+  "private": true,
+  "version": "0.0.0",
+  "description": "LugasJS — small, explicit, Bun-native TypeScript framework (pre-release workspace)",
+  "type": "module",
+  "scripts": {
+    "versions": "bun --version && tsc --version",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "verify:docs": "bun run scripts/verify-okf.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "7.0.2"
+  }
+}
