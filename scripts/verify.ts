@@ -18,7 +18,7 @@ Runs named checks:
 }
 
 async function run(name: string, command: readonly string[]): Promise<CheckResult> {
-  const proc = Bun.spawn(command, { stdout: "pipe", stderr: "pipe" });
+  const proc = Bun.spawn([...command], { stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
   const exit = await proc.exited;
   const output = `${stdout}${stderr}`.trim();
