@@ -1,12 +1,13 @@
 /**
- * Ordered guard execution and short-circuit handling (M2-010).
+ * Ordered guard execution and short-circuit handling (M2-010, M2-011).
  *
  * Runs named route guards in sequence. If a guard returns a native Response,
  * execution stops immediately (short-circuit), bypassing later guards and the
  * route handler. Synchronous execution is preserved when all guards in the chain
- * return synchronously.
+ * return synchronously. Rejects overwriting reserved context keys.
  */
 import type { GuardDescriptor } from "../core/types";
+import { BASE_CONTEXT_RESERVED_KEYS } from "./context";
 
 export type RunGuardsResult =
   | { readonly kind: "continue"; readonly context: Record<string, unknown> }
@@ -15,6 +16,20 @@ export type RunGuardsResult =
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   if ((typeof value !== "object" || value === null) && typeof value !== "function") return false;
   return typeof (value as { readonly then?: unknown }).then === "function";
+}
+
+function applyEnrichment(
+  guardName: string,
+  target: Record<string, unknown>,
+  enrichment: unknown,
+): Record<string, unknown> {
+  if (typeof enrichment !== "object" || enrichment === null) return target;
+  for (const key of Object.keys(enrichment)) {
+    if (BASE_CONTEXT_RESERVED_KEYS.has(key)) {
+      throw new Error(`Guard '${guardName}' cannot overwrite reserved context key '${key}'`);
+    }
+  }
+  return { ...target, ...enrichment };
 }
 
 export function runGuards(
@@ -38,9 +53,8 @@ export function runGuards(
         if (asyncResult instanceof Response) {
           return { kind: "response", response: asyncResult };
         }
-        if (typeof asyncResult === "object" && asyncResult !== null) {
-          enrichedContext = { ...enrichedContext, ...asyncResult };
-        }
+        enrichedContext = applyEnrichment(guard.name, enrichedContext, asyncResult);
+
         for (let j = i + 1; j < guards.length; j++) {
           const nextGuard = guards[j]!;
           const nextInput = { ...baseContext, ...enrichedContext };
@@ -48,9 +62,7 @@ export function runGuards(
           if (nextResult instanceof Response) {
             return { kind: "response", response: nextResult };
           }
-          if (typeof nextResult === "object" && nextResult !== null) {
-            enrichedContext = { ...enrichedContext, ...nextResult };
-          }
+          enrichedContext = applyEnrichment(nextGuard.name, enrichedContext, nextResult);
         }
         return { kind: "continue", context: enrichedContext };
       })();
@@ -60,9 +72,7 @@ export function runGuards(
       return { kind: "response", response: result };
     }
 
-    if (typeof result === "object" && result !== null) {
-      enrichedContext = { ...enrichedContext, ...result };
-    }
+    enrichedContext = applyEnrichment(guard.name, enrichedContext, result);
   }
 
   return { kind: "continue", context: enrichedContext };
