@@ -45,8 +45,8 @@ describe("Standard Schema executor", () => {
       expect.objectContaining({ code: "STANDARD_SCHEMA_RESULT_INVALID" }),
     );
 
-    const both = { "~standard": { version: 1 as const, vendor: "fixture", validate: () => ({ value: 1, issues: [] }) } };
-    expect(() => executeStandardSchema(both as never, "value")).toThrowError(/both/);
+    const nonArrayIssues = { "~standard": { version: 1 as const, vendor: "fixture", validate: () => ({ issues: "bad-issues" }) } };
+    expect(() => executeStandardSchema(nonArrayIssues as never, "value")).toThrowError(/issues/);
   });
 
   test("normalizes rejected asynchronous result promises as executor errors", async () => {
