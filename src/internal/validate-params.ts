@@ -15,13 +15,19 @@ export const VALIDATION_PROBLEM_TYPE = "https://lugasjs.dev/problems/validation"
 
 export function createValidationProblem(
   issues: ReadonlyArray<NormalizedValidationIssue>,
+  source?: "params" | "query" | "headers" | "body",
 ): Response {
-  return problem(422, {
+  const fields: Record<string, unknown> = {
     type: VALIDATION_PROBLEM_TYPE,
     title: "Request validation failed",
+    status: 422,
     code: "VALIDATION_FAILED",
     issues,
-  });
+  };
+  if (source !== undefined) {
+    fields["source"] = source;
+  }
+  return problem(422, fields);
 }
 
 export type ValidateParamsSuccess<T> = {
@@ -49,7 +55,7 @@ function handleValidationResult<TOutput>(
     const normalized = normalizeValidationIssues(rawResult.issues);
     return {
       ok: false,
-      response: createValidationProblem(normalized),
+      response: createValidationProblem(normalized, "params"),
       issues: normalized,
     };
   }

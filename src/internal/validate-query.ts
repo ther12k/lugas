@@ -38,7 +38,7 @@ function handleValidationResult<TOutput>(
     const normalized = normalizeValidationIssues(rawResult.issues);
     return {
       ok: false,
-      response: createValidationProblem(normalized),
+      response: createValidationProblem(normalized, "query"),
       issues: normalized,
     };
   }
