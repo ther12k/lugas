@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { defineApp } from "../../../src/core/app";
-import { route } from "../../../src/core/route";
-import { defineModule } from "../../../src/core/module";
-import { json, text, empty, problem, redirect } from "../../../src/core/response";
+import { defineApp } from "../../src/core/app";
+import { route } from "../../src/core/route";
+import { defineModule } from "../../src/core/module";
+import { json, text, empty, problem, redirect } from "../../src/core/response";
 
 const get = (body: string) => route({ handler: () => new Response(body) });
 
