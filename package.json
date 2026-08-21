@@ -4,6 +4,13 @@
   "version": "0.0.0",
   "description": "LugasJS — small, explicit, Bun-native TypeScript framework (pre-release workspace)",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": ["src", "README.md", "AGENTS.md", "docs/okf/architecture"],
   "scripts": {
     "versions": "bun --version && tsc --version",
     "typecheck": "tsc --noEmit",
