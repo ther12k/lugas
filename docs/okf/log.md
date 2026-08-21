@@ -28,3 +28,10 @@
 - M1-001 through M1-018 merged with evidence; local clean verification: 111 tests pass, 1 documented Bun leak characterization skip, 0 failures, typecheck/docs/diff pass.
 - M1 conformance exposed and corrected nested descriptor compilation in native method maps (c206180).
 - M2 implementation is authorized after gate merge; GitHub Actions remains blocked by account billing/spending-limit condition.
+
+## 2026-08-21 — M2 gate passed locally
+
+- M2-001 through M2-018 merged with evidence; local clean verification: 218 tests pass, 1 documented Bun leak characterization skip, 0 failures, typecheck/docs/diff pass.
+- Input validation across params, query, headers, and body implemented with Standard Schema v1 structural support and 0 runtime dependencies.
+- Sequential guard execution, typed context enrichment, short-circuit response unions, adversarial security matrix, and bounded fuzz tests closed.
+- M3 typed client implementation is authorized after gate merge.
