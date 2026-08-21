@@ -23,3 +23,55 @@ export function json<S extends number, B>(status: S, body: B, init?: ResponseIni
   if (!headers.has("content-type")) headers.set("content-type", "application/json; charset=utf-8");
   return new Response(JSON.stringify(body), { ...init, status, headers }) as TypedResponse<S, B>;
 }
+
+/**
+ * `text(status, body, init?)` — `text/plain; charset=utf-8` unless the
+ * caller overrides content-type.
+ */
+export function text<S extends number, B extends string>(status: S, body: B, init?: ResponseInit): TypedResponse<S, B> {
+  const headers = new Headers(init?.headers as Bun.HeadersInit | undefined);
+  if (!headers.has("content-type")) headers.set("content-type", "text/plain; charset=utf-8");
+  return new Response(body, { ...init, status, headers }) as TypedResponse<S, B>;
+}
+
+/** `empty(status, init?)` — bodyless response (204/304 and friends). */
+export function empty<S extends number>(status: S, init?: ResponseInit): TypedResponse<S, undefined> {
+  return new Response(null, { ...init, status }) as TypedResponse<S, undefined>;
+}
+
+export const PROBLEM_CONTENT_TYPE = "application/problem+json";
+
+export type ProblemFields = {
+  type?: string | undefined;
+  title?: string | undefined;
+  detail?: string | undefined;
+  instance?: string | undefined;
+} & Record<string, unknown>;
+
+const PROBLEM_RESERVED = new Set(["type", "title", "detail", "instance"]);
+
+/**
+ * `problem(status, fields, init?)` — RFC 9457 problem details. Extension
+ * members are bounded: string/number/boolean values pass through; nested
+ * objects/arrays are serialized but flagged length-bounded by the caller's
+ * responsibility (M2-009 normalizes issue extensions).
+ */
+export function problem<S extends number>(status: S, fields: ProblemFields, init?: ResponseInit): TypedResponse<S, ProblemFields> {
+  const headers = new Headers(init?.headers as Bun.HeadersInit | undefined);
+  if (!headers.has("content-type")) headers.set("content-type", PROBLEM_CONTENT_TYPE);
+  const members: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined) continue;
+    members[key] = value;
+  }
+  return new Response(JSON.stringify(members), { ...init, status, headers }) as TypedResponse<S, ProblemFields>;
+}
+
+export const REDIRECT_STATUSES = [301, 302, 303, 307, 308] as const;
+export type RedirectStatus = (typeof REDIRECT_STATUSES)[number];
+
+/** `redirect(location, status?)` — 302 default; only 3xx redirect statuses allowed. */
+export function redirect(location: string | URL, status: RedirectStatus = 302): TypedResponse<RedirectStatus, undefined> {
+  const href = location instanceof URL ? location.href : location;
+  return new Response(null, { status, headers: { location: href } }) as TypedResponse<RedirectStatus, undefined>;
+}
