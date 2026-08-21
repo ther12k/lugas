@@ -79,7 +79,7 @@ function handleValidationResult<TOutput>(
     const sanitized = sanitizeHeaderIssues(normalized);
     return {
       ok: false,
-      response: createValidationProblem(sanitized),
+      response: createValidationProblem(sanitized, "headers"),
       issues: sanitized,
     };
   }
