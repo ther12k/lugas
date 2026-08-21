@@ -1,5 +1,5 @@
 /**
- * Core public type skeleton (M1-001).
+ * Core public type skeleton (M1-001, M2-011).
  *
  * Readonly marker/descriptor types for the canonical Lugas declaration
  * syntax selected by the M0-009 spike: stateless factories with an explicit
@@ -23,6 +23,7 @@ export type GuardResult<Enrichment> = Enrichment | Response | Promise<Enrichment
 export type GuardHandler<TServices, Enrichment> = (context: {
   readonly request: Request;
   readonly services: TServices;
+  readonly [key: string]: unknown;
 }) => GuardResult<Enrichment>;
 
 export type GuardDescriptor<TServices = unknown, Enrichment = unknown> = Branded<
@@ -32,6 +33,21 @@ export type GuardDescriptor<TServices = unknown, Enrichment = unknown> = Branded
   },
   "GuardDescriptor"
 >;
+
+export type ExtractGuardEnrichment<TGuard> = TGuard extends GuardDescriptor<any, infer E>
+  ? (E extends Response ? {} : (E extends Promise<infer P> ? (P extends Response ? {} : P) : E))
+  : {};
+
+export type MergeGuardEnrichments<TGuards extends ReadonlyArray<unknown>> = TGuards extends readonly [
+  infer Head,
+  ...infer Tail
+]
+  ? Tail extends readonly []
+    ? ExtractGuardEnrichment<Head>
+    : ExtractGuardEnrichment<Head> & MergeGuardEnrichments<Tail>
+  : TGuards extends ReadonlyArray<infer Item>
+  ? ExtractGuardEnrichment<Item>
+  : {};
 
 export type RouteHandler<TServices = unknown, TContext = unknown> = (context: {
   readonly request: Request;
