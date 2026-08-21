@@ -124,16 +124,13 @@ function normalizeResult<Output>(value: unknown): StandardSchemaResult<Output> {
     throw invalidResult("validator result must be an object");
   }
   const result = value as { readonly value?: unknown; readonly issues?: unknown };
-  const hasValue = "value" in result;
-  const hasIssues = "issues" in result;
-  if (hasIssues && result.issues !== undefined) {
-    if (hasValue) throw invalidResult("validator result cannot contain both 'value' and 'issues'");
+  if (result.issues !== undefined) {
     if (!Array.isArray(result.issues) || !result.issues.every(isIssue)) {
       throw invalidResult("validator result 'issues' must be an array of issue objects");
     }
-    return { issues: result.issues } as StandardSchemaFailure;
+    return { issues: result.issues };
   }
-  if (!hasValue) throw invalidResult("successful validator result must contain 'value'");
+  if (!("value" in result)) throw invalidResult("successful validator result must contain 'value'");
   return { value: result.value as Output };
 }
 
