@@ -31,17 +31,18 @@ export function defineModule<TServices>(config: ModuleConfig<TServices>): Module
   if (typeof config.routes !== "object" || config.routes === null || Array.isArray(config.routes)) {
     throw new Error("defineModule(): 'routes' must be an object keyed by full path");
   }
+  const HTTP_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
   const seen = new Set<string>();
   for (const [path, entry] of Object.entries(config.routes)) {
     if (typeof entry !== "object" || entry === null) {
       continue; // native Response/Bun.file values and descriptors validated at composition
     }
     for (const method of Object.keys(entry as Record<string, unknown>)) {
-      const upper = method.toUpperCase();
-      if (upper === method) continue; // method map entries cannot collide by construction
-      const dedupe = `${method} ${path}`;
+      const canonical = method.toUpperCase();
+      if (!HTTP_METHODS.has(canonical)) continue; // non-method keys validated at composition
+      const dedupe = `${canonical} ${path}`;
       if (seen.has(dedupe)) {
-        throw new Error(`defineModule(): duplicate route entry '${dedupe}'`);
+        throw new Error(`defineModule(): duplicate route entry '${method} ${path}'`);
       }
       seen.add(dedupe);
     }
