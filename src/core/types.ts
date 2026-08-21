@@ -13,11 +13,9 @@ export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | 
 /** Minimal Standard-Schema-shaped input placeholder; M2 replaces the payload. */
 export type SchemaLike = { readonly "~standard": unknown };
 
-/** A validated-response helper result; helpers land with M1-002/M1-003. */
-export type TypedResponse<S extends number = number, B = unknown> = {
-  readonly status: S;
-  readonly body: B;
-} & Response;
+import type { TypedResponse as _TypedResponse } from "./response";
+/** A validated-response helper result; canonical definition lives in `./response`. */
+export type TypedResponse<S extends number = number, B = unknown> = _TypedResponse<S, B>;
 
 /** Guard handler result: enrich context, or short-circuit with a Response. */
 export type GuardResult<Enrichment> = Enrichment | Response | Promise<Enrichment | Response>;
