@@ -1,21 +1,26 @@
 /**
- * `route()` descriptor factory (M1-004).
+ * `route()` descriptor factory (M1-004, M2-014).
  *
  * A route is an immutable descriptor, never a handler. Local invariants are
  * checked at creation so misconfiguration fails at startup, not per request:
  * exactly one function `handler`, and no unknown keys (typos must not pass
- * silently). Guards (`before`) are accepted as branded descriptors; their
- * execution pipeline lands with M2.
+ * silently). Accepts optional schemas (`params`, `query`, `headers`, `body`)
+ * and ordered guard descriptors (`before`).
  */
 import { brand } from "../internal/brands";
+import type { StandardSchema } from "../internal/standard-schema";
 import type { GuardDescriptor, RouteDescriptor, RouteHandler } from "./types";
 
 export type RouteConfig<TServices, TContext> = {
   handler: RouteHandler<TServices, TContext>;
   before?: ReadonlyArray<GuardDescriptor<TServices, unknown>>;
+  params?: StandardSchema<any, any>;
+  query?: StandardSchema<any, any>;
+  headers?: StandardSchema<any, any>;
+  body?: StandardSchema<any, any>;
 };
 
-const ROUTE_KEYS = new Set(["handler", "before"]);
+const ROUTE_KEYS = new Set(["handler", "before", "params", "query", "headers", "body"]);
 
 export function route<TServices, TContext>(
   config: RouteConfig<TServices, TContext>,
@@ -25,7 +30,9 @@ export function route<TServices, TContext>(
   }
   for (const key of Object.keys(config)) {
     if (!ROUTE_KEYS.has(key)) {
-      throw new Error(`route(): unknown config key '${key}' (allowed: handler, before)`);
+      throw new Error(
+        `route(): unknown config key '${key}' (allowed: handler, before, params, query, headers, body)`,
+      );
     }
   }
   if (typeof config.handler !== "function") {
@@ -39,5 +46,15 @@ export function route<TServices, TContext>(
       }
     }
   }
-  return brand(Object.freeze({ handler: config.handler, before: config.before ?? [] }), "RouteDescriptor");
+  return brand(
+    Object.freeze({
+      handler: config.handler,
+      before: config.before ?? [],
+      params: config.params,
+      query: config.query,
+      headers: config.headers,
+      body: config.body,
+    }),
+    "RouteDescriptor",
+  );
 }
