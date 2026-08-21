@@ -8,6 +8,7 @@
 import { brand } from "../internal/brands";
 import { compose, type Composition } from "../internal/compose";
 import type { LugasApp, ModuleDescriptor } from "./types";
+import { serveApp } from "../internal/serve";
 
 export type AppConfig<TServices> = {
   services?: TServices;
@@ -27,6 +28,7 @@ export type AppInternals<TServices = unknown> = {
 
 export type LugasAppInstance<TServices = unknown> = LugasApp<TServices> & {
   readonly manifest: AppInternals<TServices>["manifest"];
+  readonly serve: (options?: import("../internal/serve").SafeServeOptions) => Bun.Server<unknown>;
 };
 
 export function defineApp<TServices>(config: AppConfig<TServices>): LugasAppInstance<TServices> {
@@ -65,6 +67,7 @@ export function defineApp<TServices>(config: AppConfig<TServices>): LugasAppInst
       config,
       composition,
       manifest,
+      serve: (options?: import("../internal/serve").SafeServeOptions) => serveApp(config, options),
     }),
     "LugasApp",
   ) as unknown as LugasAppInstance<TServices>;
