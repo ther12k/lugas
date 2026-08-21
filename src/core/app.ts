@@ -1,0 +1,71 @@
+/**
+ * `defineApp()` validation and composition shell (M1-007).
+ *
+ * Validates configuration, composes routes/modules into internal state, and
+ * exposes a placeholder truthful manifest. Serving is implemented by M1-015;
+ * this shell never starts a server.
+ */
+import { brand } from "../internal/brands";
+import { compose, type Composition } from "../internal/compose";
+import type { LugasApp, ModuleDescriptor } from "./types";
+
+export type AppConfig<TServices> = {
+  services?: TServices;
+  routes?: Readonly<Record<string, unknown>>;
+  modules?: ReadonlyArray<ModuleDescriptor<TServices>>;
+  notFound?: (request: Request) => Response | Promise<Response>;
+  onError?: (error: unknown, request: Request) => Response | Promise<Response>;
+};
+
+const APP_KEYS = new Set(["services", "routes", "modules", "notFound", "onError"]);
+
+export type AppInternals<TServices = unknown> = {
+  readonly config: AppConfig<TServices>;
+  readonly composition: Composition;
+  readonly manifest: Readonly<{ modules: ReadonlyArray<string>; routeCount: number }>;
+};
+
+export type LugasAppInstance<TServices = unknown> = LugasApp<TServices> & {
+  readonly manifest: AppInternals<TServices>["manifest"];
+};
+
+export function defineApp<TServices>(config: AppConfig<TServices>): LugasAppInstance<TServices> {
+  if (typeof config !== "object" || config === null) {
+    throw new Error("defineApp(): config must be an object");
+  }
+  for (const key of Object.keys(config)) {
+    if (!APP_KEYS.has(key)) {
+      throw new Error(`defineApp(): unknown config key '${key}' (allowed: services, routes, modules, notFound, onError)`);
+    }
+  }
+  if (config.modules !== undefined) {
+    if (!Array.isArray(config.modules)) throw new Error("defineApp(): 'modules' must be an array");
+    const names = new Set<string>();
+    for (const module_ of config.modules) {
+      if (typeof module_ !== "object" || module_ === null || typeof (module_ as ModuleDescriptor<TServices>).name !== "string") {
+        throw new Error("defineApp(): 'modules' entries must be defineModule() descriptors");
+      }
+      if (names.has(module_.name)) {
+        throw new Error(`defineApp(): duplicate module name '${module_.name}'`);
+      }
+      names.add(module_.name);
+    }
+  }
+  if (config.routes !== undefined && (typeof config.routes !== "object" || config.routes === null)) {
+    throw new Error("defineApp(): 'routes' must be an object keyed by full path");
+  }
+  const composition = compose({
+    routes: config.routes,
+    modules: (config.modules ?? []) as ReadonlyArray<ModuleDescriptor<never>>,
+  });
+  const manifest = Object.freeze({ modules: composition.moduleNames, routeCount: composition.routes.length });
+  return brand(
+    Object.freeze({
+      services: config.services as TServices,
+      config,
+      composition,
+      manifest,
+    }),
+    "LugasApp",
+  ) as unknown as LugasAppInstance<TServices>;
+}
