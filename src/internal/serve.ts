@@ -13,6 +13,25 @@ export function serveApp<TServices>(config: AppConfig<TServices>, options: SafeS
   }
   const compiled: Record<string, unknown> = {};
   for (const [path, entry] of Object.entries(routeEntries)) {
+    // Bun method maps may contain Lugas descriptors per method. Compile only
+    // those values; preserve native method values exactly.
+    if (typeof entry === "object" && entry !== null && !(entry instanceof Response) && !(entry instanceof Blob) && !('handler' in entry) && !('dir' in entry)) {
+      const methodMap: Record<string, unknown> = {};
+      for (const [method, value] of Object.entries(entry as Record<string, unknown>)) {
+        const methodKind = classifyRoute(value);
+        if (methodKind.kind === "lugas-descriptor") {
+          const routeId = `${method} ${path}`;
+          methodMap[method] = withErrorPolicy(compileRoute(routeId, methodKind.descriptor, config.services).handler, config.onError ?? defaultOnError, routeId);
+        } else if (methodKind.kind === "unsupported") {
+          throw new Error(`unsupported route entry at ${method} ${path}`);
+        } else if (methodKind.kind === "native-response") methodMap[method] = methodKind.response;
+        else if (methodKind.kind === "native-file") methodMap[method] = methodKind.file;
+        else if (methodKind.kind === "native-dir") methodMap[method] = { dir: methodKind.path };
+        else methodMap[method] = methodKind.map;
+      }
+      compiled[path] = methodMap;
+      continue;
+    }
     const kind = classifyRoute(entry);
     if (kind.kind === "lugas-descriptor") {
       const routeId = `* ${path}`;
