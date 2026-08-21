@@ -42,6 +42,7 @@ export type RouteHandler<TServices = unknown, TContext = unknown> = (context: {
 export type RouteDescriptor<TServices = unknown, TContext = unknown> = Branded<
   {
     readonly handler: RouteHandler<TServices, TContext>;
+    readonly before: ReadonlyArray<GuardDescriptor<TServices, unknown>>;
   },
   "RouteDescriptor"
 >;
