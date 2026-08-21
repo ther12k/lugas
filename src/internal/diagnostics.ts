@@ -24,3 +24,7 @@ export function unsupportedRoute(path: string, owner: string): LugasDiagnostic {
     message: `unsupported route entry at ${path} (owner ${owner})`,
   };
 }
+
+export function pathInvalid(path: string, reason: string): LugasDiagnostic {
+  return { code: "PATH_INVALID", message: `invalid path ${JSON.stringify(path)}: ${reason}` };
+}
