@@ -21,3 +21,10 @@
 - M0-001 through M0-011 merged with evidence; clean checkout verification passed (`bun run verify`: typecheck, 29 tests, OKF validator, diff hygiene).
 - M0-009 recommends stateless bound type definitions with explicit generic escape hatch for M1.
 - M1 implementation is authorized; owner-blocked package/license/publication decisions remain unchanged.
+
+
+## 2026-08-21 — M1 gate passed locally
+
+- M1-001 through M1-018 merged with evidence; local clean verification: 111 tests pass, 1 documented Bun leak characterization skip, 0 failures, typecheck/docs/diff pass.
+- M1 conformance exposed and corrected nested descriptor compilation in native method maps (c206180).
+- M2 implementation is authorized after gate merge; GitHub Actions remains blocked by account billing/spending-limit condition.
