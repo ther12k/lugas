@@ -35,18 +35,24 @@ export type GuardDescriptor<TServices = unknown, Enrichment = unknown> = Branded
 >;
 
 export type ExtractGuardEnrichment<TGuard> = TGuard extends GuardDescriptor<any, infer E>
-  ? (E extends Response ? {} : (E extends Promise<infer P> ? (P extends Response ? {} : P) : E))
-  : {};
+  ? (E extends Response
+      ? never
+      : (E extends Promise<infer P>
+          ? (P extends Response ? never : P)
+          : E))
+  : never;
 
 export type MergeGuardEnrichments<TGuards extends ReadonlyArray<unknown>> = TGuards extends readonly [
   infer Head,
   ...infer Tail
 ]
   ? Tail extends readonly []
-    ? ExtractGuardEnrichment<Head>
-    : ExtractGuardEnrichment<Head> & MergeGuardEnrichments<Tail>
+    ? ([ExtractGuardEnrichment<Head>] extends [never] ? {} : ExtractGuardEnrichment<Head>)
+    : ([ExtractGuardEnrichment<Head>] extends [never]
+        ? MergeGuardEnrichments<Tail>
+        : ExtractGuardEnrichment<Head> & MergeGuardEnrichments<Tail>)
   : TGuards extends ReadonlyArray<infer Item>
-  ? ExtractGuardEnrichment<Item>
+  ? ([ExtractGuardEnrichment<Item>] extends [never] ? {} : ExtractGuardEnrichment<Item>)
   : {};
 
 export type ExtractGuardResponse<TGuard> = TGuard extends GuardDescriptor<any, infer E>
