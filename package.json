@@ -19,8 +19,11 @@
     "verify": "bun run scripts/verify.ts"
   },
   "devDependencies": {
+    "@standard-schema/spec": "^1.1.0",
     "@types/bun": "1.4.0",
     "elysia": "2.0.0-beta.6",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "valibot": "^1.4.2",
+    "zod": "^4.4.3"
   }
 }
