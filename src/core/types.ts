@@ -26,10 +26,14 @@ export type GuardHandler<TServices, Enrichment> = (context: {
   readonly [key: string]: unknown;
 }) => GuardResult<Enrichment>;
 
-export type GuardDescriptor<TServices = unknown, Enrichment = unknown> = Branded<
+export type GuardDescriptor<TServices = unknown, TResult = unknown> = Branded<
   {
     readonly name: string;
-    readonly handler: GuardHandler<TServices, Enrichment>;
+    readonly handler: (context: {
+      readonly request: Request;
+      readonly services: TServices;
+      readonly [key: string]: unknown;
+    }) => TResult;
   },
   "GuardDescriptor"
 >;
@@ -98,7 +102,7 @@ export type RouteHandler<TServices = unknown, TContext = unknown> = (context: {
   readonly request: Request;
   readonly services: TServices;
   readonly params: Record<string, string>;
-} & TContext) => Response | TypedResponse | Promise<Response | TypedResponse>;
+} & TContext) => Response | Promise<Response>;
 
 export type RouteDescriptor<
   TServices = unknown,
@@ -107,10 +111,16 @@ export type RouteDescriptor<
   TQuery = unknown,
   THeaders = unknown,
   TBody = unknown,
+  TReturn = Response | Promise<Response>,
+  TGuards extends ReadonlyArray<GuardDescriptor<any, any>> = ReadonlyArray<GuardDescriptor<unknown, unknown>>,
 > = Branded<
   {
-    readonly handler: RouteHandler<TServices, TContext>;
-    readonly before: ReadonlyArray<GuardDescriptor<TServices, unknown>>;
+    readonly handler: (context: {
+      readonly request: Request;
+      readonly services: TServices;
+      readonly params: Record<string, string>;
+    } & TContext) => TReturn;
+    readonly before: TGuards;
     readonly params?: TParams | undefined;
     readonly query?: TQuery | undefined;
     readonly headers?: THeaders | undefined;

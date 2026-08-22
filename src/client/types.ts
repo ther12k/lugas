@@ -67,3 +67,22 @@ export type ClientCallInput<
 > = ClientInput<RouteEntryForMethod<TContract, TPath, TMethod>> & {
   readonly pathParams: PathParams<TPath>;
 };
+
+/**
+ * Status-discriminated client outcome for a single response (M3-003).
+ * Raw (unbranded) Responses widen conservarily to `{ status: number; body: unknown }`.
+ */
+export type ClientOutcome<TResponse> = TResponse extends import("../core/response").TypedResponse<
+  infer S extends number,
+  infer B
+>
+  ? { readonly status: S; readonly body: B }
+  : never;
+
+/**
+ * Full union of client outcomes for a route entry's responses (M3-003).
+ * Supports conditional handler returns and async handlers via `Awaited`.
+ */
+export type ClientOutcomes<TEntry> = TEntry extends { readonly responses: infer R }
+  ? ClientOutcome<Awaited<R>>
+  : never;
