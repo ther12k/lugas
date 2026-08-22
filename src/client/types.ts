@@ -86,3 +86,17 @@ export type ClientOutcome<TResponse> = TResponse extends import("../core/respons
 export type ClientOutcomes<TEntry> = TEntry extends { readonly responses: infer R }
   ? ClientOutcome<Awaited<R>>
   : never;
+
+/**
+ * Per-method/path client outcome union (M3-004).
+ *
+ * Merges ordered guard short-circuit responses with handler responses through
+ * the single indexed `RouteEntryForMethod` lookup, so guard statuses (e.g.
+ * 401/403) and handler statuses appear in one discriminated union without
+ * re-expanding the whole contract per client method.
+ */
+export type ClientOutcomesFor<
+  TContract,
+  TPath extends string,
+  TMethod extends HttpMethod,
+> = ClientOutcomes<RouteEntryForMethod<TContract, TPath, TMethod>>;
