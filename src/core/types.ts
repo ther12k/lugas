@@ -100,25 +100,44 @@ export type RouteHandler<TServices = unknown, TContext = unknown> = (context: {
   readonly params: Record<string, string>;
 } & TContext) => Response | TypedResponse | Promise<Response | TypedResponse>;
 
-export type RouteDescriptor<TServices = unknown, TContext = unknown> = Branded<
+export type RouteDescriptor<
+  TServices = unknown,
+  TContext = unknown,
+  TParams = unknown,
+  TQuery = unknown,
+  THeaders = unknown,
+  TBody = unknown,
+> = Branded<
   {
     readonly handler: RouteHandler<TServices, TContext>;
     readonly before: ReadonlyArray<GuardDescriptor<TServices, unknown>>;
+    readonly params?: TParams | undefined;
+    readonly query?: TQuery | undefined;
+    readonly headers?: THeaders | undefined;
+    readonly body?: TBody | undefined;
   },
   "RouteDescriptor"
 >;
 
-export type ModuleDescriptor<TServices = unknown> = Branded<
+export type MergeModulesRoutes<TModules extends ReadonlyArray<unknown>> = TModules extends readonly [
+  infer Head,
+  ...infer Tail
+]
+  ? (Head extends ModuleDescriptor<any, infer R> ? R : {}) & MergeModulesRoutes<Tail>
+  : {};
+
+export type ModuleDescriptor<TServices = unknown, TRoutes = unknown> = Branded<
   {
     readonly name: string;
-    readonly routes: Readonly<Record<string, unknown>>;
+    readonly routes: TRoutes;
   },
   "ModuleDescriptor"
 >;
 
-export type LugasApp<TServices = unknown> = Branded<
+export type LugasApp<TServices = unknown, TRoutes = unknown> = Branded<
   {
     readonly services: TServices;
+    readonly routes?: TRoutes;
   },
   "LugasApp"
 >;

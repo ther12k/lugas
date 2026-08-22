@@ -9,14 +9,17 @@
 import { brand } from "../internal/brands";
 import type { ModuleDescriptor } from "./types";
 
-export type ModuleConfig<TServices> = {
+export type ModuleConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = {
   name: string;
-  routes: Readonly<Record<string, unknown>>;
+  routes: TRoutes;
 };
 
 const MODULE_KEYS = new Set(["name", "routes"]);
 
-export function defineModule<TServices>(config: ModuleConfig<TServices>): ModuleDescriptor<TServices> {
+export function defineModule<
+  TServices = unknown,
+  const TRoutes extends Readonly<Record<string, unknown>> = Readonly<Record<string, unknown>>,
+>(config: ModuleConfig<TServices, TRoutes>): ModuleDescriptor<TServices, TRoutes> {
   if (typeof config !== "object" || config === null) {
     throw new Error("defineModule(): config must be an object");
   }

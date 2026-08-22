@@ -11,20 +11,34 @@ import { brand } from "../internal/brands";
 import type { StandardSchema } from "../internal/standard-schema";
 import type { GuardDescriptor, RouteDescriptor, RouteHandler } from "./types";
 
-export type RouteConfig<TServices, TContext> = {
+export type RouteConfig<
+  TServices = unknown,
+  TContext = unknown,
+  TParams = unknown,
+  TQuery = unknown,
+  THeaders = unknown,
+  TBody = unknown,
+> = {
   handler: RouteHandler<TServices, TContext>;
   before?: ReadonlyArray<GuardDescriptor<TServices, unknown>>;
-  params?: StandardSchema<any, any>;
-  query?: StandardSchema<any, any>;
-  headers?: StandardSchema<any, any>;
-  body?: StandardSchema<any, any>;
+  params?: TParams;
+  query?: TQuery;
+  headers?: THeaders;
+  body?: TBody;
 };
 
 const ROUTE_KEYS = new Set(["handler", "before", "params", "query", "headers", "body"]);
 
-export function route<TServices, TContext>(
-  config: RouteConfig<TServices, TContext>,
-): RouteDescriptor<TServices, TContext> {
+export function route<
+  TServices = unknown,
+  TContext = unknown,
+  const TParams = undefined,
+  const TQuery = undefined,
+  const THeaders = undefined,
+  const TBody = undefined,
+>(
+  config: RouteConfig<TServices, TContext, TParams, TQuery, THeaders, TBody>,
+): RouteDescriptor<TServices, TContext, TParams, TQuery, THeaders, TBody> {
   if (typeof config !== "object" || config === null) {
     throw new Error("route(): config must be an object");
   }
