@@ -18,9 +18,15 @@ export type RouteConfig<
   TQuery = unknown,
   THeaders = unknown,
   TBody = unknown,
+  TReturn = Response | Promise<Response>,
+  TGuards extends ReadonlyArray<GuardDescriptor<any, any>> = ReadonlyArray<GuardDescriptor<TServices, unknown>>,
 > = {
-  handler: RouteHandler<TServices, TContext>;
-  before?: ReadonlyArray<GuardDescriptor<TServices, unknown>>;
+  handler: (context: {
+    readonly request: Request;
+    readonly services: TServices;
+    readonly params: Record<string, string>;
+  } & TContext) => TReturn;
+  before?: TGuards;
   params?: TParams;
   query?: TQuery;
   headers?: THeaders;
@@ -36,9 +42,11 @@ export function route<
   const TQuery = undefined,
   const THeaders = undefined,
   const TBody = undefined,
+  TReturn extends Response | Promise<Response> = Response | Promise<Response>,
+  TGuards extends ReadonlyArray<GuardDescriptor<any, any>> = readonly [],
 >(
-  config: RouteConfig<TServices, TContext, TParams, TQuery, THeaders, TBody>,
-): RouteDescriptor<TServices, TContext, TParams, TQuery, THeaders, TBody> {
+  config: RouteConfig<TServices, TContext, TParams, TQuery, THeaders, TBody, TReturn, TGuards>,
+): RouteDescriptor<TServices, TContext, TParams, TQuery, THeaders, TBody, TReturn, TGuards> {
   if (typeof config !== "object" || config === null) {
     throw new Error("route(): config must be an object");
   }
@@ -63,7 +71,7 @@ export function route<
   return brand(
     Object.freeze({
       handler: config.handler,
-      before: config.before ?? [],
+      before: (config.before ?? []) as TGuards,
       params: config.params,
       query: config.query,
       headers: config.headers,

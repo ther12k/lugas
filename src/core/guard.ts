@@ -11,16 +11,20 @@
 import { brand } from "../internal/brands";
 import type { GuardDescriptor, GuardHandler } from "./types";
 
-export type GuardConfig<TServices, Enrichment extends object> = {
+export type GuardConfig<TServices, TResult extends object> = {
   name: string;
-  handler: GuardHandler<TServices, Enrichment>;
+  handler: (context: {
+    readonly request: Request;
+    readonly services: TServices;
+    readonly [key: string]: unknown;
+  }) => TResult;
 };
 
 const GUARD_KEYS = new Set(["name", "handler"]);
 
-export function guard<TServices, Enrichment extends object>(
-  config: GuardConfig<TServices, Enrichment>,
-): GuardDescriptor<TServices, Enrichment> {
+export function guard<TServices, TResult extends object>(
+  config: GuardConfig<TServices, TResult>,
+): GuardDescriptor<TServices, TResult> {
   if (typeof config !== "object" || config === null) {
     throw new Error("guard(): config must be an object");
   }
