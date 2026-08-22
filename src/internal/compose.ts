@@ -60,7 +60,7 @@ export function compose(config: {
   }
   for (const module_ of config.modules ?? []) {
     moduleNames.push(module_.name);
-    for (const [path, entry] of Object.entries(module_.routes)) {
+    for (const [path, entry] of Object.entries((module_.routes ?? {}) as Record<string, unknown>)) {
       indexEntry(ownerLabel(module_.name), path, entry);
       routes.push({ owner: { module: module_.name, path }, entry });
     }

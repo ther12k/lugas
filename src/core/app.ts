@@ -7,13 +7,13 @@
  */
 import { brand } from "../internal/brands";
 import { compose, type Composition } from "../internal/compose";
-import type { LugasApp, ModuleDescriptor } from "./types";
+import type { LugasApp, MergeModulesRoutes, ModuleDescriptor } from "./types";
 import { serveApp } from "../internal/serve";
 
-export type AppConfig<TServices> = {
+export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = {
   services?: TServices;
-  routes?: Readonly<Record<string, unknown>>;
-  modules?: ReadonlyArray<ModuleDescriptor<TServices>>;
+  routes?: TRoutes;
+  modules?: ReadonlyArray<ModuleDescriptor<TServices, any>>;
   notFound?: (request: Request) => Response | Promise<Response>;
   onError?: (error: unknown, request: Request) => Response | Promise<Response>;
 };
@@ -21,17 +21,23 @@ export type AppConfig<TServices> = {
 const APP_KEYS = new Set(["services", "routes", "modules", "notFound", "onError"]);
 
 export type AppInternals<TServices = unknown> = {
-  readonly config: AppConfig<TServices>;
+  readonly config: AppConfig<TServices, any>;
   readonly composition: Composition;
   readonly manifest: Readonly<{ modules: ReadonlyArray<string>; routeCount: number }>;
 };
 
-export type LugasAppInstance<TServices = unknown> = LugasApp<TServices> & {
+export type LugasAppInstance<TServices = unknown, TRoutes = unknown> = LugasApp<TServices, TRoutes> & {
   readonly manifest: AppInternals<TServices>["manifest"];
   readonly serve: (options?: import("../internal/serve").SafeServeOptions) => Bun.Server<unknown>;
 };
 
-export function defineApp<TServices>(config: AppConfig<TServices>): LugasAppInstance<TServices> {
+export function defineApp<
+  TServices = unknown,
+  const TRoutes extends Readonly<Record<string, unknown>> = Readonly<Record<string, unknown>>,
+  const TModules extends ReadonlyArray<ModuleDescriptor<TServices, any>> = readonly [],
+>(
+  config: AppConfig<TServices, TRoutes> & { readonly modules?: TModules },
+): LugasAppInstance<TServices, TRoutes & MergeModulesRoutes<TModules>> {
   if (typeof config !== "object" || config === null) {
     throw new Error("defineApp(): config must be an object");
   }
@@ -70,5 +76,5 @@ export function defineApp<TServices>(config: AppConfig<TServices>): LugasAppInst
       serve: (options?: import("../internal/serve").SafeServeOptions) => serveApp(config, options),
     }),
     "LugasApp",
-  ) as unknown as LugasAppInstance<TServices>;
+  ) as unknown as LugasAppInstance<TServices, TRoutes & MergeModulesRoutes<TModules>>;
 }
