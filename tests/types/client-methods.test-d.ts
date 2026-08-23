@@ -47,9 +47,18 @@ type _t6 = Expect<Equal<HeadPaths, "/any">>;
 type OptionsPaths = Parameters<Client["options"]>[0];
 type _t7 = Expect<Equal<OptionsPaths, "/any">>;
 
-// 2. Canonical methods resolve to a plain Response promise (parsing lands in M3-011).
+// 2. Canonical methods resolve to status-discriminated results (M3-011).
+//    Known 200 outcomes narrow to success with the declared payload; raw
+//    handler Responses stay open as either branch over `unknown`.
 type GetResult = Awaited<ReturnType<Client["get"]>>;
-type _t8 = Expect<Equal<GetResult, Response>>;
+type _t8 = Expect<
+  Equal<
+    GetResult,
+    | { readonly ok: true; readonly status: 200; readonly data: { ok: boolean }; readonly response: Response }
+    | { readonly ok: true; readonly status: number; readonly data: unknown; readonly response: Response }
+    | { readonly ok: false; readonly status: number; readonly error: unknown; readonly response: Response }
+  >
+>;
 
 // 3. Escape hatch accepts any supported uppercase verb with any path.
 type RequestParams = Parameters<Client["request"]>;

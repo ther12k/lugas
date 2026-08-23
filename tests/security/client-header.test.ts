@@ -92,7 +92,7 @@ describe("client header security", () => {
         body: { name: "Ada", tags: ["admin", "dev"] },
       });
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ name: "Ada", tags: ["admin", "dev"] });
+      expect(res.data).toEqual({ name: "Ada", tags: ["admin", "dev"] });
     } finally {
       server.stop(true);
     }
