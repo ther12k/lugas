@@ -17,10 +17,10 @@
  * Bodies are always read from a `Response.clone()` so the returned
  * `response` keeps a readable, header-complete body after parsing.
  *
- * Decode-failure semantics (throw vs result for malformed declared JSON)
- * are frozen by M3-012; the interim policy records them as `undefined`
- * payload with the original response attached.
+ * Frozen decode policy (M3-012): a recognized JSON body that fails to parse
+ * throws `ClientDecodeError` with the original response attached.
  */
+import { ClientDecodeError } from "./errors";
 
 export type ClientSuccess<TStatus extends number, TData> = {
   readonly ok: true;
@@ -61,8 +61,10 @@ async function readBody(response: Response): Promise<unknown> {
   if (isJsonMedia(mediaType)) {
     try {
       return await response.clone().json();
-    } catch {
-      return undefined;
+    } catch (cause) {
+      // Frozen M3-012 policy: malformed declared JSON throws ClientDecodeError
+      // with the original response attached; body content stays out of messages.
+      throw new ClientDecodeError(response, cause);
     }
   }
   if (mediaType.startsWith("text/")) {
