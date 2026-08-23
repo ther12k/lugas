@@ -1,6 +1,6 @@
 /**
- * `createClient()` base configuration, fetch injection, and explicit typed
- * HTTP methods (M3-006, M3-007).
+ * `createClient()` base configuration, fetch injection, explicit typed HTTP
+ * methods, and path-parameter interpolation (M3-006–M3-008).
  *
  * Runtime is platform-neutral: no Bun globals, no Proxy. The application type
  * parameter exists only at compile time and is fully erased — the client stores
@@ -11,6 +11,8 @@
  */
 import type { HttpMethod } from "../core/types";
 import type { ClientMethod, ClientRequestEscapeHatch } from "./types";
+import type { ClientPathParams } from "./path";
+import { interpolatePath } from "./path";
 
 export type ClientFetch = typeof fetch;
 
@@ -101,25 +103,28 @@ export function createClient<API = unknown>(config: ClientConfig): LugasClient<A
   const baseUrl = normalizeBaseUrl(config.baseUrl);
   const transport: ClientFetch =
     config.fetch ?? (globalThis.fetch.bind(globalThis) as ClientFetch);
-  const send = (method: HttpMethod, path: string): Promise<Response> =>
-    transport(joinUrl(baseUrl, path), { method });
+  const send = (
+    method: HttpMethod,
+    path: string,
+    params?: ClientPathParams,
+  ): Promise<Response> => transport(joinUrl(baseUrl, interpolatePath(path, params)), { method });
   return Object.freeze({
     baseUrl,
     fetch: transport,
-    get: (path) => send("GET", path),
-    post: (path) => send("POST", path),
-    put: (path) => send("PUT", path),
-    patch: (path) => send("PATCH", path),
-    delete: (path) => send("DELETE", path),
-    head: (path) => send("HEAD", path),
-    options: (path) => send("OPTIONS", path),
+    get: (path, input) => send("GET", path, input?.params),
+    post: (path, input) => send("POST", path, input?.params),
+    put: (path, input) => send("PUT", path, input?.params),
+    patch: (path, input) => send("PATCH", path, input?.params),
+    delete: (path, input) => send("DELETE", path, input?.params),
+    head: (path, input) => send("HEAD", path, input?.params),
+    options: (path, input) => send("OPTIONS", path, input?.params),
     request: (method, path) => {
       if (!(CLIENT_HTTP_METHODS as readonly string[]).includes(method)) {
         throw new Error(
           `${DIAGNOSTIC_PREFIX} unsupported request method ${JSON.stringify(String(method))}; expected one of ${CLIENT_HTTP_METHODS.join(", ")}`,
         );
       }
-      return send(method, path);
+      return transport(joinUrl(baseUrl, path), { method });
     },
   });
 }
