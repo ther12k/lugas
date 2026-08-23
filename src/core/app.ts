@@ -1,14 +1,16 @@
 /**
- * `defineApp()` validation and composition shell (M1-007).
+ * `defineApp()` validation and composition shell (M1-007, M4R1-001).
  *
  * Validates configuration, composes routes/modules into internal state, and
- * exposes a placeholder truthful manifest. Serving is implemented by M1-015;
- * this shell never starts a server.
+ * exposes a truthful frozen manifest. The canonical PreparedApp graph is
+ * snapshotted, classified, and compiled exactly once here; serving consumes
+ * only that graph and never re-reads user configuration.
  */
 import { diagnostic } from "../internal/diagnostics";
 import { brand } from "../internal/brands";
 import { compose, type Composition } from "../internal/compose";
 import { buildManifest, type LugasManifestV1 } from "../internal/manifest";
+import { prepareApp, type PreparedApp } from "../internal/prepared-app";
 import type { LugasApp, MergeModulesRoutes, ModuleDescriptor } from "./types";
 import { serveApp } from "../internal/serve";
 
@@ -23,10 +25,11 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
 const APP_KEYS = new Set(["services", "routes", "modules", "notFound", "onError"]);
 
 export type AppInternals<TServices = unknown> = {
-  readonly config: AppConfig<TServices, any>;
   readonly composition: Composition;
   /** Frozen runtime-truth manifest (lugas-manifest-v1) — reading starts no server. */
   readonly manifest: LugasManifestV1;
+  /** Canonical prepared graph — the only input `serveApp()` consumes. */
+  readonly prepared: PreparedApp;
 };
 
 export type LugasAppInstance<TServices = unknown, TRoutes = unknown> = LugasApp<TServices, TRoutes> & {
@@ -72,13 +75,22 @@ export function defineApp<
     modules: (config.modules ?? []) as ReadonlyArray<ModuleDescriptor<never>>,
   });
   const manifest = buildManifest(composition);
+  // Snapshot + classify + compile exactly once. Services stay live references;
+  // routing structure is captured here and never re-read at serve time.
+  const prepared = prepareApp({
+    routes: config.routes,
+    modules: config.modules as ReadonlyArray<ModuleDescriptor<TServices, any>> | undefined,
+    services: config.services as TServices,
+    notFound: config.notFound,
+    onError: config.onError,
+  });
   return brand(
     Object.freeze({
       services: config.services as TServices,
-      config,
       composition,
       manifest,
-      serve: (options?: import("../internal/serve").SafeServeOptions) => serveApp(config, options),
+      prepared,
+      serve: (options?: import("../internal/serve").SafeServeOptions) => serveApp(prepared, options),
     }),
     "LugasApp",
   ) as unknown as LugasAppInstance<TServices, TRoutes & MergeModulesRoutes<TModules>>;

@@ -41,8 +41,8 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_GUARD_003 | guard() | 'name' must be a non-empty string | guard names appear in manifests; use stable names |
 | LUGAS_GUARD_004 | guard() | 'handler' must be a function | return Response to short-circuit or enrichment object |
 | LUGAS_ROUTES_001 | compose() | duplicate route across owners | remove one declaration; both owners named in message |
-| LUGAS_ROUTES_002 | serve pipeline | unsupported entry under method key | use route(), native Response, functions, or {dir} |
-| LUGAS_ROUTES_003 | serve pipeline | unsupported route entry shape | same shapes as LUGAS_ROUTES_002 |
+| LUGAS_ROUTES_002 | defineApp() | unsupported entry under method key | use route(), native Response, functions, or {dir} |
+| LUGAS_ROUTES_003 | defineApp() | unsupported route entry shape | same shapes as LUGAS_ROUTES_002 |
 | LUGAS_ROUTES_004 | path analysis | invalid route path | paths start with '/' and follow Bun syntax |
 
 ## Compatibility
