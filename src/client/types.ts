@@ -164,11 +164,36 @@ export type MethodCallInput<TContract, TPath extends string, TMethod extends Htt
     MethodBodyInput<TContract, TPath, TMethod> &
     MethodPlatformInit;
 
+/** True when the path declares at least one `:param` segment. */
+type HasParams<TPath extends string> = keyof PathParams<TPath> extends never ? false : true;
+
+type QueryRequired<C, P extends string, M extends HttpMethod> = MethodQueryInput<C, P, M> extends { readonly query?: undefined } ? false : true;
+type HeadersRequired<C, P extends string, M extends HttpMethod> = MethodHeadersInput<C, P, M> extends { readonly headers?: undefined } ? false : true;
+type BodyRequired<C, P extends string, M extends HttpMethod> = MethodBodyInput<C, P, M> extends { readonly body?: undefined } ? false : true;
+
+/**
+ * Whether a route requires a structured input object: any declared
+ * params/query/headers/body slot makes the whole input argument required.
+ */
+export type RequiresInput<TContract, TPath extends string, TMethod extends HttpMethod> =
+  HasParams<TPath> extends true
+    ? true
+    : [QueryRequired<TContract, TPath, TMethod>, HeadersRequired<TContract, TPath, TMethod>, BodyRequired<TContract, TPath, TMethod>] extends [false, false, false]
+    ? false
+    : true;
+
 export type ClientMethod<TContract, TMethod extends HttpMethod> = <
   TPath extends PathsForMethod<TContract, TMethod>,
 >(
-  path: TPath,
-  input?: MethodCallInput<TContract, TPath, TMethod>,
+  ...args: RequiresInput<TContract, TPath, TMethod> extends true
+    ? [
+        path: TPath,
+        input: MethodCallInput<TContract, TPath, TMethod>,
+      ]
+    : [
+        path: TPath,
+        input?: MethodCallInput<TContract, TPath, TMethod>,
+      ]
 ) => Promise<ClientCallResult<TContract, TPath, TMethod>>;
 
 /**

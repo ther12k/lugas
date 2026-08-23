@@ -15,11 +15,11 @@
  *   fails with a stable diagnostic (mirrors M2-007's media-type policy).
  * - `signal`, `credentials`, `redirect`, `cache`, and every other non-owned
  *   platform option are forwarded unchanged.
- * - Absent (`undefined`) or `null` declared bodies send no body at all —
- *   never a synthetic JSON `"undefined"`.
- *
- * Diagnostics name headers but never include header values, so
- * authorization/cookie secrets cannot leak through error messages.
+ * - Body presence is distinct from body value (M4R1-006): an omitted key or
+ *   `undefined` sends no body at all — never a synthetic JSON `"undefined"` —
+ *   while an explicit `null` serializes as literal JSON `null`.
+ * - Diagnostics name headers but never include header values, so
+ *   authorization/cookie secrets cannot leak through error messages.
  */
 
 import type { HttpMethod } from "../core/types";
@@ -50,7 +50,7 @@ export type BuildRequestOptions = {
   readonly method: HttpMethod;
   /** Structured headers; override platform-option headers per key. */
   readonly headers?: unknown;
-  /** Declared JSON body; `undefined`/`null` means no body. */
+  /** Declared JSON body; `undefined` (or omitted) means no body, `null` is JSON null. */
   readonly body?: unknown;
   /** Platform options minus method/body/headers; forwarded verbatim. */
   readonly init?: unknown;
@@ -143,7 +143,7 @@ export function buildRequestInit(options: BuildRequestOptions): BuiltRequest {
   const headers = new Headers();
   applyHeaderEntries(headers, options.headers, "typed header");
 
-  const hasDeclaredBody = options.body !== undefined && options.body !== null;
+  const hasDeclaredBody = options.body !== undefined;
   let body: string | undefined;
   if (hasDeclaredBody) {
     const callerContentType = headers.get("content-type");

@@ -52,10 +52,21 @@ function isJsonMedia(mediaType: string): boolean {
 }
 
 /** Reads one body according to the media-type policy without consuming the original. */
-async function readBody(response: Response): Promise<unknown> {
+async function readBody(
+  response: Response,
+  options: { readonly method?: string },
+): Promise<unknown> {
   const contentType = response.headers.get("content-type");
   const mediaType = contentType?.split(";")[0]?.trim().toLowerCase();
-  if (mediaType === undefined || mediaType === "" || BODILESS_STATUSES.has(response.status)) {
+  // Bodiless by HTTP semantics: declared statuses, null-body responses, and
+  // HEAD exchanges regardless of content-type (M4R1-006).
+  if (
+    mediaType === undefined ||
+    mediaType === "" ||
+    response.body === null ||
+    options.method?.toUpperCase() === "HEAD" ||
+    BODILESS_STATUSES.has(response.status)
+  ) {
     return undefined;
   }
   if (isJsonMedia(mediaType)) {
@@ -77,11 +88,16 @@ async function readBody(response: Response): Promise<unknown> {
  * Parses one response into a discriminated result keyed by the actual
  * status. Never throws for HTTP outcomes; network/transport failures are
  * untouched fetch behavior (M3-013).
+ *
+ * `options.method` enables HTTP-semantics awareness (M4R1-006): HEAD
+ * responses carry headers only, so any content-type with an empty or absent
+ * body is normal and never raises a decode error.
  */
 export async function parseResponse(
   response: Response,
+  options: { readonly method?: string } = {},
 ): Promise<ClientResult<number, unknown>> {
-  const body = await readBody(response);
+  const body = await readBody(response, options);
   if (response.ok) {
     return {
       ok: true,

@@ -137,20 +137,32 @@ export function createClient<API = unknown>(config: ClientConfig): LugasClient<A
     });
     const parse = async () => {
       const response: Response = await transport(target, built.init);
-      return parseResponse(response);
+      return parseResponse(response, { method });
     };
     return parse() as Promise<TResult>;
   };
+  /**
+   * Builds one typed method function. The internal implementation accepts
+   * `(path, input?)` loosely; the public `ClientMethod` conditional-tuple
+   * signature cannot be satisfied by a concrete arrow without an assertion,
+   * because generic deferred variadic tuples are not forwardable. This is a
+   * single documented assertion point; all compile-time enforcement happens
+   * in the declared `LugasClient` types.
+   */
+  const methodFn = <M extends HttpMethod>(httpMethod: M): ClientMethod<API, Extract<M, HttpMethod>> =>
+    ((path: string, input?: unknown) =>
+      send(httpMethod, path, input)) as unknown as ClientMethod<API, Extract<M, HttpMethod>>;
+
   return Object.freeze({
     baseUrl,
     fetch: transport,
-    get: (path, input) => send("GET", path, input),
-    post: (path, input) => send("POST", path, input),
-    put: (path, input) => send("PUT", path, input),
-    patch: (path, input) => send("PATCH", path, input),
-    delete: (path, input) => send("DELETE", path, input),
-    head: (path, input) => send("HEAD", path, input),
-    options: (path, input) => send("OPTIONS", path, input),
+    get: methodFn("GET"),
+    post: methodFn("POST"),
+    put: methodFn("PUT"),
+    patch: methodFn("PATCH"),
+    delete: methodFn("DELETE"),
+    head: methodFn("HEAD"),
+    options: methodFn("OPTIONS"),
     request: (method, path) => {
       if (!(CLIENT_HTTP_METHODS as readonly string[]).includes(method)) {
         throw new Error(
