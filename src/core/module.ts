@@ -6,6 +6,7 @@
  * exactly as declared — Lugas descriptors and native Bun values alike — so
  * compilation (M1-008/M1-009) sees the original objects.
  */
+import { diagnostic } from "../internal/diagnostics";
 import { brand } from "../internal/brands";
 import type { ModuleDescriptor } from "./types";
 
@@ -21,18 +22,18 @@ export function defineModule<
   const TRoutes extends Readonly<Record<string, unknown>> = Readonly<Record<string, unknown>>,
 >(config: ModuleConfig<TServices, TRoutes>): ModuleDescriptor<TServices, TRoutes> {
   if (typeof config !== "object" || config === null) {
-    throw new Error("defineModule(): config must be an object");
+    throw diagnostic("LUGAS_MODULE_001", "defineModule(): config must be an object", { hint: "pass defineModule({ name, routes })" });
   }
   for (const key of Object.keys(config)) {
     if (!MODULE_KEYS.has(key)) {
-      throw new Error(`defineModule(): unknown config key '${key}' (allowed: name, routes)`);
+      throw diagnostic("LUGAS_MODULE_002", `defineModule(): unknown config key '${key}'`, { hint: "allowed keys: name, routes", context: { key } });
     }
   }
   if (typeof config.name !== "string" || config.name.trim() === "") {
-    throw new Error("defineModule(): 'name' must be a non-empty string");
+    throw diagnostic("LUGAS_MODULE_003", "defineModule(): 'name' must be a non-empty string", { hint: "module names appear in manifests; use stable names" });
   }
   if (typeof config.routes !== "object" || config.routes === null || Array.isArray(config.routes)) {
-    throw new Error("defineModule(): 'routes' must be an object keyed by full path");
+    throw diagnostic("LUGAS_MODULE_004", "defineModule(): 'routes' must be an object keyed by full path", { hint: 'use string paths like "/invoices/:id"' });
   }
   const HTTP_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
   const seen = new Set<string>();
@@ -45,7 +46,7 @@ export function defineModule<
       if (!HTTP_METHODS.has(canonical)) continue; // non-method keys validated at composition
       const dedupe = `${canonical} ${path}`;
       if (seen.has(dedupe)) {
-        throw new Error(`defineModule(): duplicate route entry '${method} ${path}'`);
+        throw diagnostic("LUGAS_MODULE_005", `defineModule(): duplicate route entry '${method} ${path}'`, { hint: "each method+path may be declared once per module", context: { method, path } });
       }
       seen.add(dedupe);
     }

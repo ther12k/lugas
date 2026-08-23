@@ -1,4 +1,5 @@
 /** Native Bun server assembly for `app.serve()` (M1-015). */
+import { diagnostic } from "./diagnostics";
 import { classifyRoute } from "./classify-route";
 import { compileRoute } from "./compile-route";
 import { withErrorPolicy, defaultNotFound, defaultOnError } from "./error-policy";
@@ -23,7 +24,9 @@ export function serveApp<TServices>(config: AppConfig<TServices>, options: SafeS
           const routeId = `${method} ${path}`;
           methodMap[method] = withErrorPolicy(compileRoute(routeId, methodKind.descriptor, config.services).handler, config.onError ?? defaultOnError, routeId);
         } else if (methodKind.kind === "unsupported") {
-          throw new Error(`unsupported route entry at ${method} ${path}`);
+          throw diagnostic("LUGAS_ROUTES_002", `unsupported route entry at ${method} ${path}`, {
+            context: { method, path },
+          });
         } else if (methodKind.kind === "native-response") methodMap[method] = methodKind.response;
         else if (methodKind.kind === "native-file") methodMap[method] = methodKind.file;
         else if (methodKind.kind === "native-dir") methodMap[method] = { dir: methodKind.path };
@@ -38,7 +41,9 @@ export function serveApp<TServices>(config: AppConfig<TServices>, options: SafeS
       const handler = compileRoute(routeId, kind.descriptor, config.services).handler;
       compiled[path] = withErrorPolicy(handler, config.onError ?? defaultOnError, routeId);
     } else if (kind.kind === "unsupported") {
-      throw new Error(`unsupported route entry at ${path}`);
+      throw diagnostic("LUGAS_ROUTES_003", `unsupported route entry at ${path}`, {
+        context: { path },
+      });
     } else if (kind.kind === "native-response") {
       compiled[path] = kind.response;
     } else if (kind.kind === "native-file") {

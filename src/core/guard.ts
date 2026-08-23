@@ -8,6 +8,7 @@
  * primitive, which the handler return type rejects at compile time and the
  * executor rejects at runtime (M2-010).
  */
+import { diagnostic } from "../internal/diagnostics";
 import { brand } from "../internal/brands";
 import type { GuardDescriptor, GuardHandler } from "./types";
 
@@ -26,18 +27,18 @@ export function guard<TServices, TResult extends object>(
   config: GuardConfig<TServices, TResult>,
 ): GuardDescriptor<TServices, TResult> {
   if (typeof config !== "object" || config === null) {
-    throw new Error("guard(): config must be an object");
+    throw diagnostic("LUGAS_GUARD_001", "guard(): config must be an object", { hint: "pass guard({ name, handler })" });
   }
   for (const key of Object.keys(config)) {
     if (!GUARD_KEYS.has(key)) {
-      throw new Error(`guard(): unknown config key '${key}' (allowed: name, handler)`);
+      throw diagnostic("LUGAS_GUARD_002", `guard(): unknown config key '${key}'`, { hint: "allowed keys: name, handler", context: { key } });
     }
   }
   if (typeof config.name !== "string" || config.name.trim() === "") {
-    throw new Error("guard(): 'name' must be a non-empty string");
+    throw diagnostic("LUGAS_GUARD_003", "guard(): 'name' must be a non-empty string", { hint: "guard names appear in manifests; use stable names" });
   }
   if (typeof config.handler !== "function") {
-    throw new Error("guard(): 'handler' must be a function");
+    throw diagnostic("LUGAS_GUARD_004", "guard(): 'handler' must be a function", { hint: "return a Response to short-circuit or an enrichment object" });
   }
   return brand(Object.freeze({ name: config.name, handler: config.handler }), "GuardDescriptor");
 }

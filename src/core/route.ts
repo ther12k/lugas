@@ -7,6 +7,7 @@
  * silently). Accepts optional schemas (`params`, `query`, `headers`, `body`)
  * and ordered guard descriptors (`before`).
  */
+import { diagnostic } from "../internal/diagnostics";
 import { brand } from "../internal/brands";
 import type { StandardSchema } from "../internal/standard-schema";
 import type { GuardDescriptor, RouteDescriptor, RouteHandler } from "./types";
@@ -48,23 +49,24 @@ export function route<
   config: RouteConfig<TServices, TContext, TParams, TQuery, THeaders, TBody, TReturn, TGuards>,
 ): RouteDescriptor<TServices, TContext, TParams, TQuery, THeaders, TBody, TReturn, TGuards> {
   if (typeof config !== "object" || config === null) {
-    throw new Error("route(): config must be an object");
+    throw diagnostic("LUGAS_ROUTE_001", "route(): config must be an object", { hint: "pass route({ handler })" });
   }
   for (const key of Object.keys(config)) {
     if (!ROUTE_KEYS.has(key)) {
-      throw new Error(
-        `route(): unknown config key '${key}' (allowed: handler, before, params, query, headers, body)`,
-      );
+      throw diagnostic("LUGAS_ROUTE_002", `route(): unknown config key '${key}'`, {
+        hint: "allowed keys: handler, before, params, query, headers, body",
+        context: { key },
+      });
     }
   }
   if (typeof config.handler !== "function") {
-    throw new Error("route(): 'handler' must be a function");
+    throw diagnostic("LUGAS_ROUTE_003", "route(): 'handler' must be a function", { hint: "handler receives the validated context and returns a Response" });
   }
   if (config.before !== undefined) {
-    if (!Array.isArray(config.before)) throw new Error("route(): 'before' must be an array of guard descriptors");
+    if (!Array.isArray(config.before)) throw diagnostic("LUGAS_ROUTE_004", "route(): 'before' must be an array of guard descriptors", { hint: "list guards in execution order: before: [authGuard]" });
     for (const g of config.before) {
       if (typeof g !== "object" || g === null || typeof (g as GuardDescriptor).name !== "string") {
-        throw new Error("route(): 'before' entries must be guard() descriptors");
+        throw diagnostic("LUGAS_ROUTE_005", "route(): 'before' entries must be guard() descriptors", { hint: "create guards with guard({ name, handler })" });
       }
     }
   }
