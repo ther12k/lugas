@@ -31,7 +31,7 @@ export function compose(config: {
     const key = `${method} ${path}`;
     const prior = owned.get(key);
     if (prior !== undefined) {
-      throw new Error(duplicateRoute(method, path, prior, owner).message);
+      throw duplicateRoute(method, path, prior, owner);
     }
     owned.set(key, owner);
   };

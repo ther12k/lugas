@@ -14,7 +14,7 @@ export type PathAnalysis = {
 
 export function analyzePath(path: string): PathAnalysis | LugasDiagnostic {
   if (typeof path !== "string" || !path.startsWith("/")) {
-    return { code: "PATH_INVALID", message: `route path must start with '/': ${JSON.stringify(path)}` };
+    return { code: "LUGAS_ROUTES_004", message: `route path must start with '/': ${JSON.stringify(path)}` };
   }
   const segments = path.slice(1).split("/");
   const paramNames: string[] = [];
@@ -23,22 +23,22 @@ export function analyzePath(path: string): PathAnalysis | LugasDiagnostic {
     if (segment.startsWith(":")) {
       const name = segment.slice(1);
       if (name === "" || !/^[A-Za-z0-9_]+$/.test(name)) {
-        return { code: "PATH_INVALID", message: `invalid param token '${segment}' in path ${path}` };
+        return { code: "LUGAS_ROUTES_004", message: `invalid param token '${segment}' in path ${path}` };
       }
       if (paramNames.includes(name)) {
-        return { code: "PATH_INVALID", message: `duplicate param ':${name}' in path ${path}` };
+        return { code: "LUGAS_ROUTES_004", message: `duplicate param ':${name}' in path ${path}` };
       }
       paramNames.push(name);
       continue;
     }
     if (segment === "*") {
       if (i !== segments.length - 1) {
-        return { code: "PATH_INVALID", message: `wildcard '*' must be the final segment in path ${path}` };
+        return { code: "LUGAS_ROUTES_004", message: `wildcard '*' must be the final segment in path ${path}` };
       }
       continue;
     }
     if (segment.includes("*") || segment.startsWith(":")) {
-      return { code: "PATH_INVALID", message: `malformed segment '${segment}' in path ${path}` };
+      return { code: "LUGAS_ROUTES_004", message: `malformed segment '${segment}' in path ${path}` };
     }
   }
   return { paramNames };

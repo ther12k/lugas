@@ -5,6 +5,7 @@
  * exposes a placeholder truthful manifest. Serving is implemented by M1-015;
  * this shell never starts a server.
  */
+import { diagnostic } from "../internal/diagnostics";
 import { brand } from "../internal/brands";
 import { compose, type Composition } from "../internal/compose";
 import { buildManifest, type LugasManifestV1 } from "../internal/manifest";
@@ -41,28 +42,30 @@ export function defineApp<
   config: AppConfig<TServices, TRoutes> & { readonly modules?: TModules },
 ): LugasAppInstance<TServices, TRoutes & MergeModulesRoutes<TModules>> {
   if (typeof config !== "object" || config === null) {
-    throw new Error("defineApp(): config must be an object");
+    throw diagnostic("LUGAS_APP_001", "defineApp(): config must be an object", { hint: "pass defineApp({ routes }) with an object literal" });
   }
   for (const key of Object.keys(config)) {
     if (!APP_KEYS.has(key)) {
-      throw new Error(`defineApp(): unknown config key '${key}' (allowed: services, routes, modules, notFound, onError)`);
+      throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, notFound, onError", context: { key } });
     }
   }
   if (config.modules !== undefined) {
-    if (!Array.isArray(config.modules)) throw new Error("defineApp(): 'modules' must be an array");
+    if (!Array.isArray(config.modules)) throw diagnostic("LUGAS_APP_003", "defineApp(): 'modules' must be an array", { hint: "wrap modules: modules: [defineModule(...)]" });
     const names = new Set<string>();
     for (const module_ of config.modules) {
       if (typeof module_ !== "object" || module_ === null || typeof (module_ as ModuleDescriptor<TServices>).name !== "string") {
-        throw new Error("defineApp(): 'modules' entries must be defineModule() descriptors");
+        throw diagnostic("LUGAS_APP_004", "defineApp(): 'modules' entries must be defineModule() descriptors", {
+          hint: "create modules with defineModule({ name, routes })",
+        });
       }
       if (names.has(module_.name)) {
-        throw new Error(`defineApp(): duplicate module name '${module_.name}'`);
+        throw diagnostic("LUGAS_APP_005", `defineApp(): duplicate module name '${module_.name}'`, { hint: "module names must be unique within an app", context: { module: module_.name } });
       }
       names.add(module_.name);
     }
   }
   if (config.routes !== undefined && (typeof config.routes !== "object" || config.routes === null)) {
-    throw new Error("defineApp(): 'routes' must be an object keyed by full path");
+    throw diagnostic("LUGAS_APP_006", "defineApp(): 'routes' must be an object keyed by full path", { hint: 'use string paths like "/users/:id"' });
   }
   const composition = compose({
     routes: config.routes,
