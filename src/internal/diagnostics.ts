@@ -21,6 +21,7 @@ export type DiagnosticCode =
   | "LUGAS_MODULE_001" | "LUGAS_MODULE_002" | "LUGAS_MODULE_003" | "LUGAS_MODULE_004" | "LUGAS_MODULE_005"
   | "LUGAS_ROUTE_001" | "LUGAS_ROUTE_002" | "LUGAS_ROUTE_003" | "LUGAS_ROUTE_004" | "LUGAS_ROUTE_005"
   | "LUGAS_GUARD_001" | "LUGAS_GUARD_002" | "LUGAS_GUARD_003" | "LUGAS_GUARD_004"
+  | "LUGAS_GUARD_005" | "LUGAS_GUARD_006" | "LUGAS_GUARD_007"
   | "LUGAS_ROUTES_001" | "LUGAS_ROUTES_002" | "LUGAS_ROUTES_003" | "LUGAS_ROUTES_004"
   | "LUGAS_TEST_001";
 
@@ -69,6 +70,9 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_GUARD_002", thrownBy: "guard()", meaning: "unknown config key", hint: "allowed keys: name, handler" },
   { code: "LUGAS_GUARD_003", thrownBy: "guard()", meaning: "'name' must be a non-empty string", hint: "guard names appear in manifests; use stable names" },
   { code: "LUGAS_GUARD_004", thrownBy: "guard()", meaning: "'handler' must be a function", hint: "return a Response to short-circuit or an enrichment object" },
+  { code: "LUGAS_GUARD_005", thrownBy: "guard pipeline", meaning: "guard returned an invalid result shape", hint: "return Response to short-circuit, {} for no enrichment, or a plain object of context fields" },
+  { code: "LUGAS_GUARD_006", thrownBy: "guard pipeline", meaning: "guard enrichment overwrote a framework-owned context key", hint: "guards may add new context keys but never framework-owned ones" },
+  { code: "LUGAS_GUARD_007", thrownBy: "guard pipeline", meaning: "duplicate enrichment key across guards", hint: "each enrichment key may be produced by exactly one guard per route" },
   { code: "LUGAS_ROUTES_001", thrownBy: "compose()", meaning: "duplicate route across owners", hint: "remove one declaration; both owners are named in the message" },
   { code: "LUGAS_ROUTES_002", thrownBy: "defineApp()", meaning: "unsupported route entry under a method key", hint: "use route() descriptors, native Response values, functions, or {dir}" },
   { code: "LUGAS_ROUTES_003", thrownBy: "defineApp()", meaning: "unsupported route entry shape", hint: "same allowed shapes as LUGAS_ROUTES_002" },
