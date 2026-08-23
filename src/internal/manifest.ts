@@ -17,7 +17,37 @@
  * Records retain no handler or service references: they are frozen,
  * JSON-serializable snapshots of composition facts.
  */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { Composition } from "./compose";
+
+/** Frozen v1 manifest shape (docs/manifest-v1.md). */
+export type LugasManifestV1 = {
+  readonly format: "lugas-manifest-v1";
+  readonly frameworkVersion: string;
+  readonly bunCompatibility: string;
+  readonly modules: ReadonlyArray<{
+    readonly name: string;
+    readonly routes: readonly string[];
+  }>;
+  readonly routes: ReadonlyArray<ManifestRouteRecord>;
+};
+
+function deepFreeze<T>(value: T): T {
+  if (Array.isArray(value)) {
+    value.forEach(deepFreeze);
+  } else if (typeof value === "object" && value !== null) {
+    for (const key of Object.keys(value as object)) {
+      deepFreeze((value as Record<string, unknown>)[key]);
+    }
+  }
+  return Object.freeze(value);
+}
+
+function frameworkVersion(): string {
+  const raw = readFileSync(resolve(import.meta.dir, "../../package.json"), "utf8");
+  return (JSON.parse(raw) as { version?: string }).version ?? "0.0.0";
+}
 
 export type ManifestRouteKind = "native" | "lugas";
 
@@ -192,4 +222,33 @@ export function sortForSerialization(
       return a.method < b.method ? -1 : a.method > b.method ? 1 : 0;
     }),
   );
+}
+
+/**
+ * Assembles the complete frozen v1 manifest from a composition. Pure:
+ * performs no requests, starts no server, executes no handlers.
+ */
+export function buildManifest(composition: Composition): LugasManifestV1 {
+  const records = sortForSerialization(captureRouteRecords(composition));
+  const modules = composition.moduleNames
+    .map((name) => ({
+      name,
+      routes: [...new Set(records.filter((r) => r.module === name).map((r) => r.path))].sort(),
+    }))
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  return deepFreeze({
+    format: "lugas-manifest-v1",
+    frameworkVersion: frameworkVersion(),
+    bunCompatibility: `bun@${Bun.version}`,
+    modules,
+    routes: records,
+  });
+}
+
+/**
+ * Ordinary JSON serialization with stable property/array order (the builder
+ * constructs keys in schema order, so plain stringify is deterministic).
+ */
+export function serializeManifest(manifest: LugasManifestV1): string {
+  return `${JSON.stringify(manifest, null, 2)}\n`;
 }

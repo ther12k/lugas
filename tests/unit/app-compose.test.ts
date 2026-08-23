@@ -9,8 +9,8 @@ describe("defineApp()", () => {
   test("composes root routes and module routes with ownership", () => {
     const users = defineModule({ name: "users", routes: { "/users/:id": { GET: handler } } });
     const app = defineApp({ routes: { "/health": new Response("OK") }, modules: [users] });
-    expect(app.manifest.modules).toEqual(["users"]);
-    expect(app.manifest.routeCount).toBe(2);
+    expect(app.manifest.modules.map((m) => m.name)).toEqual(["users"]);
+    expect(app.manifest.routes.length).toBe(2);
   });
 
   test("rejects duplicate module names", () => {
@@ -26,7 +26,8 @@ describe("defineApp()", () => {
 
   test("placeholder manifest reports only runtime truth", () => {
     const app = defineApp({ services: { db: 1 } });
-    expect(app.manifest.routeCount).toBe(0);
+    expect(app.manifest.routes.length).toBe(0);
+    expect(app.manifest.format).toBe("lugas-manifest-v1");
     expect(Object.isFrozen(app.manifest)).toBe(true);
   });
 

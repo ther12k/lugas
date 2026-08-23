@@ -32,6 +32,7 @@ type LugasManifestV1 = {
     readonly path: string;
     readonly module: string | null;
     readonly kind: "native" | "lugas";
+    readonly native?: "static" | "handler" | "directory";
     readonly validates: ReadonlyArray<"params" | "query" | "headers" | "body">;
     readonly guards: readonly string[];
   }>;
@@ -50,7 +51,8 @@ type LugasManifestV1 = {
 | `routes[].method` | Uppercase literal key of the route entry as declared. |
 | `routes[].path` | The declared route path string verbatim (params like `:id` and wildcards appear un-interpolated). |
 | `routes[].module` | Owning module name, or `null` when declared at the app root. |
-| `routes[].kind` | `"native"` when the entry is a bare native `Response`; `"lugas"` when it is a `route()` descriptor. |
+| `routes[].kind` | `"native"` when the entry is a bare native value (`Response`, function, `{dir}`); `"lugas"` when it is a `route()` descriptor. |
+| `routes[].native` | Optional, present only on `kind: "native"` rows. Additive v1 field (M4-004): `"static"` for bare Response/Blob values, `"handler"` for plain functions, `"directory"` for `{dir}` entries. Runtime source: entry shape at composition time. Readers must ignore unknown fields per the compatibility policy. |
 | `routes[].validates` | Which slots carry a Standard Schema validator on the descriptor — presence only, in canonical order. |
 | `routes[].guards` | Guard names in execution order (declaration order of `before`). |
 
@@ -135,7 +137,6 @@ The manifest contains (ordering applied):
 ```json
 {
   "routes": [
-    { "method": "GET", "path": "/invoices/:id", "module": "billing", "kind": "lugas", "validates": ["params"], "guards": [] },
     { "method": "POST", "path": "/users", "module": null, "kind": "lugas", "validates": ["headers", "body"], "guards": ["auth"] },
     { "method": "GET", "path": "/ping", "module": null, "kind": "native", "validates": [], "guards": [] }
   ],

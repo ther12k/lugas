@@ -7,6 +7,7 @@
  */
 import { brand } from "../internal/brands";
 import { compose, type Composition } from "../internal/compose";
+import { buildManifest, type LugasManifestV1 } from "../internal/manifest";
 import type { LugasApp, MergeModulesRoutes, ModuleDescriptor } from "./types";
 import { serveApp } from "../internal/serve";
 
@@ -23,7 +24,8 @@ const APP_KEYS = new Set(["services", "routes", "modules", "notFound", "onError"
 export type AppInternals<TServices = unknown> = {
   readonly config: AppConfig<TServices, any>;
   readonly composition: Composition;
-  readonly manifest: Readonly<{ modules: ReadonlyArray<string>; routeCount: number }>;
+  /** Frozen runtime-truth manifest (lugas-manifest-v1) — reading starts no server. */
+  readonly manifest: LugasManifestV1;
 };
 
 export type LugasAppInstance<TServices = unknown, TRoutes = unknown> = LugasApp<TServices, TRoutes> & {
@@ -66,7 +68,7 @@ export function defineApp<
     routes: config.routes,
     modules: (config.modules ?? []) as ReadonlyArray<ModuleDescriptor<never>>,
   });
-  const manifest = Object.freeze({ modules: composition.moduleNames, routeCount: composition.routes.length });
+  const manifest = buildManifest(composition);
   return brand(
     Object.freeze({
       services: config.services as TServices,
