@@ -70,7 +70,7 @@ Expected manifest:
     { "name": "billing", "routes": ["/invoices/:id"] }
   ],
   "routes": [
-    { "method": "GET", "path": "/health", "module": null, "kind": "native", "validates": [], "guards": [] },
+    { "method": "GET", "path": "/health", "module": null, "kind": "native", "native": "static", "validates": [], "guards": [] },
     { "method": "GET", "path": "/invoices/:id", "module": "billing", "kind": "lugas", "validates": ["params", "query"], "guards": [] },
     { "method": "GET", "path": "/users", "module": null, "kind": "lugas", "validates": [], "guards": [] },
     { "method": "POST", "path": "/users", "module": null, "kind": "lugas", "validates": ["headers", "body"], "guards": ["auth", "tenant"] },
