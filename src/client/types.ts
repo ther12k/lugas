@@ -116,11 +116,26 @@ export type MethodParamsInput<TPath extends string> =
     ? { readonly params?: undefined }
     : { readonly params: PathParams<TPath> };
 
+/**
+ * Query input slot for a method call (M3-009): required exactly when the
+ * route entry declares a `query` schema; values mirror the schema's output
+ * type and are serialized as repeated scalar keys.
+ */
+export type MethodQueryInput<TContract, TPath extends string, TMethod extends HttpMethod> =
+  ClientInput<RouteEntryForMethod<TContract, TPath, TMethod>>["query"] extends infer Q
+    ? [Q] extends [undefined]
+      ? { readonly query?: undefined }
+      : { readonly query: Exclude<Q, undefined> }
+    : never;
+
+export type MethodCallInput<TContract, TPath extends string, TMethod extends HttpMethod> =
+  MethodParamsInput<TPath> & MethodQueryInput<TContract, TPath, TMethod>;
+
 export type ClientMethod<TContract, TMethod extends HttpMethod> = <
   TPath extends PathsForMethod<TContract, TMethod>,
 >(
   path: TPath,
-  input?: MethodParamsInput<TPath>,
+  input?: MethodCallInput<TContract, TPath, TMethod>,
 ) => Promise<Response>;
 
 /**
