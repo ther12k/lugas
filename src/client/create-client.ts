@@ -13,6 +13,7 @@ import type { HttpMethod } from "../core/types";
 import type { ClientMethod, ClientRequestEscapeHatch } from "./types";
 import type { ClientPathParams } from "./path";
 import { interpolatePath } from "./path";
+import { appendQuery, serializeQuery } from "./query";
 
 export type ClientFetch = typeof fetch;
 
@@ -107,17 +108,21 @@ export function createClient<API = unknown>(config: ClientConfig): LugasClient<A
     method: HttpMethod,
     path: string,
     params?: ClientPathParams,
-  ): Promise<Response> => transport(joinUrl(baseUrl, interpolatePath(path, params)), { method });
+    query?: unknown,
+  ): Promise<Response> => {
+    const target = appendQuery(joinUrl(baseUrl, interpolatePath(path, params)), serializeQuery(query));
+    return transport(target, { method });
+  };
   return Object.freeze({
     baseUrl,
     fetch: transport,
-    get: (path, input) => send("GET", path, input?.params),
-    post: (path, input) => send("POST", path, input?.params),
-    put: (path, input) => send("PUT", path, input?.params),
-    patch: (path, input) => send("PATCH", path, input?.params),
-    delete: (path, input) => send("DELETE", path, input?.params),
-    head: (path, input) => send("HEAD", path, input?.params),
-    options: (path, input) => send("OPTIONS", path, input?.params),
+    get: (path, input) => send("GET", path, input?.params, input?.query),
+    post: (path, input) => send("POST", path, input?.params, input?.query),
+    put: (path, input) => send("PUT", path, input?.params, input?.query),
+    patch: (path, input) => send("PATCH", path, input?.params, input?.query),
+    delete: (path, input) => send("DELETE", path, input?.params, input?.query),
+    head: (path, input) => send("HEAD", path, input?.params, input?.query),
+    options: (path, input) => send("OPTIONS", path, input?.params, input?.query),
     request: (method, path) => {
       if (!(CLIENT_HTTP_METHODS as readonly string[]).includes(method)) {
         throw new Error(
