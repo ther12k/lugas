@@ -1,19 +1,25 @@
 /**
- * Canonical prepared-application graph (M4R1-001).
+ * Canonical prepared-application graph (M4R1-001, M4R1-002).
  *
  * Built exactly once inside `defineApp()`: route/module structures are
- * snapshotted, every entry is classified once against the pinned Bun oracle,
- * and Lugas descriptors are compiled once with the resolved error policy.
- * The resulting frozen graph is the single input consumed by `serve()` —
- * serving never re-reads user configuration, so later mutations of the
- * caller's route objects cannot diverge the server from the manifest.
+ * snapshotted, declarations are grouped per path, different HTTP methods on
+ * one path merge into a single frozen method map (order-independently), and
+ * every surviving entry is classified once against the pinned Bun oracle.
+ * Lugas descriptors compile once with the resolved error policy. The frozen
+ * graph is the single input consumed by `serve()` — serving never re-reads
+ * user configuration.
+ *
+ * Collision semantics (duplicates are fatal; module order never wins):
+ * - same exact method + same path -> startup diagnostic naming both owners
+ * - different methods + same path -> merge into one method map
+ * - any-method value vs explicit-method map on one path -> explicit
+ *   diagnostic: raw Bun resolves such overlap by insertion order, which is
+ *   precisely the silent order-dependence Lugas forbids.
  *
  * Services stay live references by contract; structural immutability applies
- * to routing/policy ownership, not service contents. Per-method merge
- * semantics across owners are preserved exactly as-is here and are owned by
- * M4R1-002.
+ * to routing/policy ownership, not service contents.
  */
-import { diagnostic } from "./diagnostics";
+import { diagnostic, duplicateRoute } from "./diagnostics";
 import { classifyRoute } from "./classify-route";
 import { compileRoute } from "./compile-route";
 import { defaultNotFound, defaultOnError, withErrorPolicy, type ErrorPolicy, type NotFoundPolicy } from "./error-policy";
@@ -44,6 +50,19 @@ function freezeContainers(value: Record<string, unknown>): Record<string, unknow
   return value;
 }
 
+type Declaration = { readonly owner: string; readonly entry: unknown };
+type MethodClaim = { readonly owner: string; readonly value: unknown };
+
+function isPlainEntryObject(entry: unknown): entry is Record<string, unknown> {
+  return typeof entry === "object" && entry !== null && !(entry instanceof Response) && !(entry instanceof Blob) && !("handler" in entry) && !("dir" in entry);
+}
+
+/** True when an entry serves all methods instead of named ones: functions,
+ * native Response/Blob values, `{ dir }` maps, and Lugas descriptors. */
+function isAnyMethodEntry(entry: unknown): boolean {
+  return typeof entry === "function" || !isPlainEntryObject(entry);
+}
+
 export function prepareApp<TServices>(config: {
   routes?: Readonly<Record<string, unknown>> | undefined;
   modules?: ReadonlyArray<ModuleDescriptor<TServices, any>> | undefined;
@@ -53,62 +72,111 @@ export function prepareApp<TServices>(config: {
 }): PreparedApp {
   const onError = config.onError ?? defaultOnError;
 
-  // Structural snapshot: own-key copies of root and module route maps, in
-  // declaration order (module entries replace earlier path entries — current
-  // assembly semantics; merge semantics are owned by M4R1-002).
-  const routeEntries: Record<string, unknown> = { ...(config.routes ?? {}) };
-  for (const module_ of config.modules ?? []) {
-    for (const [path, entry] of Object.entries((module_.routes ?? {}) as Record<string, unknown>)) {
-      routeEntries[path] = entry;
+  // Collect declarations per path, in declaration order (root first, then
+  // modules in order). Ownership is tracked per method for diagnostics.
+  const declarationsByPath = new Map<string, Declaration[]>();
+  const declare = (owner: string, source: Readonly<Record<string, unknown>> | undefined): void => {
+    for (const [path, entry] of Object.entries(source ?? {})) {
+      let list = declarationsByPath.get(path);
+      if (list === undefined) {
+        list = [];
+        declarationsByPath.set(path, list);
+      }
+      list.push({ owner, entry });
     }
+  };
+  declare("app root routes", config.routes);
+  for (const module_ of config.modules ?? []) {
+    declare(`module '${module_.name}'`, (module_.routes ?? {}) as Record<string, unknown>);
   }
 
-  const compiled: Record<string, unknown> = {};
-  for (const [path, entry] of Object.entries(routeEntries)) {
-    // Bun method maps may contain Lugas descriptors per method. Compile only
-    // those values; preserve native method values exactly.
-    if (typeof entry === "object" && entry !== null && !(entry instanceof Response) && !(entry instanceof Blob) && !('handler' in entry) && !('dir' in entry)) {
-      const methodMap: Record<string, unknown> = {};
-      for (const [method, value] of Object.entries(entry as Record<string, unknown>)) {
-        const methodKind = classifyRoute(value);
-        if (methodKind.kind === "lugas-descriptor") {
-          const routeId = `${method} ${path}`;
-          methodMap[method] = withErrorPolicy(compileRoute(routeId, methodKind.descriptor, config.services).handler, onError, routeId);
-        } else if (methodKind.kind === "unsupported") {
-          throw diagnostic("LUGAS_ROUTES_002", `unsupported route entry at ${method} ${path}`, {
-            context: { method, path },
-          });
-        } else if (methodKind.kind === "native-handler") methodMap[method] = methodKind.handler;
-        else if (methodKind.kind === "native-response") methodMap[method] = methodKind.response;
-        else if (methodKind.kind === "native-file") methodMap[method] = methodKind.file;
-        else if (methodKind.kind === "native-dir") methodMap[method] = { dir: methodKind.path };
-        else methodMap[method] = methodKind.map;
-      }
-      compiled[path] = Object.freeze(methodMap);
-      continue;
+  const compileMethodValue = (method: string, path: string, value: unknown): unknown => {
+    const kind = classifyRoute(value);
+    if (kind.kind === "lugas-descriptor") {
+      const routeId = `${method} ${path}`;
+      return withErrorPolicy(compileRoute(routeId, kind.descriptor, config.services).handler, onError, routeId);
     }
-    const kind = classifyRoute(entry);
-    if (kind.kind === "native-handler") {
+    if (kind.kind === "unsupported") {
+      throw diagnostic("LUGAS_ROUTES_002", `unsupported route entry at ${method} ${path}`, {
+        context: { method, path },
+      });
+    }
+    // Raw Bun semantics (M4R1-004): function values serve verbatim.
+    if (kind.kind === "native-handler") return kind.handler;
+    if (kind.kind === "native-response") return kind.response;
+    if (kind.kind === "native-file") return kind.file;
+    if (kind.kind === "native-dir") return { dir: kind.path };
+    return kind.map;
+  };
+
+  const compiled: Record<string, unknown> = {};
+  for (const [path, declarations] of declarationsByPath) {
+    const anyClaims: Declaration[] = [];
+    const methodClaims = new Map<string, MethodClaim>();
+
+    for (const { owner, entry } of declarations) {
+      const plain = isPlainEntryObject(entry) ? entry : undefined;
+      if (plain === undefined) {
+        anyClaims.push({ owner, entry });
+        continue;
+      }
+      for (const [method, value] of Object.entries(plain)) {
+        const prior = methodClaims.get(method);
+        if (prior !== undefined) {
+          // Defensive: identical exact-method re-declarations are already
+          // fatal in composition; assembly refuses them independently so no
+          // caller can bypass ownership by reaching this layer directly.
+          throw duplicateRoute(method, path, prior.owner, owner);
+        }
+        methodClaims.set(method, { owner, value });
+      }
+    }
+
+    if (anyClaims.length > 1) {
+      throw duplicateRoute("*", path, anyClaims[0]!.owner, anyClaims[1]!.owner);
+    }
+    if (anyClaims.length === 1 && methodClaims.size > 0) {
+      const firstMethod = methodClaims.keys().next().value as string;
+      const methodOwner = methodClaims.get(firstMethod)!.owner;
+      // Pinned-oracle enforcement: raw Bun keeps one value per path and would
+      // resolve this overlap by insertion order. Lugas fails closed instead.
+      throw duplicateRoute("*", path, anyClaims[0]!.owner, methodOwner);
+    }
+
+    if (anyClaims.length === 1) {
+      const entry = anyClaims[0]!.entry;
+      const kind = classifyRoute(entry);
       // Raw Bun semantics (M4R1-004): function values serve verbatim,
       // untouched by the framework pipeline.
-      compiled[path] = kind.handler;
-    } else if (kind.kind === "lugas-descriptor") {
-      const routeId = `* ${path}`;
-      const handler = compileRoute(routeId, kind.descriptor, config.services).handler;
-      compiled[path] = withErrorPolicy(handler, onError, routeId);
-    } else if (kind.kind === "unsupported") {
-      throw diagnostic("LUGAS_ROUTES_003", `unsupported route entry at ${path}`, {
-        context: { path },
-      });
-    } else if (kind.kind === "native-response") {
-      compiled[path] = kind.response;
-    } else if (kind.kind === "native-file") {
-      compiled[path] = kind.file;
-    } else if (kind.kind === "native-dir") {
-      compiled[path] = { dir: kind.path };
-    } else {
-      compiled[path] = kind.map;
+      if (kind.kind === "native-handler") {
+        compiled[path] = kind.handler;
+        continue;
+      }
+      if (kind.kind === "lugas-descriptor") {
+        const routeId = `* ${path}`;
+        const handler = compileRoute(routeId, kind.descriptor, config.services).handler;
+        compiled[path] = withErrorPolicy(handler, onError, routeId);
+      } else if (kind.kind === "unsupported") {
+        throw diagnostic("LUGAS_ROUTES_003", `unsupported route entry at ${path}`, {
+          context: { path },
+        });
+      } else if (kind.kind === "native-response") {
+        compiled[path] = kind.response;
+      } else if (kind.kind === "native-file") {
+        compiled[path] = kind.file;
+      } else if (kind.kind === "native-dir") {
+        compiled[path] = { dir: kind.path };
+      } else {
+        compiled[path] = kind.map;
+      }
+      continue;
     }
+
+    const methodMap: Record<string, unknown> = {};
+    for (const [method, claim] of methodClaims) {
+      methodMap[method] = compileMethodValue(method, path, claim.value);
+    }
+    compiled[path] = Object.freeze(methodMap);
   }
 
   return Object.freeze({
