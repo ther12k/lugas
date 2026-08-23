@@ -57,7 +57,11 @@ describe("matrix: path parameter adversarial cases", () => {
   }
 
   const failures = [
-    { name: "missing param throws LUGAS_CLIENT_001 before fetch", run: (c: ReturnType<typeof recordingClient>["client"]) => c.get("/m/:id") as never, code: /^LUGAS_CLIENT_001/ },
+    // Runtime guard stays reachable through a loosely-typed alias: since
+    // M4R1-006 the typed signature makes omitting required input a compile
+    // error, but the runtime diagnostic (LUGAS_CLIENT_001 before any fetch)
+    // remains contract for untyped call paths.
+    { name: "missing param throws LUGAS_CLIENT_001 before fetch", run: (c: ReturnType<typeof recordingClient>["client"]) => (c.get as (p: string) => Promise<unknown>)("/m/:id"), code: /^LUGAS_CLIENT_001/ },
     {
       name: "undefined param value throws LUGAS_CLIENT_001",
       run: (c: ReturnType<typeof recordingClient>["client"]) => c.get("/m/:id", { params: { id: undefined }, query: {} } as never),

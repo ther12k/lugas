@@ -42,9 +42,11 @@ type _t2 = Expect<
   >
 >;
 
-// 3. Omitting input for a param-declared path compiles (input optional) but
-//    fails at runtime with LUGAS_CLIENT_001 — compile-time facts and runtime
-//    facts stay distinct by architecture.
+// 3. M4R1-006 correction: omitting the input object for a param-declared
+//    path is now a COMPILE error (required tuple). The runtime diagnostic
+//    LUGAS_CLIENT_001 remains contract for untyped call paths — compile-time
+//    facts and runtime facts stay distinct by architecture.
 function usage(client: Client) {
+  // @ts-expect-error missing required path params input
   void client.get("/users/:id");
 }

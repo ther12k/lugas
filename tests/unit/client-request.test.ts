@@ -108,12 +108,21 @@ describe("buildRequestInit() JSON body policy", () => {
     expect(h.get("content-type")).toBe("application/json");
   });
 
-  test("absent or null bodies send nothing synthetic", () => {
-    for (const body of [undefined, null]) {
+  test("omitted/undefined bodies send nothing; explicit null is JSON null (M4R1-006)", () => {
+    const omitted = buildRequestInit({ method: "POST" });
+    expect(omitted.init.body).toBeUndefined();
+    expect(new Headers(omitted.init.headers).has("content-type")).toBeFalse();
+
+    for (const body of [undefined]) {
       const built = buildRequestInit({ method: "POST", body });
       expect(built.init.body).toBeUndefined();
       expect(new Headers(built.init.headers).has("content-type")).toBeFalse();
     }
+
+    // M4R1-006 correction: presence differs from value — null is JSON null.
+    const nil = buildRequestInit({ method: "POST", body: null });
+    expect(nil.init.body).toBe("null");
+    expect(new Headers(nil.init.headers).get("content-type")).toBe("application/json");
   });
 
   test("caller JSON content types are preserved verbatim", () => {
