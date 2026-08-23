@@ -84,7 +84,8 @@ function tsconfigFor(entryRel: string, name: string): string {
         isolatedModules: true,
         noEmit: true,
         skipLibCheck: true, // matches the developer-experience tsconfig; disclosed in report
-        tsBuildInfoFile: join(RESULTS, `${name}.tsbuildinfo`),
+        // Relative so generated configs stay identical across checkouts.
+        tsBuildInfoFile: `results/${name}.tsbuildinfo`,
       },
       include: [entryRel],
     },

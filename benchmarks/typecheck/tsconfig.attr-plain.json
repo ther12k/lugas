@@ -16,7 +16,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "tsBuildInfoFile": "/home/ther12k/Workspace/Learning/lugas/.worktrees/M3-017/benchmarks/typecheck/results/attr-plain.tsbuildinfo"
+    "tsBuildInfoFile": "results/attr-plain.tsbuildinfo"
   },
   "include": [
     "attribution/plain-100.ts"

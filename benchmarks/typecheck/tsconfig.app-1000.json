@@ -16,7 +16,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "tsBuildInfoFile": "/home/ther12k/Workspace/Learning/lugas/.worktrees/M3-017/benchmarks/typecheck/results/app-1000.tsbuildinfo"
+    "tsBuildInfoFile": "results/app-1000.tsbuildinfo"
   },
   "include": [
     "entries/app-1000.entry.ts"

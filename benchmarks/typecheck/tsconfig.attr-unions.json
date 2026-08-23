@@ -16,7 +16,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "tsBuildInfoFile": "/home/ther12k/Workspace/Learning/lugas/.worktrees/M3-017/benchmarks/typecheck/results/attr-unions.tsbuildinfo"
+    "tsBuildInfoFile": "results/attr-unions.tsbuildinfo"
   },
   "include": [
     "attribution/unions-100.ts"
