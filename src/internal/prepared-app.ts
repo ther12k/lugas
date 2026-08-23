@@ -65,13 +65,6 @@ export function prepareApp<TServices>(config: {
 
   const compiled: Record<string, unknown> = {};
   for (const [path, entry] of Object.entries(routeEntries)) {
-    // Bare function routes pass through verbatim: Bun's native router accepts
-    // them (pinned-oracle fact) and the manifest records them as native
-    // "handler". Full classifier conformance is owned by M4R1-004.
-    if (typeof entry === "function") {
-      compiled[path] = entry;
-      continue;
-    }
     // Bun method maps may contain Lugas descriptors per method. Compile only
     // those values; preserve native method values exactly.
     if (typeof entry === "object" && entry !== null && !(entry instanceof Response) && !(entry instanceof Blob) && !('handler' in entry) && !('dir' in entry)) {
@@ -85,7 +78,8 @@ export function prepareApp<TServices>(config: {
           throw diagnostic("LUGAS_ROUTES_002", `unsupported route entry at ${method} ${path}`, {
             context: { method, path },
           });
-        } else if (methodKind.kind === "native-response") methodMap[method] = methodKind.response;
+        } else if (methodKind.kind === "native-handler") methodMap[method] = methodKind.handler;
+        else if (methodKind.kind === "native-response") methodMap[method] = methodKind.response;
         else if (methodKind.kind === "native-file") methodMap[method] = methodKind.file;
         else if (methodKind.kind === "native-dir") methodMap[method] = { dir: methodKind.path };
         else methodMap[method] = methodKind.map;
@@ -94,7 +88,11 @@ export function prepareApp<TServices>(config: {
       continue;
     }
     const kind = classifyRoute(entry);
-    if (kind.kind === "lugas-descriptor") {
+    if (kind.kind === "native-handler") {
+      // Raw Bun semantics (M4R1-004): function values serve verbatim,
+      // untouched by the framework pipeline.
+      compiled[path] = kind.handler;
+    } else if (kind.kind === "lugas-descriptor") {
       const routeId = `* ${path}`;
       const handler = compileRoute(routeId, kind.descriptor, config.services).handler;
       compiled[path] = withErrorPolicy(handler, onError, routeId);
