@@ -2,6 +2,12 @@
  * `createClient()` base configuration, fetch injection, explicit typed HTTP
  * methods, and path-parameter interpolation (M3-006–M3-008).
  *
+ * Transport policy (M3-013): network, TLS, DNS, and abort failures from the
+ * transport reject exactly as plain `fetch` rejects — never caught, wrapped,
+ * converted into client results, or retried. Automatic retry is an
+ * application-level responsibility; cancellation works through the native
+ * AbortSignal passed via platform options.
+ *
  * Runtime is platform-neutral: no Bun globals, no Proxy. The application type
  * parameter exists only at compile time and is fully erased — the client stores
  * just the normalized base URL, the transport function, and a small enumerable
