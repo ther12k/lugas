@@ -11,6 +11,9 @@
  * `app.serve()`, never internal compilation.
  */
 import { diagnostic } from "../internal/diagnostics";
+import { createClient } from "../client/create-client";
+import type { LugasClient } from "../client/create-client";
+import type { AppContract } from "../core/contract";
 import type { LugasAppInstance } from "../core/app";
 
 const ALLOWED_OPTION_KEYS = new Set(["port", "hostname", "development"]);
@@ -22,11 +25,16 @@ export type TestServerOptions = {
   readonly development?: boolean;
 };
 
-export type TestServer = {
+export type TestServer<TClient = unknown> = {
   readonly port: number;
   /** Base URL, no trailing slash. */
   readonly url: string;
   readonly server: Bun.Server<unknown>;
+  /**
+   * The REAL typed client (lugas/client implementation) bound to this
+   * server: no testing clone, no duplicated URL/response logic.
+   */
+  readonly client: TClient;
   /**
    * Fetch against this server. Relative paths ("​/users") resolve against
    * the base URL; absolute URLs and Request inputs pass through untouched.
@@ -52,7 +60,7 @@ function rejectForbiddenOptions(options: Record<string, unknown>): void {
 export function createTestServer<TServices, TRoutes>(
   app: LugasAppInstance<TServices, TRoutes>,
   options: TestServerOptions = {},
-): TestServer {
+): TestServer<LugasClient<AppContract<LugasAppInstance<TServices, TRoutes>>>> {
   rejectForbiddenOptions(options as Record<string, unknown>);
   const server = app.serve({ port: options.port ?? 0, development: options.development ?? false });
   const base = new URL(server.url);
@@ -69,10 +77,21 @@ export function createTestServer<TServices, TRoutes>(
     await Promise.resolve();
   }
 
-  const handle: TestServer = {
+  const boundFetch = ((input: string | URL | Request, init?: RequestInit) => {
+    const resolved =
+      typeof input === "string" && input.startsWith("/") ? new URL(input, base.origin) : input;
+    return globalThis.fetch(resolved, init);
+  }) as unknown as typeof fetch;
+  const client = createClient<AppContract<LugasAppInstance<TServices, TRoutes>>>({
+    baseUrl: base.origin,
+    fetch: boundFetch,
+  });
+
+  const handle: TestServer<LugasClient<AppContract<LugasAppInstance<TServices, TRoutes>>>> = {
     port: server.port ?? 0,
     url: base.origin,
     server,
+    client,
     fetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
       const resolved =
         typeof input === "string" && input.startsWith("/") ? new URL(input, base.origin) : input;
