@@ -75,6 +75,13 @@ rg -c "elysia|eden|Bun\\.|new Proxy" src/client/*.ts
 - All 18 dependencies confirmed merged on base; local verification green on base before starting.
 - Conflict group `gate`; no overlapping worktrees active. Only owned files touched.
 
+## Gate correction
+
+Gate reproduction caught a portability defect from M3-017: generated bench
+tsconfigs embedded absolute `tsBuildInfoFile` paths, producing per-checkout
+churn. Fixed in this branch (relative paths) and proven idempotent by a clean
+second consecutive run. Recorded here per the review-packet standard.
+
 ## Working-tree state
 
 Clean at handoff; closes #69.
