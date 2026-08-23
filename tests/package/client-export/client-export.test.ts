@@ -101,16 +101,20 @@ describe("lugas/client export surface", () => {
 
     const outputs = readdirSync(outDir);
     expect(outputs).toContain("bundle-entry.js");
-    const smoke = Bun.spawnSync(["node", join(outDir, "bundle-entry.js")], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    expect({
-      code: smoke.exitCode,
-      stdout: new TextDecoder().decode(smoke.stdout).trim(),
-      stderr: new TextDecoder().decode(smoke.stderr).trim(),
-    }).toEqual({ code: 0, stdout: "BUNDLE-SUBPATH-OK", stderr: "" });
-    rmSync(outDir, { recursive: true, force: true });
+    try {
+      const smoke = Bun.spawnSync(["node", join(outDir, "bundle-entry.js")], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      expect({
+        code: smoke.exitCode,
+        stdout: new TextDecoder().decode(smoke.stdout).trim(),
+        stderr: new TextDecoder().decode(smoke.stderr).trim(),
+      }).toEqual({ code: 0, stdout: "BUNDLE-SUBPATH-OK", stderr: "" });
+    } finally {
+      rmSync(entry, { force: true });
+      rmSync(outDir, { recursive: true, force: true });
+    }
   });
 
   test("npm pack dry run contains declarations and no benchmark/worktree data", () => {
