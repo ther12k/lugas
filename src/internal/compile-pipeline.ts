@@ -58,22 +58,21 @@ export function compilePipeline(
 
   const hasGuards = (guards as ReadonlyArray<GuardDescriptor<unknown, unknown>>).length > 0;
 
-  // FAST PATH: No validation and no guards
+  // FAST PATH: No validation and no guards. One unified invocation path —
+  // async-ness is observed from the returned value, never guessed from the
+  // function's constructor (M4R1-004). Sync handlers stay promise-free.
   if (!hasValidation && !hasGuards) {
-    const isAsync = userHandler.constructor.name !== "Function";
-    if (isAsync) {
-      return async (request: Request) => {
-        const rawParams = (request as Request & { params?: Record<string, string> }).params ?? {};
-        const out = await userHandler({ request, ...base, params: rawParams });
-        if (!(out instanceof Response)) {
-          throw new TypeError(`Route ${routeId}: handler must return a native Response`);
-        }
-        return out;
-      };
-    }
     return (request: Request) => {
       const rawParams = (request as Request & { params?: Record<string, string> }).params ?? {};
       const out = userHandler({ request, ...base, params: rawParams });
+      if (isPromiseLike(out)) {
+        return Promise.resolve(out).then((resolved) => {
+          if (!(resolved instanceof Response)) {
+            throw new TypeError(`Route ${routeId}: handler must return a native Response`);
+          }
+          return resolved;
+        });
+      }
       if (!(out instanceof Response)) {
         throw new TypeError(`Route ${routeId}: handler must return a native Response`);
       }

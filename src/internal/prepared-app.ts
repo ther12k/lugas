@@ -101,6 +101,8 @@ export function prepareApp<TServices>(config: {
         context: { method, path },
       });
     }
+    // Raw Bun semantics (M4R1-004): function values serve verbatim.
+    if (kind.kind === "native-handler") return kind.handler;
     if (kind.kind === "native-response") return kind.response;
     if (kind.kind === "native-file") return kind.file;
     if (kind.kind === "native-dir") return { dir: kind.path };
@@ -143,14 +145,13 @@ export function prepareApp<TServices>(config: {
 
     if (anyClaims.length === 1) {
       const entry = anyClaims[0]!.entry;
-      // Bare function routes pass through verbatim: Bun's native router
-      // accepts them (pinned-oracle fact); full classifier conformance is
-      // owned by M4R1-004.
-      if (typeof entry === "function") {
-        compiled[path] = entry;
+      const kind = classifyRoute(entry);
+      // Raw Bun semantics (M4R1-004): function values serve verbatim,
+      // untouched by the framework pipeline.
+      if (kind.kind === "native-handler") {
+        compiled[path] = kind.handler;
         continue;
       }
-      const kind = classifyRoute(entry);
       if (kind.kind === "lugas-descriptor") {
         const routeId = `* ${path}`;
         const handler = compileRoute(routeId, kind.descriptor, config.services).handler;
