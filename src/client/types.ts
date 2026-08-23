@@ -128,8 +128,40 @@ export type MethodQueryInput<TContract, TPath extends string, TMethod extends Ht
       : { readonly query: Exclude<Q, undefined> }
     : never;
 
+/**
+ * Headers slot for a method call (M3-010): required exactly when the route
+ * entry declares a `headers` schema; values mirror the schema output type.
+ */
+export type MethodHeadersInput<TContract, TPath extends string, TMethod extends HttpMethod> =
+  ClientInput<RouteEntryForMethod<TContract, TPath, TMethod>>["headers"] extends infer H
+    ? [H] extends [undefined]
+      ? { readonly headers?: undefined }
+      : { readonly headers: Exclude<H, undefined> }
+    : never;
+
+/**
+ * Body slot for a method call (M3-010): required exactly when the route entry
+ * declares a `body` schema; values mirror the schema output type and are
+ * serialized as JSON.
+ */
+export type MethodBodyInput<TContract, TPath extends string, TMethod extends HttpMethod> =
+  ClientInput<RouteEntryForMethod<TContract, TPath, TMethod>>["body"] extends infer B
+    ? [B] extends [undefined]
+      ? { readonly body?: undefined }
+      : { readonly body: Exclude<B, undefined> }
+    : never;
+
+/** Platform options that stay owned by the caller (M3-010). */
+export type MethodPlatformInit = {
+  readonly init?: Omit<RequestInit, "method" | "body" | "headers">;
+};
+
 export type MethodCallInput<TContract, TPath extends string, TMethod extends HttpMethod> =
-  MethodParamsInput<TPath> & MethodQueryInput<TContract, TPath, TMethod>;
+  MethodParamsInput<TPath> &
+    MethodQueryInput<TContract, TPath, TMethod> &
+    MethodHeadersInput<TContract, TPath, TMethod> &
+    MethodBodyInput<TContract, TPath, TMethod> &
+    MethodPlatformInit;
 
 export type ClientMethod<TContract, TMethod extends HttpMethod> = <
   TPath extends PathsForMethod<TContract, TMethod>,

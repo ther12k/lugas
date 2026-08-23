@@ -11,9 +11,9 @@
  */
 import type { HttpMethod } from "../core/types";
 import type { ClientMethod, ClientRequestEscapeHatch } from "./types";
-import type { ClientPathParams } from "./path";
 import { interpolatePath } from "./path";
 import { appendQuery, serializeQuery } from "./query";
+import { buildRequestInit } from "./request";
 
 export type ClientFetch = typeof fetch;
 
@@ -92,6 +92,18 @@ export type LugasClient<API = unknown> = {
 };
 
 /**
+ * Reads one structured-input slot at the runtime boundary. Compile-time
+ * safety is provided by the `MethodCallInput` signature; this helper exists
+ * because generic deferred types cannot be property-accessed directly here.
+ */
+function slot<K extends string>(input: unknown, key: K): unknown {
+  if (typeof input !== "object" || input === null) {
+    return undefined;
+  }
+  return (input as Record<string, unknown>)[key];
+}
+
+/**
  * Creates a typed client bound to a base URL and transport.
  * The `API` type parameter is accepted for end-to-end typing and erased:
  * methods are plain functions built here, so no Proxy or runtime route tree
@@ -104,25 +116,29 @@ export function createClient<API = unknown>(config: ClientConfig): LugasClient<A
   const baseUrl = normalizeBaseUrl(config.baseUrl);
   const transport: ClientFetch =
     config.fetch ?? (globalThis.fetch.bind(globalThis) as ClientFetch);
-  const send = (
-    method: HttpMethod,
-    path: string,
-    params?: ClientPathParams,
-    query?: unknown,
-  ): Promise<Response> => {
-    const target = appendQuery(joinUrl(baseUrl, interpolatePath(path, params)), serializeQuery(query));
-    return transport(target, { method });
+  const send = (method: HttpMethod, path: string, input?: unknown): Promise<Response> => {
+    const target = appendQuery(
+      joinUrl(baseUrl, interpolatePath(path, slot(input, "params"))),
+      serializeQuery(slot(input, "query")),
+    );
+    const built = buildRequestInit({
+      method,
+      headers: slot(input, "headers"),
+      body: slot(input, "body"),
+      init: slot(input, "init"),
+    });
+    return transport(target, built.init);
   };
   return Object.freeze({
     baseUrl,
     fetch: transport,
-    get: (path, input) => send("GET", path, input?.params, input?.query),
-    post: (path, input) => send("POST", path, input?.params, input?.query),
-    put: (path, input) => send("PUT", path, input?.params, input?.query),
-    patch: (path, input) => send("PATCH", path, input?.params, input?.query),
-    delete: (path, input) => send("DELETE", path, input?.params, input?.query),
-    head: (path, input) => send("HEAD", path, input?.params, input?.query),
-    options: (path, input) => send("OPTIONS", path, input?.params, input?.query),
+    get: (path, input) => send("GET", path, input),
+    post: (path, input) => send("POST", path, input),
+    put: (path, input) => send("PUT", path, input),
+    patch: (path, input) => send("PATCH", path, input),
+    delete: (path, input) => send("DELETE", path, input),
+    head: (path, input) => send("HEAD", path, input),
+    options: (path, input) => send("OPTIONS", path, input),
     request: (method, path) => {
       if (!(CLIENT_HTTP_METHODS as readonly string[]).includes(method)) {
         throw new Error(
