@@ -106,9 +106,21 @@ export type ClientOutcomesFor<
  * The path parameter is restricted to the literal paths whose contract entry
  * supports that verb (including `ALL` entries); unsupported combinations are
  * compile errors.
+ *
+ * Since M3-008 the method accepts an optional input object whose `params`
+ * field is required exactly when the chosen path declares `:name` segments;
+ * values are interpolated and encoded before dispatch.
  */
-export type ClientMethod<TContract, TMethod extends HttpMethod> = (
-  path: PathsForMethod<TContract, TMethod>,
+export type MethodParamsInput<TPath extends string> =
+  keyof PathParams<TPath> extends never
+    ? { readonly params?: undefined }
+    : { readonly params: PathParams<TPath> };
+
+export type ClientMethod<TContract, TMethod extends HttpMethod> = <
+  TPath extends PathsForMethod<TContract, TMethod>,
+>(
+  path: TPath,
+  input?: MethodParamsInput<TPath>,
 ) => Promise<Response>;
 
 /**

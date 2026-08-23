@@ -46,7 +46,7 @@ describe("createClient() typed HTTP methods", () => {
     ] as const;
     for (const [name, upper] of verbs) {
       const { client, calls } = makeRecordingClient();
-      await client[name]("/any");
+      await (client[name] as (path: "/any") => Promise<Response>)("/any");
       expect(calls).toHaveLength(1);
       expect(calls[0]?.method).toBe(upper);
       expect(calls[0]?.url).toBe("https://x.test/api/any");
