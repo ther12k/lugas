@@ -40,6 +40,9 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_GUARD_002 | guard() | unknown config key | allowed keys: name, handler |
 | LUGAS_GUARD_003 | guard() | 'name' must be a non-empty string | guard names appear in manifests; use stable names |
 | LUGAS_GUARD_004 | guard() | 'handler' must be a function | return Response to short-circuit or enrichment object |
+| LUGAS_GUARD_005 | guard pipeline | guard result is not Response or plain object | return Response, {} for no enrichment, or a plain object |
+| LUGAS_GUARD_006 | guard pipeline | enrichment overwrote framework-owned key | guards add new keys; never request/services/params/query/headers/body |
+| LUGAS_GUARD_007 | guard pipeline | duplicate enrichment key across guards | each key produced by exactly one guard per route |
 | LUGAS_ROUTES_001 | compose() | duplicate route across owners | remove one declaration; both owners named in message |
 | LUGAS_ROUTES_002 | serve pipeline | unsupported entry under method key | use route(), native Response, functions, or {dir} |
 | LUGAS_ROUTES_003 | serve pipeline | unsupported route entry shape | same shapes as LUGAS_ROUTES_002 |

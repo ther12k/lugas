@@ -1,9 +1,10 @@
 /**
- * Base request context and guard enrichment merging (M1-011, M2-011).
+ * Base request context and guard enrichment merging (M1-011, M2-011, M4R1-003).
  *
  * Provides collision-safe context construction for route handlers and guards.
- * Prevents guard enrichments from overwriting reserved base properties
- * (`request`, `services`, `params`).
+ * Prevents guard enrichments from overwriting framework-owned properties:
+ * `request`, `services`, `params`, plus validated slots `query`, `headers`,
+ * `body` (reserved even when a route declares no schema for them).
  */
 import type { RouteHandler } from "../core/types";
 
@@ -13,7 +14,14 @@ export type BaseContext<TServices = unknown, TParams extends Record<string, stri
   readonly params: TParams;
 };
 
-export const BASE_CONTEXT_RESERVED_KEYS = new Set(["request", "services", "params"]);
+export const BASE_CONTEXT_RESERVED_KEYS = new Set([
+  "request",
+  "services",
+  "params",
+  "query",
+  "headers",
+  "body",
+]);
 
 export function createContext<TServices, TParams extends Record<string, string>>(
   request: Request,

@@ -114,23 +114,31 @@ export function compilePipeline(
       if (!bRes.ok) return bRes.response;
       const bodyData = bRes.data;
 
-      // 5. Guards execution
-      let guardContext = {};
+      // 5. Guards execution — guards receive the full validated context
+      let guardContext: Record<string, unknown> = {};
       if (hasGuards) {
-        const gRes = await runGuards(guards, { request, services });
+        const gRes = await runGuards(guards, {
+          request,
+          ...base,
+          params: paramsData,
+          ...(querySchema !== undefined ? { query: queryData } : {}),
+          ...(headersSchema !== undefined ? { headers: headersData } : {}),
+          ...(bodySchema !== undefined ? { body: bodyData } : {}),
+        });
         if (gRes.kind === "response") return gRes.response;
         guardContext = gRes.context;
       }
 
-      // 6. User handler
+      // 6. User handler — framework-owned keys applied last so validator
+      // truth always reaches the handler (enrichment rejection is primary).
       const ctx: PipelineContext = {
+        ...guardContext,
         request,
         ...base,
         params: paramsData,
         query: queryData,
         headers: headersData,
         body: bodyData,
-        ...guardContext,
       };
       const out = await userHandler(ctx);
       if (!(out instanceof Response)) {
@@ -192,20 +200,23 @@ export function compilePipeline(
       queryData = qRes.data;
     }
 
-    // 4. Guards execution
+    // 4. Guards execution — guards receive the full validated context
     let guardContext: Record<string, unknown> = {};
     if (hasGuards) {
-      const gRes = runGuards(guards, { request, services });
+      const guardInput: Record<string, unknown> = { request, ...base, params: paramsData };
+      if (headersSchema !== undefined) guardInput.headers = headersData;
+      if (querySchema !== undefined) guardInput.query = queryData;
+      const gRes = runGuards(guards, guardInput);
       if (isPromiseLike(gRes)) {
         return Promise.resolve(gRes).then((resolvedG) => {
           if (resolvedG.kind === "response") return resolvedG.response;
           return executeAsyncHandler(routeId, userHandler, {
+            ...resolvedG.context,
             request,
             ...base,
             params: paramsData,
             query: queryData,
             headers: headersData,
-            ...resolvedG.context,
           });
         });
       }
@@ -213,14 +224,14 @@ export function compilePipeline(
       guardContext = gRes.context;
     }
 
-    // 5. User handler
+    // 5. User handler — framework-owned keys applied last
     const ctx: PipelineContext = {
+      ...guardContext,
       request,
       ...base,
       params: paramsData,
       query: queryData,
       headers: headersData,
-      ...guardContext,
     };
     const out = userHandler(ctx);
     if (isPromiseLike(out)) {
@@ -274,18 +285,24 @@ async function executeAsyncPipeline(
 
   let guardContext = {};
   if (guards.length > 0) {
-    const gRes = await runGuards(guards, { request, services });
+    const gRes = await runGuards(guards, {
+      request,
+      ...base,
+      params: paramsData,
+      ...(querySchema !== undefined ? { query: queryData } : {}),
+      ...(headersSchema !== undefined ? { headers: headersData } : {}),
+    });
     if (gRes.kind === "response") return gRes.response;
     guardContext = gRes.context;
   }
 
   const ctx: PipelineContext = {
+    ...guardContext,
     request,
     ...base,
     params: paramsData,
     query: queryData,
     headers: headersData,
-    ...guardContext,
   };
   return executeAsyncHandler(routeId, userHandler, ctx);
 }
