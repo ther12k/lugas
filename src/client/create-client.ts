@@ -14,6 +14,8 @@ import type { ClientMethod, ClientRequestEscapeHatch } from "./types";
 import { interpolatePath } from "./path";
 import { appendQuery, serializeQuery } from "./query";
 import { buildRequestInit } from "./request";
+import type { ClientResult } from "./parse-response";
+import { parseResponse } from "./parse-response";
 
 export type ClientFetch = typeof fetch;
 
@@ -116,7 +118,7 @@ export function createClient<API = unknown>(config: ClientConfig): LugasClient<A
   const baseUrl = normalizeBaseUrl(config.baseUrl);
   const transport: ClientFetch =
     config.fetch ?? (globalThis.fetch.bind(globalThis) as ClientFetch);
-  const send = (method: HttpMethod, path: string, input?: unknown): Promise<Response> => {
+  const send = <TResult>(method: HttpMethod, path: string, input?: unknown): Promise<TResult> => {
     const target = appendQuery(
       joinUrl(baseUrl, interpolatePath(path, slot(input, "params"))),
       serializeQuery(slot(input, "query")),
@@ -127,7 +129,11 @@ export function createClient<API = unknown>(config: ClientConfig): LugasClient<A
       body: slot(input, "body"),
       init: slot(input, "init"),
     });
-    return transport(target, built.init);
+    const parse = async () => {
+      const response: Response = await transport(target, built.init);
+      return parseResponse(response);
+    };
+    return parse() as Promise<TResult>;
   };
   return Object.freeze({
     baseUrl,

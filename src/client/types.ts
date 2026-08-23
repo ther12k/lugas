@@ -8,6 +8,7 @@
  */
 import type { AppContract } from "../core/contract";
 import type { HttpMethod } from "../core/types";
+import type { ClientFailure, ClientResult, ClientSuccess } from "./parse-response";
 
 /** Extracts `:param` names from a literal path such as `/users/:id/posts/:slug`. */
 export type PathParams<TPath extends string> =
@@ -168,7 +169,36 @@ export type ClientMethod<TContract, TMethod extends HttpMethod> = <
 >(
   path: TPath,
   input?: MethodCallInput<TContract, TPath, TMethod>,
-) => Promise<Response>;
+) => Promise<ClientCallResult<TContract, TPath, TMethod>>;
+
+/**
+ * Runtime-truth branch for one compile-time outcome (M3-011): 2xx literal
+ * statuses become successes, other literals become failures, and widened
+ * `number` statuses stay open as either branch with `unknown` payloads.
+ */
+export type StatusBranch<S> = [S] extends [never]
+  ? never
+  : number extends S
+  ? boolean
+  : `${S & number}` extends `2${string}`
+  ? true
+  : false;
+
+type ResultForStatus<S, B> = [StatusBranch<S>] extends [true]
+  ? ClientSuccess<S extends number ? S : number, B>
+  : [StatusBranch<S>] extends [false]
+  ? ClientFailure<S extends number ? S : number, B>
+  : ClientResult<number, unknown>;
+
+export type ClientResultForOutcome<O> = O extends {
+  readonly status: infer S;
+  readonly body: infer B;
+}
+  ? ResultForStatus<S, B>
+  : never;
+
+export type ClientCallResult<TContract, TPath extends string, TMethod extends HttpMethod> =
+  ClientResultForOutcome<ClientOutcomesFor<TContract, TPath, TMethod>>;
 
 /**
  * Generic `request` escape hatch (M3-007). Accepts any path with a supported

@@ -33,7 +33,7 @@ describe("client/server query round-trip", () => {
         query: { q: "lugas", page: 3, tag: ["fast", "bun"] },
       });
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ q: "lugas", page: 3, tag: ["fast", "bun"] });
+      expect(res.data).toEqual({ q: "lugas", page: 3, tag: ["fast", "bun"] });
     } finally {
       server.stop(true);
     }
@@ -45,7 +45,7 @@ describe("client/server query round-trip", () => {
       const client = createClient<API>({ baseUrl: server.url });
       const res = await client.get("/search", { query: { q: "", page: 1 } });
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ q: "", page: 1 });
+      expect(res.data).toEqual({ q: "", page: 1 });
     } finally {
       server.stop(true);
     }
@@ -57,7 +57,7 @@ describe("client/server query round-trip", () => {
       const client = createClient<API>({ baseUrl: server.url });
       const res = await client.get("/search", { query: { q: "日本語 クエリ", page: 1 } });
       expect(res.status).toBe(200);
-      expect(await res.json()).toMatchObject({ q: "日本語 クエリ" });
+      expect(res.data).toMatchObject({ q: "日本語 クエリ" });
     } finally {
       server.stop(true);
     }
@@ -69,7 +69,7 @@ describe("client/server query round-trip", () => {
       const client = createClient<API>({ baseUrl: server.url });
       const res = await client.get("/search", { query: { q: "x", page: 1 } });
       expect(res.status).toBe(200);
-      const body = (await res.json()) as Record<string, unknown>;
+      const body = res.data as Record<string, unknown>;
       expect(body).toEqual({ q: "x", page: 1 });
       expect("tag" in body).toBeFalse();
     } finally {
@@ -96,7 +96,7 @@ describe("client/server query round-trip", () => {
         query: { q: "a b", page: 2 },
       });
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ q: "a b", page: 2 });
+      expect(res.data).toEqual({ q: "a b", page: 2 });
     } finally {
       server.stop(true);
     }
@@ -123,7 +123,7 @@ describe("client/server query round-trip", () => {
       const client = createClient<API3>({ baseUrl: server.url });
       const res = await client.get("/search", { query: { q: "one", tag: ["solo"] } });
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ q: "one", tag: "solo" });
+      expect(res.data).toEqual({ q: "one", tag: "solo" });
     } finally {
       server.stop(true);
     }
