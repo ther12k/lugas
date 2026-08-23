@@ -110,8 +110,12 @@ function encodeSegments(value: string): string {
  * Interpolates declared parameters into a route template exactly once per
  * declaration, encoding every supplied segment. Missing, extra, undefined,
  * ambiguous, and mistyped parameters are rejected before any fetch.
+ *
+ * `params` is deliberately `unknown`: this function is the runtime
+ * enforcement point of the path-parameter policy (compile-time typing is
+ * provided by `MethodParamsInput`).
  */
-export function interpolatePath(template: string, params?: ClientPathParams): string {
+export function interpolatePath(template: string, params?: unknown): string {
   const parsed = parseTemplate(template);
   if (params === undefined) {
     if (parsed.names.length > 0 || parsed.hasWildcard) {
@@ -125,7 +129,8 @@ export function interpolatePath(template: string, params?: ClientPathParams): st
   if (typeof params !== "object" || params === null || Array.isArray(params)) {
     throw new ClientPathError("LUGAS_CLIENT_003", "params must be an object");
   }
-  for (const key of Object.keys(params)) {
+  const provided = params as { readonly [key: string]: unknown };
+  for (const key of Object.keys(provided)) {
     const declared = parsed.names.includes(key) || (key === "*" && parsed.hasWildcard);
     if (!declared) {
       throw new ClientPathError(
@@ -142,13 +147,13 @@ export function interpolatePath(template: string, params?: ClientPathParams): st
       continue;
     }
     const key = segment === "*" ? "*" : segment.slice(1);
-    if (!(key in params) || params[key] === undefined || params[key] === null) {
+    if (!(key in provided) || provided[key] === undefined || provided[key] === null) {
       throw new ClientPathError(
         "LUGAS_CLIENT_001",
         `missing path parameter ':${key}' for '${template}'`,
       );
     }
-    const value = params[key];
+    const value = provided[key];
     if (segment === "*") {
       if (typeof value === "string") {
         parts.push(encodeSegments(value));
