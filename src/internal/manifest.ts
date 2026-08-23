@@ -21,9 +21,22 @@ import type { Composition } from "./compose";
 
 export type ManifestRouteKind = "native" | "lugas";
 
+const EMPTY_CAPABILITIES: ReadonlyArray<ManifestCapability> = Object.freeze([]);
+const EMPTY_GUARDS: readonly string[] = Object.freeze([]);
+
 export type NativeRouteShape = "static" | "handler" | "directory";
 
 export type ManifestMethod = string;
+
+export type ManifestCapability = "params" | "query" | "headers" | "body";
+
+/** Canonical capability order mandated by the frozen v1 document. */
+const CAPABILITY_ORDER: ReadonlyArray<ManifestCapability> = [
+  "params",
+  "query",
+  "headers",
+  "body",
+];
 
 export type ManifestRouteRecord = {
   /** Declared uppercase method key; `"*"` for native any-method entries. */
@@ -33,6 +46,10 @@ export type ManifestRouteRecord = {
   readonly kind: ManifestRouteKind;
   /** Present only when `kind === "native"`. */
   readonly native?: NativeRouteShape | undefined;
+  /** Slots carrying a declared validator — presence only, canonical order. */
+  readonly validates: ReadonlyArray<ManifestCapability>;
+  /** Guard names in execution order. */
+  readonly guards: readonly string[];
 };
 
 function classifyNative(entry: unknown): NativeRouteShape {
@@ -65,6 +82,8 @@ function recordsForEntry(owner: { module: string | null; path: string }, entry: 
         module: owner.module,
         kind: "native",
         native: typeof entry === "function" ? "handler" : "static",
+        validates: EMPTY_CAPABILITIES,
+        guards: EMPTY_GUARDS,
       }),
     ];
   }
@@ -76,6 +95,8 @@ function recordsForEntry(owner: { module: string | null; path: string }, entry: 
         module: owner.module,
         kind: "native",
         native: "directory",
+        validates: EMPTY_CAPABILITIES,
+        guards: EMPTY_GUARDS,
       }),
     ];
   }
@@ -102,6 +123,8 @@ function recordsForEntry(owner: { module: string | null; path: string }, entry: 
           module: owner.module,
           kind: "native",
           native: typeof child === "function" ? ("handler" as const) : ("static" as const),
+          validates: EMPTY_CAPABILITIES,
+          guards: EMPTY_GUARDS,
         }),
       );
       continue;
@@ -114,16 +137,26 @@ function recordsForEntry(owner: { module: string | null; path: string }, entry: 
           module: owner.module,
           kind: "native",
           native: "directory" as const,
+          validates: EMPTY_CAPABILITIES,
+          guards: EMPTY_GUARDS,
         }),
       );
       continue;
     }
+    const childRecord = child as Record<string, unknown>;
+    const validates = CAPABILITY_ORDER.filter(
+      (slot) => childRecord[slot] !== undefined,
+    );
+    const before = Array.isArray(childRecord.before) ? childRecord.before : [];
+    const guards = before.map((g) => (g as { name?: unknown }).name as string);
     out.push(
       Object.freeze({
         method: key,
         path: owner.path,
         module: owner.module,
         kind: "lugas",
+        validates,
+        guards,
       }),
     );
   }
