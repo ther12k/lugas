@@ -71,7 +71,18 @@ describe("createClient() base configuration", () => {
     type API = { readonly "/users": { readonly GET: unknown } };
     const typed: LugasClient<API> = createClient<API>({ baseUrl: "https://x.test" });
     expect(typed.baseUrl).toEqual({ origin: "https://x.test", basePath: "" });
-    expect(Object.keys(typed).sort()).toEqual(["baseUrl", "fetch"]);
+    expect(Object.keys(typed).sort()).toEqual([
+      "baseUrl",
+      "delete",
+      "fetch",
+      "get",
+      "head",
+      "options",
+      "patch",
+      "post",
+      "put",
+      "request",
+    ]);
   });
 
   test("module has no Bun-specific or Proxy usage at runtime surface", async () => {

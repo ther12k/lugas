@@ -1,12 +1,16 @@
 /**
- * `createClient()` base configuration and fetch injection (M3-006).
+ * `createClient()` base configuration, fetch injection, and explicit typed
+ * HTTP methods (M3-006, M3-007).
  *
  * Runtime is platform-neutral: no Bun globals, no Proxy. The application type
  * parameter exists only at compile time and is fully erased — the client stores
- * just the normalized base URL and the transport function. Base URL
- * normalization preserves origin and base path; a base URL carrying a query or
- * fragment is rejected instead of silently dropping those parts.
+ * just the normalized base URL, the transport function, and a small enumerable
+ * set of method functions. Base URL normalization preserves origin and base
+ * path; a base URL carrying a query or fragment is rejected instead of silently
+ * dropping those parts.
  */
+import type { HttpMethod } from "../core/types";
+import type { ClientMethod, ClientRequestEscapeHatch } from "./types";
 
 export type ClientFetch = typeof fetch;
 
@@ -53,23 +57,42 @@ export function joinUrl(base: NormalizedBaseUrl, path: string): string {
   return `${base.origin}${base.basePath}${normalizedPath}`;
 }
 
+/** The supported uppercase HTTP verbs, matching Bun's native route method set. */
+export const CLIENT_HTTP_METHODS = [
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "HEAD",
+  "OPTIONS",
+] as const satisfies readonly HttpMethod[];
+
 /**
  * The typed Lugas client handle. `API` names the application contract for
- * compile-time method typing (introduced incrementally from M3-007 on); it is
- * never represented at runtime.
+ * compile-time method typing; it is never represented at runtime.
  */
 export type LugasClient<API = unknown> = {
   /** Resolved base URL parts (frozen snapshot of configuration). */
   readonly baseUrl: NormalizedBaseUrl;
   /** The transport used for requests (injected or global). */
   readonly fetch: ClientFetch;
-  /** Phantom marker keeping `API` nominally attached without runtime presence. */
-  readonly _api?: API;
+  readonly get: ClientMethod<API, "GET">;
+  readonly post: ClientMethod<API, "POST">;
+  readonly put: ClientMethod<API, "PUT">;
+  readonly patch: ClientMethod<API, "PATCH">;
+  readonly delete: ClientMethod<API, "DELETE">;
+  readonly head: ClientMethod<API, "HEAD">;
+  readonly options: ClientMethod<API, "OPTIONS">;
+  /** Generic escape hatch; see `ClientRequestEscapeHatch`. */
+  readonly request: ClientRequestEscapeHatch;
 };
 
 /**
  * Creates a typed client bound to a base URL and transport.
- * The `API` type parameter is accepted for end-to-end typing and erased.
+ * The `API` type parameter is accepted for end-to-end typing and erased:
+ * methods are plain functions built here, so no Proxy or runtime route tree
+ * is involved in dispatching.
  */
 export function createClient<API = unknown>(config: ClientConfig): LugasClient<API> {
   if (typeof config !== "object" || config === null) {
@@ -78,8 +101,25 @@ export function createClient<API = unknown>(config: ClientConfig): LugasClient<A
   const baseUrl = normalizeBaseUrl(config.baseUrl);
   const transport: ClientFetch =
     config.fetch ?? (globalThis.fetch.bind(globalThis) as ClientFetch);
+  const send = (method: HttpMethod, path: string): Promise<Response> =>
+    transport(joinUrl(baseUrl, path), { method });
   return Object.freeze({
     baseUrl,
     fetch: transport,
+    get: (path) => send("GET", path),
+    post: (path) => send("POST", path),
+    put: (path) => send("PUT", path),
+    patch: (path) => send("PATCH", path),
+    delete: (path) => send("DELETE", path),
+    head: (path) => send("HEAD", path),
+    options: (path) => send("OPTIONS", path),
+    request: (method, path) => {
+      if (!(CLIENT_HTTP_METHODS as readonly string[]).includes(method)) {
+        throw new Error(
+          `${DIAGNOSTIC_PREFIX} unsupported request method ${JSON.stringify(String(method))}; expected one of ${CLIENT_HTTP_METHODS.join(", ")}`,
+        );
+      }
+      return send(method, path);
+    },
   });
 }

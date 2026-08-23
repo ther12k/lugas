@@ -22,9 +22,9 @@ export type PathsForMethod<TContract, TMethod extends HttpMethod> = TContract ex
   ? {
       [P in keyof TContract]: TContract[P] extends Record<string, unknown>
         ? TMethod extends keyof TContract[P]
-          ? P
+          ? P & string
           : "ALL" extends keyof TContract[P]
-          ? P
+          ? P & string
           : never
         : never;
     }[keyof TContract]
@@ -100,3 +100,23 @@ export type ClientOutcomesFor<
   TPath extends string,
   TMethod extends HttpMethod,
 > = ClientOutcomes<RouteEntryForMethod<TContract, TPath, TMethod>>;
+
+/**
+ * Explicit lower-case client method bound to one HTTP verb (M3-007).
+ * The path parameter is restricted to the literal paths whose contract entry
+ * supports that verb (including `ALL` entries); unsupported combinations are
+ * compile errors.
+ */
+export type ClientMethod<TContract, TMethod extends HttpMethod> = (
+  path: PathsForMethod<TContract, TMethod>,
+) => Promise<Response>;
+
+/**
+ * Generic `request` escape hatch (M3-007). Accepts any path with a supported
+ * uppercase verb; it never weakens the canonical methods, which keep
+ * method-specific path restrictions and inference.
+ */
+export type ClientRequestEscapeHatch = (
+  method: HttpMethod,
+  path: string,
+) => Promise<Response>;
