@@ -26,10 +26,12 @@ describe("synchronous route fast path", () => {
     }) as never;
     const compiled = compileRoute("GET /e", descriptor, undefined);
     const wrapped = withErrorPolicy(compiled.handler, defaultOnError, "GET /e");
-    // wrapped is async (error policy may be async); the sync handler's throw
-    // must surface from the sync branch before any await.
+    // M4R1-007 correction: the policy boundary is no longer force-async.
+    // A sync handler's throw resolves through the default policy to a
+    // redacted 500 Response — synchronously, with no Promise allocation.
     const outcome = wrapped(new Request("http://x/e"));
-    expect(outcome).toBeInstanceOf(Promise); // policy boundary is async; handler throw preserved
+    expect(outcome).not.toBeInstanceOf(Promise);
+    expect((outcome as Response).status).toBe(500);
   });
 
   test("sync fast path survives 1k sequential calls without promise allocation", () => {
