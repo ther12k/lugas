@@ -16,7 +16,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "tsBuildInfoFile": "/home/ther12k/Workspace/Learning/lugas/.worktrees/M3-017/benchmarks/typecheck/results/attr-schemas.tsbuildinfo"
+    "tsBuildInfoFile": "/home/ther12k/Workspace/Learning/lugas/.worktrees/M3-GATE/benchmarks/typecheck/results/attr-schemas.tsbuildinfo"
   },
   "include": [
     "attribution/schemas-100.ts"
