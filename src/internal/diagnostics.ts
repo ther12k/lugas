@@ -14,14 +14,15 @@
  * Data-only diagnostic results (non-throwing, e.g. path analysis) reuse the
  * same code registry through the `LugasDiagnostic` shape.
  */
-export type DiagnosticFamily = "APP" | "MODULE" | "ROUTE" | "GUARD" | "ROUTES";
+export type DiagnosticFamily = "APP" | "MODULE" | "ROUTE" | "GUARD" | "ROUTES" | "TEST";
 
 export type DiagnosticCode =
   | "LUGAS_APP_001" | "LUGAS_APP_002" | "LUGAS_APP_003" | "LUGAS_APP_004" | "LUGAS_APP_005" | "LUGAS_APP_006"
   | "LUGAS_MODULE_001" | "LUGAS_MODULE_002" | "LUGAS_MODULE_003" | "LUGAS_MODULE_004" | "LUGAS_MODULE_005"
   | "LUGAS_ROUTE_001" | "LUGAS_ROUTE_002" | "LUGAS_ROUTE_003" | "LUGAS_ROUTE_004" | "LUGAS_ROUTE_005"
   | "LUGAS_GUARD_001" | "LUGAS_GUARD_002" | "LUGAS_GUARD_003" | "LUGAS_GUARD_004"
-  | "LUGAS_ROUTES_001" | "LUGAS_ROUTES_002" | "LUGAS_ROUTES_003" | "LUGAS_ROUTES_004";
+  | "LUGAS_ROUTES_001" | "LUGAS_ROUTES_002" | "LUGAS_ROUTES_003" | "LUGAS_ROUTES_004"
+  | "LUGAS_TEST_001";
 
 /** Data-only diagnostic result (analysis helpers); never thrown as-is. */
 export type LugasDiagnostic = {
@@ -72,6 +73,7 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_ROUTES_002", thrownBy: "serve pipeline", meaning: "unsupported route entry under a method key", hint: "use route() descriptors, native Response values, functions, or {dir}" },
   { code: "LUGAS_ROUTES_003", thrownBy: "serve pipeline", meaning: "unsupported route entry shape", hint: "same allowed shapes as LUGAS_ROUTES_002" },
   { code: "LUGAS_ROUTES_004", thrownBy: "path analysis", meaning: "invalid route path", hint: "paths must start with '/' and follow Bun route syntax" },
+  { code: "LUGAS_TEST_001", thrownBy: "createTestServer()", meaning: "forbidden server override option", hint: "the test server inherits routes/errors from the app; configure them via defineApp/route/guard" },
 ];
 
 const CODE_SET = new Set<string>(DIAGNOSTIC_CATALOG.map((entry) => entry.code));
