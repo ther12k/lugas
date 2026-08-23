@@ -16,7 +16,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "tsBuildInfoFile": "/home/ther12k/Workspace/Learning/lugas/.worktrees/M3-GATE/benchmarks/typecheck/results/app-25.tsbuildinfo"
+    "tsBuildInfoFile": "results/app-25.tsbuildinfo"
   },
   "include": [
     "entries/app-25.entry.ts"
