@@ -55,6 +55,9 @@ function freezeContainers(value: Record<string, unknown>): Record<string, unknow
 
 type Declaration = { readonly owner: string; readonly entry: unknown; readonly moduleName: string | null };
 const ROOT_OWNER = "app root routes";
+
+/** Supported uppercase HTTP method keys (M5R1-003). */
+const VALID_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
 type MethodClaim = { readonly owner: string; readonly value: unknown; readonly moduleName: string | null };
 
 function isPlainEntryObject(entry: unknown): entry is Record<string, unknown> {
@@ -140,6 +143,14 @@ export function prepareApp<TServices>(config: {
         continue;
       }
       for (const [method, value] of Object.entries(plain)) {
+        // M5R1-003: validate method keys against the supported set
+        if (method !== "ALL" && !VALID_METHODS.has(method)) {
+          throw diagnostic(
+            "LUGAS_ROUTES_002",
+            `unsupported route entry at ${method} ${path}`,
+            { hint: "use uppercase HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, or ALL", context: { method, path } },
+          );
+        }
         const prior = methodClaims.get(method);
         if (prior !== undefined) {
           // Defensive: identical exact-method re-declarations are already
