@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "environment": {
+    "bunVersion": "1.4.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpuModel": "13th Gen Intel(R) Core(TM) i5-13420H",
+    "memoryTotalMb": 15360,
+    "commit": "d4e87c3"
+  },
+  "thresholds": {
+    "plain-static": {
+      "releaseBlockMinRps": 30000,
+      "alertMinRps": 40000,
+      "targetRps": 60000
+    },
+    "plain-json": {
+      "releaseBlockMinRps": 25000,
+      "alertMinRps": 35000,
+      "targetRps": 50000
+    },
+    "validated-post": {
+      "releaseBlockMinRps": 15000,
+      "alertMinRps": 20000,
+      "targetRps": 30000
+    }
+  },
+  "typecheckBudgetMs": 2000,
+  "clientBundleMaxBytes": 25000,
+  "notes": "Thresholds derived from M5-002/003/004/005 measured evidence. Baseline updates require PR review."
+}
