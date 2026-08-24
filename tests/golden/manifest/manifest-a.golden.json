@@ -1,0 +1,87 @@
+{
+  "format": "lugas-manifest-v1",
+  "frameworkVersion": "0.0.0",
+  "bunCompatibility": "<bun-version>",
+  "modules": [
+    {
+      "name": "billing",
+      "routes": [
+        "/invoices/:id"
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "method": "*",
+      "path": "/assets",
+      "module": null,
+      "kind": "native",
+      "native": "directory",
+      "validates": [],
+      "guards": []
+    },
+    {
+      "method": "*",
+      "path": "/bare",
+      "module": null,
+      "kind": "lugas",
+      "validates": [],
+      "guards": []
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "module": null,
+      "kind": "native",
+      "native": "static",
+      "validates": [],
+      "guards": []
+    },
+    {
+      "method": "DELETE",
+      "path": "/invoices/:id",
+      "module": "billing",
+      "kind": "lugas",
+      "validates": [
+        "params"
+      ],
+      "guards": [
+        "auth"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/invoices/:id",
+      "module": "billing",
+      "kind": "lugas",
+      "validates": [
+        "params",
+        "query"
+      ],
+      "guards": []
+    },
+    {
+      "method": "*",
+      "path": "/legacy",
+      "module": null,
+      "kind": "native",
+      "native": "handler",
+      "validates": [],
+      "guards": []
+    },
+    {
+      "method": "POST",
+      "path": "/users",
+      "module": null,
+      "kind": "lugas",
+      "validates": [
+        "headers",
+        "body"
+      ],
+      "guards": [
+        "auth",
+        "tenant"
+      ]
+    }
+  ]
+}

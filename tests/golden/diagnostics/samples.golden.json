@@ -1,0 +1,54 @@
+[
+  {
+    "family": "APP",
+    "code": "LUGAS_APP_002",
+    "message": "defineApp(): unknown config key 'bogus'",
+    "hint": "allowed keys: services, routes, modules, notFound, onError",
+    "context": {
+      "key": "bogus"
+    }
+  },
+  {
+    "family": "MODULE",
+    "code": "LUGAS_MODULE_002",
+    "message": "defineModule(): unknown config key 'bogus'",
+    "hint": "allowed keys: name, routes",
+    "context": {
+      "key": "bogus"
+    }
+  },
+  {
+    "family": "ROUTE",
+    "code": "LUGAS_ROUTE_002",
+    "message": "route(): unknown config key 'bogus'",
+    "hint": "allowed keys: handler, before, params, query, headers, body",
+    "context": {
+      "key": "bogus"
+    }
+  },
+  {
+    "family": "GUARD",
+    "code": "LUGAS_GUARD_003",
+    "message": "guard(): 'name' must be a non-empty string",
+    "hint": "guard names appear in manifests; use stable names"
+  },
+  {
+    "family": "ROUTES",
+    "code": "LUGAS_ROUTES_001",
+    "message": "duplicate route GET /x: declared by module 'a' and module 'b'",
+    "hint": "remove one declaration; both owners are named above",
+    "context": {
+      "method": "GET",
+      "path": "/x"
+    }
+  },
+  {
+    "family": "TEST",
+    "code": "LUGAS_TEST_001",
+    "message": "createTestServer(): forbidden option 'routes'",
+    "hint": "the test server inherits routes/errors from the app; configure them via defineApp/route/guard",
+    "context": {
+      "key": "routes"
+    }
+  }
+]
