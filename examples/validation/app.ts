@@ -12,7 +12,7 @@ export const app = defineApp({
           q: z.string().min(1),
           page: z.coerce.number().int().positive().default(1),
         }),
-        handler: (ctx: any) => json(200, { query: ctx.query }),
+        handler: (ctx) => json(200, { query: ctx.query }),
       }),
     },
     "/users/:id": {
@@ -23,7 +23,7 @@ export const app = defineApp({
         headers: z.object({
           "x-api-version": z.string().min(1),
         }),
-        handler: (ctx: any) =>
+        handler: (ctx) =>
           json(200, { id: ctx.params.id, version: ctx.headers["x-api-version"] }),
       }),
       POST: route({
@@ -34,7 +34,7 @@ export const app = defineApp({
           name: z.string().min(2),
           email: z.string().email(),
         }),
-        handler: (ctx: any) =>
+        handler: (ctx) =>
           json(201, { id: ctx.params.id, user: ctx.body }),
       }),
     },
