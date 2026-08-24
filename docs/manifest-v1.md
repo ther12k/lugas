@@ -28,7 +28,8 @@ type LugasManifestV1 = {
   }>;
   readonly routes: ReadonlyArray<{
     readonly method:
-      | "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+      | "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS"
+      | "*";
     readonly path: string;
     readonly module: string | null;
     readonly kind: "native" | "lugas";
@@ -39,16 +40,22 @@ type LugasManifestV1 = {
 };
 ```
 
+## Provenance
+
+Records are captured once at classification time inside `prepareApp()` and
+consumed read-only by the manifest builder — one interpreter, no
+reclassification ([ADR-0017](okf/decisions/0017-manifest-v1-method-and-provenance.md)).
+
 ## Field sources — every field names its runtime origin
 
 | Field | Runtime source |
 |---|---|
 | `format` | Constant literal written by the generator. |
-| `frameworkVersion` | The installed Lugas package version constant read at generation time. Not derived from TypeScript. |
+| `frameworkVersion` | Generated build constant (`src/internal/framework-version.ts`, synced from package.json by `scripts/sync-version.ts`). No runtime filesystem reads — amended by [ADR-0017](okf/decisions/0017-manifest-v1-method-and-provenance.md). |
 | `bunCompatibility` | The observed `Bun.version` of the executing runtime that produced the manifest. Truthful observation, not a support claim. |
 | `modules[].name` | The `name` passed to `defineModule()`; root-level (module-less) routes never appear here. |
 | `modules[].routes` | Paths registered by that module, sorted per the ordering rules. |
-| `routes[].method` | Uppercase literal key of the route entry as declared. |
+| `routes[].method` | Uppercase literal key as declared, or `"*"` for any-method claims (bare descriptors, functions, static values, `{dir}`) — amended by [ADR-0017](okf/decisions/0017-manifest-v1-method-and-provenance.md). |
 | `routes[].path` | The declared route path string verbatim (params like `:id` and wildcards appear un-interpolated). |
 | `routes[].module` | Owning module name, or `null` when declared at the app root. |
 | `routes[].kind` | `"native"` when the entry is a bare native value (`Response`, function, `{dir}`); `"lugas"` when it is a `route()` descriptor. |

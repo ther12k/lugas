@@ -20,6 +20,7 @@
  * to routing/policy ownership, not service contents.
  */
 import { diagnostic, duplicateRoute } from "./diagnostics";
+import { makeFact, descriptorFacts, type RouteFact } from "./route-fact";
 import { classifyRoute } from "./classify-route";
 import { compileRoute } from "./compile-route";
 import { defaultNotFound, defaultOnError, withErrorPolicy, type ErrorPolicy, type NotFoundPolicy } from "./error-policy";
@@ -40,6 +41,8 @@ export type PreparedApp = {
   readonly bunRoutes: Readonly<Record<string, unknown>>;
   /** Resolved not-found policy captured at definition time. */
   readonly notFound: NotFoundPolicy;
+  /** Route facts captured at classification time (ADR-0017 single interpreter). */
+  readonly facts: ReadonlyArray<RouteFact>;
 };
 
 function freezeContainers(value: Record<string, unknown>): Record<string, unknown> {
@@ -50,8 +53,9 @@ function freezeContainers(value: Record<string, unknown>): Record<string, unknow
   return value;
 }
 
-type Declaration = { readonly owner: string; readonly entry: unknown };
-type MethodClaim = { readonly owner: string; readonly value: unknown };
+type Declaration = { readonly owner: string; readonly entry: unknown; readonly moduleName: string | null };
+const ROOT_OWNER = "app root routes";
+type MethodClaim = { readonly owner: string; readonly value: unknown; readonly moduleName: string | null };
 
 function isPlainEntryObject(entry: unknown): entry is Record<string, unknown> {
   return typeof entry === "object" && entry !== null && !(entry instanceof Response) && !(entry instanceof Blob) && !("handler" in entry) && !("dir" in entry);
@@ -75,23 +79,38 @@ export function prepareApp<TServices>(config: {
   // Collect declarations per path, in declaration order (root first, then
   // modules in order). Ownership is tracked per method for diagnostics.
   const declarationsByPath = new Map<string, Declaration[]>();
-  const declare = (owner: string, source: Readonly<Record<string, unknown>> | undefined): void => {
+  const declare = (owner: string, moduleName: string | null, source: Readonly<Record<string, unknown>> | undefined): void => {
     for (const [path, entry] of Object.entries(source ?? {})) {
       let list = declarationsByPath.get(path);
       if (list === undefined) {
         list = [];
         declarationsByPath.set(path, list);
       }
-      list.push({ owner, entry });
+      list.push({ owner, entry, moduleName });
     }
   };
-  declare("app root routes", config.routes);
+  declare(ROOT_OWNER, null, config.routes);
   for (const module_ of config.modules ?? []) {
-    declare(`module '${module_.name}'`, (module_.routes ?? {}) as Record<string, unknown>);
+    declare(`module '${module_.name}'`, module_.name, (module_.routes ?? {}) as Record<string, unknown>);
   }
 
-  const compileMethodValue = (method: string, path: string, value: unknown): unknown => {
+  const facts: RouteFact[] = [];
+
+  const compileMethodValue = (method: string, path: string, moduleName: string | null, value: unknown): unknown => {
     const kind = classifyRoute(value);
+    if (kind.kind === "lugas-descriptor") {
+      const declared = descriptorFacts(kind.descriptor as unknown as Record<string, unknown>);
+      facts.push(makeFact({ method, path, module: moduleName, kind: "lugas", ...declared }));
+    } else if (kind.kind === "native-handler") {
+      facts.push(makeFact({ method, path, module: moduleName, kind: "native", native: "handler", validates: [], guards: [] }));
+    } else if (kind.kind === "native-response" || kind.kind === "native-file") {
+      facts.push(makeFact({ method, path, module: moduleName, kind: "native", native: "static", validates: [], guards: [] }));
+    } else if (kind.kind === "native-dir") {
+      facts.push(makeFact({ method, path, module: moduleName, kind: "native", native: "directory", validates: [], guards: [] }));
+    } else if (kind.kind !== "unsupported" && kind.kind !== "native-method-map") {
+      // Opaque nested passthroughs record as static rows (ADR-0017 #4).
+      facts.push(makeFact({ method, path, module: moduleName, kind: "native", native: "static", validates: [], guards: [] }));
+    }
     if (kind.kind === "lugas-descriptor") {
       const routeId = `${method} ${path}`;
       return withErrorPolicy(compileRoute(routeId, kind.descriptor, config.services).handler, onError, routeId);
@@ -114,10 +133,10 @@ export function prepareApp<TServices>(config: {
     const anyClaims: Declaration[] = [];
     const methodClaims = new Map<string, MethodClaim>();
 
-    for (const { owner, entry } of declarations) {
+    for (const { owner, entry, moduleName } of declarations) {
       const plain = isPlainEntryObject(entry) ? entry : undefined;
       if (plain === undefined) {
-        anyClaims.push({ owner, entry });
+        anyClaims.push({ owner, entry, moduleName });
         continue;
       }
       for (const [method, value] of Object.entries(plain)) {
@@ -128,7 +147,7 @@ export function prepareApp<TServices>(config: {
           // caller can bypass ownership by reaching this layer directly.
           throw duplicateRoute(method, path, prior.owner, owner);
         }
-        methodClaims.set(method, { owner, value });
+        methodClaims.set(method, { owner, value, moduleName });
       }
     }
 
@@ -145,12 +164,23 @@ export function prepareApp<TServices>(config: {
 
     if (anyClaims.length === 1) {
       const entry = anyClaims[0]!.entry;
+      const moduleName = anyClaims[0]!.moduleName;
       const kind = classifyRoute(entry);
       // Raw Bun semantics (M4R1-004): function values serve verbatim,
       // untouched by the framework pipeline.
       if (kind.kind === "native-handler") {
         compiled[path] = kind.handler;
+        facts.push(makeFact({ method: "*", path, module: moduleName, kind: "native", native: "handler", validates: [], guards: [] }));
         continue;
+      }
+      // ADR-0017 #3: bare descriptors become one visible "*" lugas record.
+      if (kind.kind === "lugas-descriptor") {
+        const declared = descriptorFacts(kind.descriptor as unknown as Record<string, unknown>);
+        facts.push(makeFact({ method: "*", path, module: moduleName, kind: "lugas", ...declared }));
+      } else if (kind.kind === "native-response" || kind.kind === "native-file") {
+        facts.push(makeFact({ method: "*", path, module: moduleName, kind: "native", native: "static", validates: [], guards: [] }));
+      } else if (kind.kind === "native-dir") {
+        facts.push(makeFact({ method: "*", path, module: moduleName, kind: "native", native: "directory", validates: [], guards: [] }));
       }
       if (kind.kind === "lugas-descriptor") {
         const routeId = `* ${path}`;
@@ -174,7 +204,7 @@ export function prepareApp<TServices>(config: {
 
     const methodMap: Record<string, unknown> = {};
     for (const [method, claim] of methodClaims) {
-      methodMap[method] = compileMethodValue(method, path, claim.value);
+      methodMap[method] = compileMethodValue(method, path, claim.moduleName, claim.value);
     }
     compiled[path] = Object.freeze(methodMap);
   }
@@ -182,5 +212,6 @@ export function prepareApp<TServices>(config: {
   return Object.freeze({
     bunRoutes: Object.freeze(freezeContainers(compiled)),
     notFound: config.notFound ?? defaultNotFound,
+    facts: Object.freeze(facts),
   });
 }

@@ -70,7 +70,7 @@ function fixtureApp() {
 
 describe("manifest capability + guard identity capture", () => {
   const records = captureRouteRecords(
-    (fixtureApp() as unknown as { composition: never }).composition,
+    (fixtureApp() as unknown as { prepared: { facts: never } }).prepared.facts,
   );
   const byKey = new Map(records.map((r) => [`${r.method} ${r.path}`, r]));
 
@@ -131,7 +131,7 @@ describe("manifest capability + guard identity capture", () => {
       },
     });
     const recs = captureRouteRecords(
-      (app2 as unknown as { composition: never }).composition,
+      (app2 as unknown as { prepared: { facts: never } }).prepared.facts,
     );
     expect(recs[0]?.guards).toEqual(["same", "same"]);
     void otherSame;
@@ -141,7 +141,7 @@ describe("manifest capability + guard identity capture", () => {
     const once = sortForSerialization(records);
     const twice = sortForSerialization(
       captureRouteRecords(
-        (fixtureApp() as unknown as { composition: never }).composition,
+        (fixtureApp() as unknown as { prepared: { facts: never } }).prepared.facts,
       ),
     );
     expect(JSON.stringify(twice)).toBe(JSON.stringify(once));

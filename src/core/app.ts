@@ -70,11 +70,12 @@ export function defineApp<
   if (config.routes !== undefined && (typeof config.routes !== "object" || config.routes === null)) {
     throw diagnostic("LUGAS_APP_006", "defineApp(): 'routes' must be an object keyed by full path", { hint: 'use string paths like "/users/:id"' });
   }
+  // Composition validates ownership (duplicate rejection across owners) but
+  // no longer feeds the manifest.
   const composition = compose({
     routes: config.routes,
     modules: (config.modules ?? []) as ReadonlyArray<ModuleDescriptor<never>>,
   });
-  const manifest = buildManifest(composition);
   // Snapshot + classify + compile exactly once. Services stay live references;
   // routing structure is captured here and never re-read at serve time.
   const prepared = prepareApp({
@@ -84,6 +85,9 @@ export function defineApp<
     notFound: config.notFound,
     onError: config.onError,
   });
+  // Manifest records come from the prepared graph facts — single interpreter
+  // (M4R1-008, ADR-0017).
+  const manifest = buildManifest(prepared, composition.moduleNames);
   return brand(
     Object.freeze({
       services: config.services as TServices,
