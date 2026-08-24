@@ -1,0 +1,165 @@
+# Lugas — Full Agent Reference
+
+Version: 0.0.0
+
+## Purpose
+
+Lugas is a Bun-native HTTP framework with derived types, Standard Schema
+validation, ordered guards, and a typed client.
+
+## Non-negotiable constraints
+
+- No custom router — uses Bun's native route matching.
+- No Eden or Elysia dependency.
+- Runtime facts and compile-time contract are separate systems.
+- Public API is small, explicit, object-based, and statically searchable.
+
+## Server API: defineApp + route
+
+```ts
+import { defineApp } from "lugas";
+import { route } from "lugas";
+import { json } from "lugas";
+import { z } from "zod";
+
+const app = defineApp({
+  routes: {
+    "/users/:id": {
+      GET: route({
+        params: z.object({ id: z.string() }),
+        query: z.object({ verbose: z.boolean().optional() }),
+        handler: ({ params, query }) => json(200, { id: params.id }),
+      }),
+    },
+    "/users": {
+      POST: route({
+        body: z.object({ name: z.string() }),
+        before: [authGuard],
+        handler: ({ body }) => json(201, { created: true, name: body.name }),
+      }),
+    },
+  },
+});
+```
+
+## Validation (Standard Schema v1)
+
+Use zod or valibot on any of the four slots:
+
+```ts
+route({
+  params: z.object({ id: z.coerce.number() }),   // transformed output
+  query: z.object({ q: z.string().optional() }),
+  headers: z.object({ authorization: z.string() }),
+  body: z.object({ name: z.string(), tags: z.array(z.string()).optional() }),
+  handler: ({ params, query, headers, body }) => {
+    // params.id is number; query.q is string | undefined
+  },
+});
+```
+
+## Guards
+
+Ordered guards short-circuit with a Response or pass enrichment objects:
+
+```ts
+const auth = guard({
+  name: "auth",
+  handler: () => json(401, { error: "unauthorized" }), // short-circuit
+});
+
+const enrich = guard({
+  name: "enrich",
+  handler: () => ({ user: { id: "u1" } }), // merged into ctx
+});
+```
+
+Guards run in declaration order. Later guards cannot silently shadow earlier
+keys with different types (compile-time never).
+
+## Responses
+
+```ts
+json(200, { data: "..." })       // application/json
+text(200, "hello")               // text/plain
+empty(204)                       // no content
+problem(404, { title: "Not found", code: "NOT_FOUND" })
+redirect("/other")               // 302
+```
+
+## Typed client
+
+```ts
+import { createClient } from "lugas/client";
+import type { AppContract } from "lugas";
+
+type API = AppContract<typeof app>;
+const client = createClient<API>({ baseUrl: "https://api.example.com" });
+
+// Path restrictions are compile-time enforced:
+const res = await client.get("/users/42", { query: { verbose: true } });
+if (res.ok) console.log(res.data);
+else console.log(res.status, res.error);
+```
+
+## Test server helper
+
+```ts
+import { createTestServer } from "lugas/testing";
+
+const ts = createTestServer(app); // ephemeral port, typed .client included
+const res = await ts.client.get("/users/42");
+await ts.stop(); // deterministic cleanup
+```
+
+## Manifest inspection
+
+```ts
+const manifest = app.manifest; // readonly lugas-manifest-v1 object
+console.log(manifest.routes.length, manifest.modules);
+```
+
+## CLI
+
+```bash
+bun run src/cli/main.ts routes ./src/app.ts       # human-readable table
+bun run src/cli/main.ts inspect ./src/app.ts      # JSON manifest to stdout
+```
+
+## Worktree workflow
+
+```bash
+git worktree add .worktrees/<ISSUE-ID> -b agent/<ISSUE-ID>-<slug> main
+# work in .worktrees/<ISSUE-ID>
+git add -A && git commit && git push -u origin agent/<ISSUE-ID>-<slug>
+gh pr create && gh pr merge --merge
+git worktree remove .worktrees/<ISSUE-ID>
+```
+
+## Diagnostic codes
+
+| Code | Raised by | Meaning |
+|---|---|---|
+| LUGAS_CLIENT_001–005 | path | missing/extra/invalid/ambiguous/template |
+| LUGAS_CLIENT_006 | query | query value policy violation |
+| LUGAS_CLIENT_007–009 | request | ownership/content-type/header validation |
+| LUGAS_CLIENT_010 | decode | malformed declared JSON |
+| LUGAS_APP_001–006 | defineApp | config validation |
+| LUGAS_MODULE_001–005 | defineModule | module validation |
+| LUGAS_ROUTE_001–005 | route() | descriptor validation |
+| LUGAS_GUARD_001–004 | guard() | guard validation |
+| LUGAS_ROUTES_001–004 | compose/serve | duplicate/unsupported/invalid paths |
+
+## Prohibited patterns
+
+- Do NOT use Proxy for routing or method dispatch.
+- Do NOT import server modules in client code.
+- Do NOT use `any` at public boundaries.
+- Do NOT add features not assigned to an issue.
+- Do NOT weaken tests to make them pass.
+
+## Current limitations
+
+- macOS/Windows untested (Linux x86-64 only in CI).
+- `.d.ts` declarations deferred to release tooling.
+- Opaque browser redirects not exercised.
