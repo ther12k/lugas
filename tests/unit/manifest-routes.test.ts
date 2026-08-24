@@ -44,7 +44,7 @@ function fixtureApp() {
 }
 
 const app = fixtureApp();
-const records = captureRouteRecords((app as unknown as { composition: never }).composition);
+const records = captureRouteRecords((app as unknown as { prepared: { facts: never } }).prepared.facts);
 
 describe("manifest route capture", () => {
   test("every final method/path appears exactly once", () => {
@@ -120,7 +120,7 @@ describe("manifest route capture", () => {
   });
 
   test("capture is deterministic across repeated runs", () => {
-    const again = captureRouteRecords((app as unknown as { composition: never }).composition);
+    const again = captureRouteRecords((app as unknown as { prepared: { facts: never } }).prepared.facts);
     expect(JSON.stringify(again)).toBe(JSON.stringify(records));
   });
 });

@@ -1,27 +1,16 @@
 /**
- * Runtime manifest route-record capture (M4-002).
+ * Runtime manifest assembly (M4-002, M4R1-008, ADR-0017).
  *
- * Captures deterministic per-route records during composition — never by
- * inspecting compiled handlers — and classifies entries exactly like the
- * composition ownership index does:
- *
- * - bare `Response` / `Blob` / primitive values → native `"static"`;
- * - plain functions → native `"handler"`;
- * - `{ dir: string }` sole-key objects → native `"directory"`;
- * - `route()` descriptors (object with a handler + before array) expand to
- *   one record per declared uppercase method key, kind `"lugas"`; the key is
- *   recorded verbatim (including Bun's `ALL`) because that is the runtime
- *   truth. Final serialized representation of wildcard/ALL methods is owned
- *   by the manifest serialization step and the frozen v1 document.
- *
- * Records retain no handler or service references: they are frozen,
- * JSON-serializable snapshots of composition facts.
+ * Route records are RouteFacts captured once at classification time inside
+ * `prepareApp()` — this module never re-classifies user values. It orders
+ * (frozen v1 policy), assembles the frozen document, and serializes.
+ * `frameworkVersion` is a generated build constant (no filesystem reads).
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import type { Composition } from "./compose";
+import { FRAMEWORK_VERSION } from "./framework-version";
+import type { PreparedApp } from "./prepared-app";
+import type { RouteCapability, RouteFact } from "./route-fact";
 
-/** Frozen v1 manifest shape (docs/manifest-v1.md). */
+/** Frozen v1 manifest shape (docs/manifest-v1.md, amended by ADR-0017). */
 export type LugasManifestV1 = {
   readonly format: "lugas-manifest-v1";
   readonly frameworkVersion: string;
@@ -32,6 +21,18 @@ export type LugasManifestV1 = {
   }>;
   readonly routes: ReadonlyArray<ManifestRouteRecord>;
 };
+
+export type ManifestRouteKind = "native" | "lugas";
+
+/** Manifest record shape — an alias of the preparation-time RouteFact. */
+export type ManifestRouteRecord = RouteFact;
+export type ManifestMethod = string;
+export { CAPABILITY_ORDER } from "./route-fact";
+export type { NativeRouteShape } from "./route-fact";
+export type { RouteCapability as ManifestCapability } from "./route-fact";
+
+const EMPTY_CAPABILITIES: ReadonlyArray<RouteCapability> = Object.freeze([]);
+const EMPTY_GUARDS: readonly string[] = Object.freeze([]);
 
 function deepFreeze<T>(value: T): T {
   if (Array.isArray(value)) {
@@ -44,166 +45,14 @@ function deepFreeze<T>(value: T): T {
   return Object.freeze(value);
 }
 
-function frameworkVersion(): string {
-  const raw = readFileSync(resolve(import.meta.dir, "../../package.json"), "utf8");
-  return (JSON.parse(raw) as { version?: string }).version ?? "0.0.0";
-}
-
-export type ManifestRouteKind = "native" | "lugas";
-
-const EMPTY_CAPABILITIES: ReadonlyArray<ManifestCapability> = Object.freeze([]);
-const EMPTY_GUARDS: readonly string[] = Object.freeze([]);
-
-export type NativeRouteShape = "static" | "handler" | "directory";
-
-export type ManifestMethod = string;
-
-export type ManifestCapability = "params" | "query" | "headers" | "body";
-
-/** Canonical capability order mandated by the frozen v1 document. */
-const CAPABILITY_ORDER: ReadonlyArray<ManifestCapability> = [
-  "params",
-  "query",
-  "headers",
-  "body",
-];
-
-export type ManifestRouteRecord = {
-  /** Declared uppercase method key; `"*"` for native any-method entries. */
-  readonly method: ManifestMethod;
-  readonly path: string;
-  readonly module: string | null;
-  readonly kind: ManifestRouteKind;
-  /** Present only when `kind === "native"`. */
-  readonly native?: NativeRouteShape | undefined;
-  /** Slots carrying a declared validator — presence only, canonical order. */
-  readonly validates: ReadonlyArray<ManifestCapability>;
-  /** Guard names in execution order. */
-  readonly guards: readonly string[];
-};
-
-function classifyNative(entry: unknown): NativeRouteShape {
-  if (typeof entry === "function") {
-    return "handler";
-  }
-  if (entry instanceof Response || entry instanceof Blob) {
-    return "static";
-  }
-  return "static";
-}
-
-function isDirectoryEntry(entry: object): boolean {
-  const record = entry as Record<string, unknown>;
-  return typeof record.dir === "string" && Object.keys(record).length === 1;
-}
-
-/** Expands one composed entry into zero or more manifest records. */
-function recordsForEntry(owner: { module: string | null; path: string }, entry: unknown): ManifestRouteRecord[] {
-  if (
-    entry instanceof Response ||
-    entry instanceof Blob ||
-    typeof entry !== "object" ||
-    entry === null
-  ) {
-    return [
-      Object.freeze({
-        method: "*",
-        path: owner.path,
-        module: owner.module,
-        kind: "native",
-        native: typeof entry === "function" ? "handler" : "static",
-        validates: EMPTY_CAPABILITIES,
-        guards: EMPTY_GUARDS,
-      }),
-    ];
-  }
-  if (isDirectoryEntry(entry)) {
-    return [
-      Object.freeze({
-        method: "*",
-        path: owner.path,
-        module: owner.module,
-        kind: "native",
-        native: "directory",
-        validates: EMPTY_CAPABILITIES,
-        guards: EMPTY_GUARDS,
-      }),
-    ];
-  }
-  // Method-map objects: one child per declared uppercase method key. Each
-  // child is classified on its own so `{ GET: route(...) }`, `{ GET: new
-  // Response(...) }`, and Bun's `ALL` are all recorded truthfully.
-  const record = entry as Record<string, unknown>;
-  const out: ManifestRouteRecord[] = [];
-  for (const key of Object.keys(record)) {
-    if (key === "" || key !== key.toUpperCase()) {
-      continue;
-    }
-    const child = record[key];
-    if (
-      child instanceof Response ||
-      child instanceof Blob ||
-      typeof child !== "object" ||
-      child === null
-    ) {
-      out.push(
-        Object.freeze({
-          method: key,
-          path: owner.path,
-          module: owner.module,
-          kind: "native",
-          native: typeof child === "function" ? ("handler" as const) : ("static" as const),
-          validates: EMPTY_CAPABILITIES,
-          guards: EMPTY_GUARDS,
-        }),
-      );
-      continue;
-    }
-    if (isDirectoryEntry(child)) {
-      out.push(
-        Object.freeze({
-          method: key,
-          path: owner.path,
-          module: owner.module,
-          kind: "native",
-          native: "directory" as const,
-          validates: EMPTY_CAPABILITIES,
-          guards: EMPTY_GUARDS,
-        }),
-      );
-      continue;
-    }
-    const childRecord = child as Record<string, unknown>;
-    const validates = CAPABILITY_ORDER.filter(
-      (slot) => childRecord[slot] !== undefined,
-    );
-    const before = Array.isArray(childRecord.before) ? childRecord.before : [];
-    const guards = before.map((g) => (g as { name?: unknown }).name as string);
-    out.push(
-      Object.freeze({
-        method: key,
-        path: owner.path,
-        module: owner.module,
-        kind: "lugas",
-        validates,
-        guards,
-      }),
-    );
-  }
-  return out;
-}
-
 /**
- * Captures one record per final method/path from the composition, in
- * declaration order. Every final method/path appears exactly once because
- * composition rejects duplicates before this runs.
+ * Captures one record per prepared route fact. Facts are already classified;
+ * ordering is applied by sortForSerialization before assembly.
  */
-export function captureRouteRecords(composition: Composition): readonly ManifestRouteRecord[] {
-  const records: ManifestRouteRecord[] = [];
-  for (const { owner, entry } of composition.routes) {
-    records.push(...recordsForEntry(owner, entry));
-  }
-  return Object.freeze(records);
+export function captureRouteRecords(facts: readonly RouteFact[]): readonly ManifestRouteRecord[] {
+  // Facts are individually frozen at creation (route-fact.ts) and the
+  // prepared array is frozen; no copying, so freeze status is preserved.
+  return Object.freeze(facts);
 }
 
 /**
@@ -228,9 +77,9 @@ export function sortForSerialization(
  * Assembles the complete frozen v1 manifest from a composition. Pure:
  * performs no requests, starts no server, executes no handlers.
  */
-export function buildManifest(composition: Composition): LugasManifestV1 {
-  const records = sortForSerialization(captureRouteRecords(composition));
-  const modules = composition.moduleNames
+export function buildManifest(prepared: PreparedApp, moduleNames: readonly string[]): LugasManifestV1 {
+  const records = sortForSerialization(captureRouteRecords(prepared.facts));
+  const modules = moduleNames
     .map((name) => ({
       name,
       routes: [...new Set(records.filter((r) => r.module === name).map((r) => r.path))].sort(),
@@ -238,7 +87,7 @@ export function buildManifest(composition: Composition): LugasManifestV1 {
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   return deepFreeze({
     format: "lugas-manifest-v1",
-    frameworkVersion: frameworkVersion(),
+    frameworkVersion: FRAMEWORK_VERSION,
     bunCompatibility: `bun@${Bun.version}`,
     modules,
     routes: records,
