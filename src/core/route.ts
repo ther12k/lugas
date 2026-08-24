@@ -9,9 +9,15 @@
  */
 import { diagnostic } from "../internal/diagnostics";
 import { brand } from "../internal/brands";
-import type { StandardSchema } from "../internal/standard-schema";
+import { type RouteContext, type SchemaOutputOrRawParams } from "../internal/context";
 import type { GuardDescriptor, RouteDescriptor, RouteHandler } from "./types";
 
+/**
+ * Handler context is DERIVED from the declared schemas and guard chain
+ * (M4R1-005): schema outputs for `query` / `headers` / `body`, transformed
+ * outputs for `params`, ordered guard enrichments — see `RouteContext` in
+ * `src/internal/context.ts`.
+ */
 export type RouteConfig<
   TServices = unknown,
   TContext = unknown,
@@ -20,13 +26,11 @@ export type RouteConfig<
   THeaders = unknown,
   TBody = unknown,
   TReturn = Response | Promise<Response>,
-  TGuards extends ReadonlyArray<GuardDescriptor<any, any>> = ReadonlyArray<GuardDescriptor<TServices, unknown>>,
+  TGuards extends ReadonlyArray<GuardDescriptor<TServices, any>> = ReadonlyArray<GuardDescriptor<TServices, never>>,
 > = {
-  handler: (context: {
-    readonly request: Request;
-    readonly services: TServices;
-    readonly params: Record<string, string>;
-  } & TContext) => TReturn;
+  handler: (
+    context: RouteContext<TServices, TParams, TQuery, THeaders, TBody, TGuards> & TContext,
+  ) => TReturn;
   before?: TGuards;
   params?: TParams;
   query?: TQuery;
@@ -44,10 +48,19 @@ export function route<
   const THeaders = undefined,
   const TBody = undefined,
   TReturn extends Response | Promise<Response> = Response | Promise<Response>,
-  TGuards extends ReadonlyArray<GuardDescriptor<any, any>> = readonly [],
+  const TGuards extends ReadonlyArray<GuardDescriptor<any, any>> = readonly [],
 >(
   config: RouteConfig<TServices, TContext, TParams, TQuery, THeaders, TBody, TReturn, TGuards>,
-): RouteDescriptor<TServices, TContext, TParams, TQuery, THeaders, TBody, TReturn, TGuards> {
+): RouteDescriptor<
+  TServices,
+  RouteContext<TServices, TParams, TQuery, THeaders, TBody, TGuards> & TContext,
+  TParams,
+  TQuery,
+  THeaders,
+  TBody,
+  TReturn,
+  TGuards
+> {
   if (typeof config !== "object" || config === null) {
     throw diagnostic("LUGAS_ROUTE_001", "route(): config must be an object", { hint: "pass route({ handler })" });
   }
