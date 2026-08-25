@@ -56,7 +56,8 @@ function served() {
           before: [
             guard({
               name: "rejector",
-              handler: async ({ params }) => {
+              handler: async (ctx: any) => {
+                const params = (ctx as any).params;
                 await Bun.sleep(Math.random() * 3);
                 if (params.id === "reject") {
                   return new Response(JSON.stringify({ rejected: true }), { status: 403 });
@@ -65,7 +66,7 @@ function served() {
               },
             }),
           ],
-          handler: () => json(200, { ok: true }),
+          handler: () => new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } }),
         }),
       },
     },
@@ -88,15 +89,16 @@ describe("pipeline concurrency stress", () => {
           headers: { "content-type": "application/json", "x-request-id": reqId },
           body: JSON.stringify({ payload: `payload-${i}` }),
         }).then(async (res) => {
-          const body = await res.json();
+          const body = (await res.json()) as { requestId?: string; payload?: string };
           return { reqId, resId: body.requestId ?? "", payload: body.payload ?? "" };
         });
       });
 
       const responses = await Promise.all(requests);
       for (let i = 0; i < N; i++) {
-        expect(responses[i].resId).toBe(`req-${i}`);
-        expect(responses[i].payload).toBe(`payload-${i}`);
+        const r = responses[i]!;
+        expect(r.resId).toBe(`req-${i}`);
+        expect(r.payload).toBe(`payload-${i}`);
       }
 
       // No duplicate execution: each request should have exactly one handler call
