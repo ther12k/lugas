@@ -47,6 +47,33 @@ export function defineApp<
   if (typeof config !== "object" || config === null) {
     throw diagnostic("LUGAS_APP_001", "defineApp(): config must be an object", { hint: "pass defineApp({ routes }) with an object literal" });
   }
+
+  // M5R1 correction: validate all route paths immediately after config shape check
+  if (config.routes !== undefined) {
+    for (const [path] of Object.entries(config.routes)) {
+      if (!path.startsWith("/")) {
+        throw new Error(`LUGAS_ROUTES_004: route path must start with '/': ${JSON.stringify(path)}`);
+      }
+      const segments = path.slice(1).split("/");
+      const seen = new Set<string>();
+      for (let si = 0; si < segments.length; si++) {
+        const seg = segments[si]!;
+        if (seg.startsWith(":")) {
+          const name = seg.slice(1);
+          if (!name || !/^[A-Za-z0-9_]+$/.test(name)) {
+            throw new Error(`LUGAS_ROUTES_004: invalid param token '${seg}'`);
+          }
+          if (seen.has(name)) {
+            throw new Error(`LUGAS_ROUTES_004: duplicate param ':${name}'`);
+          }
+          seen.add(name);
+        }
+        if (seg === "*" && si !== segments.length - 1) {
+          throw new Error("LUGAS_ROUTES_004: wildcard '*' must be the final segment");
+        }
+      }
+    }
+  }
   for (const key of Object.keys(config)) {
     if (!APP_KEYS.has(key)) {
       throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, notFound, onError", context: { key } });
