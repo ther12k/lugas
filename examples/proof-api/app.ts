@@ -45,7 +45,7 @@ export const proofApp = defineApp({
         body: z.object({ name: z.string().min(1), email: z.string().email() }),
         handler: (ctx) => {
           const id = nextId++;
-          const user = { id, name: ctx.body?.name ?? "", email: ctx.body?.email ?? "" };
+          const user = { id, name: (ctx.body as any)?.name ?? "", email: (ctx.body as any)?.email ?? "" };
           users.set(id, user);
           return json(201, user);
         },
@@ -71,7 +71,7 @@ export const proofApp = defineApp({
         handler: ({ params, body }) => {
           const existing = users.get(params.id);
           if (!existing) return json(404, { code: "USER_NOT_FOUND" });
-          const updated = { ...existing, ...body };
+          const updated = { id: params.id, name: body.name ?? existing.name, email: body.email ?? existing.email };
           users.set(params.id, updated);
           return json(200, updated);
         },

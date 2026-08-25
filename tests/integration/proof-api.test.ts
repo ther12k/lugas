@@ -18,7 +18,7 @@ describe("CRUD proof API", () => {
       body: JSON.stringify({ name: "Ada", email: "ada@example.com" }),
     });
     expect(res.status).toBe(201);
-    const user = await res.json();
+    const user = (await (res.json() as Promise<any>)) as any;
     expect(user.name).toBe("Ada");
     expect(user.id).toBeGreaterThan(0);
   });
@@ -26,7 +26,7 @@ describe("CRUD proof API", () => {
   test("GET /users lists created users", async () => {
     const res = await fetch(new URL("/users", base));
     expect(res.status).toBe(200);
-    const list = await res.json();
+    const list = (await (res.json() as Promise<any>)) as any;
     expect(Array.isArray(list)).toBe(true);
     expect(list.length).toBeGreaterThan(0);
   });
@@ -40,7 +40,7 @@ describe("CRUD proof API", () => {
     });
     const res = await fetch(new URL("/users/1", base));
     expect(res.status).toBe(200);
-    const user = await res.json();
+    const user = (await (res.json() as Promise<any>)) as any;
     expect(user.id).toBe(1);
   });
 
@@ -51,7 +51,7 @@ describe("CRUD proof API", () => {
       body: JSON.stringify({ name: "Ada Updated" }),
     });
     expect(res.status).toBe(200);
-    const user = await res.json();
+    const user = (await (res.json() as Promise<any>)) as any;
     expect(user.name).toBe("Ada Updated");
   });
 
