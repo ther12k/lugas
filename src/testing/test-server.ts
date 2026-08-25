@@ -62,7 +62,9 @@ export function createTestServer<TServices, TRoutes>(
   options: TestServerOptions = {},
 ): TestServer<LugasClient<AppContract<LugasAppInstance<TServices, TRoutes>>>> {
   rejectForbiddenOptions(options as Record<string, unknown>);
-  const server = app.serve({ port: options.port ?? 0, development: options.development ?? false });
+  const serveOpts: Record<string, unknown> = { port: options.port ?? 0, development: options.development ?? false };
+  if (options.hostname !== undefined) serveOpts.hostname = options.hostname;
+  const server = app.serve(serveOpts as never);
   const base = new URL(server.url);
 
   let stopped = false;

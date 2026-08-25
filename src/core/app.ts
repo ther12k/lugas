@@ -74,6 +74,14 @@ export function defineApp<
       }
     }
   }
+
+  // M5R1: validate error/notFound policies are functions
+  if (config.onError !== undefined && typeof config.onError !== 'function') {
+    throw diagnostic('LUGAS_APP_002', "defineApp(): 'onError' must be a function", { context: { key: 'onError' } });
+  }
+  if (config.notFound !== undefined && typeof config.notFound !== 'function') {
+    throw diagnostic('LUGAS_APP_002', "defineApp(): 'notFound' must be a function", { context: { key: 'notFound' } });
+  }
   for (const key of Object.keys(config)) {
     if (!APP_KEYS.has(key)) {
       throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, notFound, onError", context: { key } });

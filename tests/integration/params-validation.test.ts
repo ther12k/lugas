@@ -50,7 +50,7 @@ describe("Params validation & transformation", () => {
     if (!syncResult.ok) {
       expect(syncResult.response.status).toBe(422);
       expect(syncResult.response.headers.get("content-type")).toContain("application/problem+json");
-      const body = (await syncResult.response.json()) as {
+      const body = (await syncResult.response.json() as any) as {
         type: string;
         title: string;
         code: string;

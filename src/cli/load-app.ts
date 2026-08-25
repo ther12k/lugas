@@ -56,6 +56,7 @@ export function loadAppManifest(
   const scriptPath = join(dir, "load-child.ts");
   writeFileSync(scriptPath, CHILD_SCRIPT);
 
+  let timedOut = false;
   try {
     const proc = Bun.spawnSync(
       [process.execPath, "run", scriptPath, resolvedPath],
@@ -68,9 +69,15 @@ export function loadAppManifest(
       },
     );
 
+    if (proc.signalCode === 'SIGKILL' || (proc.exitCode !== null && proc.exitCode > 128)) {
+      timedOut = true;
+    }
     const stdout = new TextDecoder().decode(proc.stdout).trim();
     const stderr = new TextDecoder().decode(proc.stderr).trim();
 
+    if (timedOut) {
+      return { ok: false, exitCode: 2, message: `app module timed out after ${timeout}ms — possible server start or hanging timer` };
+    }
     if (proc.exitCode === 3) {
       return { ok: false, exitCode: 3, message: stderr || "no Lugas app exported" };
     }

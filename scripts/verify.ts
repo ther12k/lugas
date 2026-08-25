@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { checkBunVersion } from "./check-bun-version";
+
 type CheckResult = { name: string; status: "PASS" | "FAIL" | "SKIP"; output: string };
 
 const checks = [
@@ -27,6 +29,8 @@ async function run(name: string, command: readonly string[]): Promise<CheckResul
 
 async function main(): Promise<number> {
   if (Bun.argv.includes("--help")) { help(); return 0; }
+  checkBunVersion();
+  console.log("== bun-version ==\nPASS\n");
   const results: CheckResult[] = [];
   for (const [name, command] of checks) {
     console.log(`== ${name} ==`);

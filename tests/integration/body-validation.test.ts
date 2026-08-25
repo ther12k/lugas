@@ -93,7 +93,7 @@ describe("JSON body validation & transformation", () => {
     if (!result.ok) {
       expect(result.response.status).toBe(422);
       expect(result.response.headers.get("content-type")).toContain("application/problem+json");
-      const body = (await result.response.json()) as {
+      const body = (await result.response.json() as any) as {
         type: string;
         title: string;
         code: string;

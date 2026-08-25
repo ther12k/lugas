@@ -165,6 +165,11 @@ export function prepareApp<TServices>(config: {
     if (anyClaims.length > 1) {
       throw duplicateRoute("*", path, anyClaims[0]!.owner, anyClaims[1]!.owner);
     }
+
+    // M5R1 correction: empty method map must fail closed
+    if (anyClaims.length === 0 && methodClaims.size === 0) {
+      throw diagnostic("LUGAS_ROUTES_003", `unsupported route entry at ${path}: no valid handler found`, { context: { path } });
+    }
     if (anyClaims.length === 1 && methodClaims.size > 0) {
       const firstMethod = methodClaims.keys().next().value as string;
       const methodOwner = methodClaims.get(firstMethod)!.owner;
