@@ -21,6 +21,8 @@ jobs:
         with:
           bun-version: ${{ matrix.bun }}
       - run: bun install --frozen-lockfile
+      # M6-006: the user-facing table must never drift from the matrix source.
+      - run: bun run verify:compatibility-report
       - run: bun run typecheck
       - run: bun test tests/unit/ tests/conformance/
       - run: bun test tests/security/ --timeout 30000
