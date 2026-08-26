@@ -5,30 +5,16 @@
  * transformed output to handlers and guards. When no schema is declared,
  * passes raw string params through with zero validation overhead.
  */
-import { problem } from "../core/response";
 import type { StandardSchema, StandardSchemaOutput } from "./standard-schema";
 import { executeStandardSchema } from "./standard-schema";
 import type { NormalizedValidationIssue } from "./validation-issues";
 import { normalizeValidationIssues } from "./validation-issues";
+import { createValidationProblem } from "./validation-problem";
 
-export const VALIDATION_PROBLEM_TYPE = "https://lugasjs.dev/problems/validation";
-
-export function createValidationProblem(
-  issues: ReadonlyArray<NormalizedValidationIssue>,
-  source?: "params" | "query" | "headers" | "body",
-): Response {
-  const fields: Record<string, unknown> = {
-    type: VALIDATION_PROBLEM_TYPE,
-    title: "Request validation failed",
-    status: 422,
-    code: "VALIDATION_FAILED",
-    issues,
-  };
-  if (source !== undefined) {
-    fields["source"] = source;
-  }
-  return problem(422, fields);
-}
+// Re-exported for existing importers (validate-query/body/headers); the
+// canonical factory lives in validation-problem.ts (M6R1-009).
+export { createValidationProblem };
+export { VALIDATION_PROBLEM_URI as VALIDATION_PROBLEM_TYPE } from "./validation-problem";
 
 export type ValidateParamsSuccess<T> = {
   readonly ok: true;

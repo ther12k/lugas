@@ -8,10 +8,12 @@
  * - Empty body returns `data: undefined` letting schemas decide validity
  * - Request cancellation / abort signals are preserved
  */
-import { problem } from "../core/response";
+import {
+  createUnsupportedMediaTypeProblem,
+  createMalformedJsonProblem,
+} from "./validation-problem";
 
-export const UNSUPPORTED_MEDIA_TYPE_URI = "https://lugasjs.dev/problems/unsupported-media-type";
-export const MALFORMED_JSON_URI = "https://lugasjs.dev/problems/malformed-json";
+export { UNSUPPORTED_MEDIA_TYPE_URI, MALFORMED_JSON_URI } from "./validation-problem";
 
 export function isJsonMediaType(contentType: string | null | undefined): boolean {
   if (typeof contentType !== "string" || contentType.trim() === "") return false;
@@ -23,24 +25,6 @@ export function isJsonMediaType(contentType: string | null | undefined): boolean
     return true;
   }
   return false;
-}
-
-export function createUnsupportedMediaTypeProblem(): Response {
-  return problem(415, {
-    type: UNSUPPORTED_MEDIA_TYPE_URI,
-    title: "Unsupported Media Type",
-    code: "UNSUPPORTED_MEDIA_TYPE",
-    detail: "Expected a JSON-compatible Content-Type header (e.g. application/json)",
-  });
-}
-
-export function createMalformedJsonProblem(): Response {
-  return problem(400, {
-    type: MALFORMED_JSON_URI,
-    title: "Malformed JSON",
-    code: "MALFORMED_JSON",
-    detail: "Request body could not be parsed as valid JSON",
-  });
 }
 
 export type ParseJsonBodySuccess = {
