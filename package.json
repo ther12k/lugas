@@ -29,7 +29,8 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "verify:docs": "bun run scripts/verify-okf.ts",
-    "verify": "bun run scripts/verify.ts"
+    "verify": "bun run scripts/verify.ts",
+    "release:package:rehearse": "bun run scripts/release/package-beta.ts"
   },
   "devDependencies": {
     "@standard-schema/spec": "^1.1.0",
