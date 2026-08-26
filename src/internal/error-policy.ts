@@ -44,7 +44,7 @@ export function resolvePolicies(config: {
  * must intercept and redact (observed on Bun 1.4.0, tests/security).
  */
 /**
- * Wrap a compiled handler with an error policy (M4R1-007).
+ * Wrap a compiled handler with an error policy (M4R1-007, fallback M6R1-008).
  *
  * The wrapper is a plain function: fully-synchronous handlers resolve and
  * return synchronously — no Promise chaining is added at the production
@@ -54,14 +54,38 @@ export function resolvePolicies(config: {
  * through wrapper closure instead of `Object.assign` onto the error, which
  * would throw on frozen errors inside catch and bypass redaction entirely
  * (leaving Bun's development error page to render message + stack).
+ *
+ * Second-line fallback (M6R1-008): an app-provided policy that throws,
+ * rejects, or returns a non-Response must never leak raw errors to Bun's
+ * development error page. Such failures fall back to the redacted default
+ * 500 problem.
  */
 export function withErrorPolicy<T extends (request: Request) => Response | Promise<Response>>(
   handler: T,
   onError: ErrorPolicy,
   routeId: string,
 ): (request: Request) => Response | Promise<Response> {
-  const handleError = (error: unknown, request: Request): Response | Promise<Response> =>
-    onError === defaultOnError ? defaultOnError(error, request, routeId) : onError(error, request);
+  const handleError = (error: unknown, request: Request): Response | Promise<Response> => {
+    if (onError === defaultOnError) {
+      return defaultOnError(error, request, routeId);
+    }
+    try {
+      const result = onError(error, request);
+      if (!isPromiseLike(result)) {
+        if (!(result instanceof Response)) {
+          return redactedFallbackResponse(request);
+        }
+        return result;
+      }
+      return Promise.resolve(result).then(
+        (resolved) =>
+          resolved instanceof Response ? resolved : redactedFallbackResponse(request),
+        () => redactedFallbackResponse(request),
+      );
+    } catch {
+      return redactedFallbackResponse(request);
+    }
+  };
   return function withErrorPolicyHandler(request: Request): Response | Promise<Response> {
     try {
       const result = handler(request);
@@ -73,6 +97,19 @@ export function withErrorPolicy<T extends (request: Request) => Response | Promi
       return handleError(error, request);
     }
   };
+}
+
+/** Last-resort redacted 500 when a custom policy itself fails (M6R1-008). */
+function redactedFallbackResponse(request: Request): Response {
+  const pathname = (() => {
+    try {
+      return new URL(request.url).pathname;
+    } catch {
+      return "unspecified";
+    }
+  })();
+  console.error(`[lugas] custom onError policy failed on ${request.method} ${pathname}; serving redacted 500`);
+  return problem(500, { title: "Internal Server Error" });
 }
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
