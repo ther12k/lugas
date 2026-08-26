@@ -13,6 +13,7 @@ import { buildManifest, type LugasManifestV1 } from "../internal/manifest";
 import { prepareApp, type PreparedApp } from "../internal/prepared-app";
 import type { LugasApp, MergeModulesRoutes, ModuleDescriptor } from "./types";
 import { serveApp } from "../internal/serve";
+import { assertValidRoutePath } from "../internal/path";
 
 export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = {
   services?: TServices;
@@ -48,30 +49,11 @@ export function defineApp<
     throw diagnostic("LUGAS_APP_001", "defineApp(): config must be an object", { hint: "pass defineApp({ routes }) with an object literal" });
   }
 
-  // M5R1 correction: validate all route paths immediately after config shape check
+  // M5R1 correction; M6R1-011: shared canonical path validator — stable
+  // LUGAS_ROUTES_004 diagnostic instead of a plain Error.
   if (config.routes !== undefined) {
     for (const [path] of Object.entries(config.routes)) {
-      if (!path.startsWith("/")) {
-        throw new Error(`LUGAS_ROUTES_004: route path must start with '/': ${JSON.stringify(path)}`);
-      }
-      const segments = path.slice(1).split("/");
-      const seen = new Set<string>();
-      for (let si = 0; si < segments.length; si++) {
-        const seg = segments[si]!;
-        if (seg.startsWith(":")) {
-          const name = seg.slice(1);
-          if (!name || !/^[A-Za-z0-9_]+$/.test(name)) {
-            throw new Error(`LUGAS_ROUTES_004: invalid param token '${seg}'`);
-          }
-          if (seen.has(name)) {
-            throw new Error(`LUGAS_ROUTES_004: duplicate param ':${name}'`);
-          }
-          seen.add(name);
-        }
-        if (seg === "*" && si !== segments.length - 1) {
-          throw new Error("LUGAS_ROUTES_004: wildcard '*' must be the final segment");
-        }
-      }
+      assertValidRoutePath(path, "app");
     }
   }
 

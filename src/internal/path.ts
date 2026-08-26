@@ -6,6 +6,7 @@
  * `*` may appear only as the final segment. Runtime schema-key comparison
  * waits for a reliable adapter (M2-003); these checks are purely syntactic.
  */
+import { diagnostic } from "./diagnostics";
 import type { LugasDiagnostic } from "./diagnostics";
 
 export type PathAnalysis = {
@@ -46,4 +47,22 @@ export function analyzePath(path: string): PathAnalysis | LugasDiagnostic {
 
 export function isDiagnostic(value: unknown): value is LugasDiagnostic {
   return typeof value === "object" && value !== null && "code" in value && "message" in value;
+}
+
+/**
+ * Shared route-path syntax validator for declaration sites (M6R1-011).
+ *
+ * Both defineApp() and defineModule() call this so path rules have exactly
+ * one implementation and violations raise the stable LUGAS_ROUTES_004
+ * diagnostic (never a plain Error with the code embedded in the message).
+ */
+export function assertValidRoutePath(path: string, owner: "app" | "module"): PathAnalysis {
+  const result = analyzePath(path);
+  if (isDiagnostic(result)) {
+    throw diagnostic("LUGAS_ROUTES_004", `${owner} routes: ${result.message}`, {
+      hint: "paths must start with '/' and follow Bun route syntax",
+      context: { path },
+    });
+  }
+  return result;
 }
