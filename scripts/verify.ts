@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { resolve } from "node:path";
 import { checkBunVersion } from "./check-bun-version";
 
 type CheckResult = { name: string; status: "PASS" | "FAIL" | "SKIP"; output: string };
@@ -51,6 +52,21 @@ async function main(): Promise<number> {
   const diff = await run("diff", ["git", "diff", "--check"]);
   results.push(diff);
   console.log(`== diff ==\n${diff.status}: ${diff.output || "(no output)"}`);
+
+  // Performance gate (M6R1-001): runs when benchmark results archive is present.
+  // SKIP on a clean checkout (no benchmarks run yet); FAIL when archive present but gate fails.
+  const perfGatePath = `${import.meta.dir}/check-performance-budget.ts`;
+  const plainResultsPath = resolve(import.meta.dir, "..", "benchmarks", "results", "m5-plain", "results.json");
+  if (await Bun.file(plainResultsPath).exists()) {
+    const perfResult = await run("perf-gate", ["bun", "run", perfGatePath]);
+    results.push(perfResult);
+    console.log(`== perf-gate ==\n${perfResult.status}: ${perfResult.output || "(no output)"}`);
+  } else {
+    const perfResult = { name: "perf-gate", status: "SKIP" as const, output: "no benchmark results archive — run benchmarks before release gate" };
+    results.push(perfResult);
+    console.log(`== perf-gate ==\nSKIP: ${perfResult.output}`);
+  }
+
   return results.some((result) => result.status === "FAIL") ? 1 : 0;
 }
 

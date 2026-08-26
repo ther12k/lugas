@@ -130,7 +130,7 @@ async function main() {
     rawStaticSamples.push(s);
     console.log(`raw-bun /static run=${i + 1}: ${s.rps} rps`);
   }
-  results.push({ scenario: "/static", framework: "raw-bun", samples: rawStaticSamples });
+  results.push({ scenario: "plain-static", framework: "raw-bun", samples: rawStaticSamples });
 
   // Lugas static
   const lugasStaticSamples: Sample[] = [];
@@ -139,7 +139,7 @@ async function main() {
     lugasStaticSamples.push(s);
     console.log(`lugas /static run=${i + 1}: ${s.rps} rps`);
   }
-  results.push({ scenario: "/static", framework: "lugas", samples: lugasStaticSamples });
+  results.push({ scenario: "plain-static", framework: "lugas", samples: lugasStaticSamples });
 
   // Raw Bun JSON
   const rawJsonSamples: Sample[] = [];
@@ -148,7 +148,7 @@ async function main() {
     rawJsonSamples.push(s);
     console.log(`raw-bun /json run=${i + 1}: ${s.rps} rps`);
   }
-  results.push({ scenario: "/json", framework: "raw-bun", samples: rawJsonSamples });
+  results.push({ scenario: "plain-json", framework: "raw-bun", samples: rawJsonSamples });
 
   // Lugas JSON
   const lugasJsonSamples: Sample[] = [];
@@ -157,25 +157,25 @@ async function main() {
     lugasJsonSamples.push(s);
     console.log(`lugas /json run=${i + 1}: ${s.rps} rps`);
   }
-  results.push({ scenario: "/json", framework: "lugas", samples: lugasJsonSamples });
+  results.push({ scenario: "plain-json", framework: "lugas", samples: lugasJsonSamples });
 
   // Summary table
   console.log("\n## Summary (median of " + RUNS + " runs)\n");
   console.log("| scenario | framework | median rps | median p50 µs | median p99 µs |");
   console.log("|---|---|---|---|---|");
 
-  for (const path of ["/static", "/json"]) {
-    const raw = results.find((r) => r.scenario === path && r.framework === "raw-bun");
-    const lg = results.find((r) => r.scenario === path && r.framework === "lugas");
+  for (const [scenarioId, path] of [["plain-static", "/static"], ["plain-json", "/json"]] as const) {
+    const raw = results.find((r) => r.scenario === scenarioId && r.framework === "raw-bun");
+    const lg = results.find((r) => r.scenario === scenarioId && r.framework === "lugas");
     if (!raw || !lg) continue;
     const rawRps = median(raw.samples.map((s) => s.rps));
     const lgRps = median(lg.samples.map((s) => s.rps));
     const overheadPct = rawRps > 0 ? (((rawRps - lgRps) / rawRps) * 100).toFixed(1) : "?";
     console.log(
-      `| ${path} | raw-bun | ${rawRps} | ${median(raw.samples.map((s) => s.p50us))} | ${median(raw.samples.map((s) => s.p99us))} |`,
+      `| ${scenarioId} | raw-bun | ${rawRps} | ${median(raw.samples.map((s) => s.p50us))} | ${median(raw.samples.map((s) => s.p99us))} |`,
     );
     console.log(
-      `| ${path} | lugas | ${lgRps} | ${median(lg.samples.map((s) => s.p50us))} | ${median(lg.samples.map((s) => s.p99us))} | — overhead: ${overheadPct}% |`,
+      `| ${scenarioId} | lugas | ${lgRps} | ${median(lg.samples.map((s) => s.p50us))} | ${median(lg.samples.map((s) => s.p99us))} | — overhead: ${overheadPct}% |`,
     );
   }
 
