@@ -67,34 +67,47 @@ async function main(): Promise<void> {
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
 
   // ------------------------------------------------------------------
-  // Stage 1: versioned staging copy (repo package.json is never touched).
+  // Stage 0: candidate integrity (#284). The candidate is the COMMITTED
+  // tree, not the working directory — a dirty tracked tree refuses to run.
+  // ------------------------------------------------------------------
+  const statusProc = Bun.spawnSync(["git", "status", "--porcelain"], {
+    cwd: ROOT, stdout: "pipe", stderr: "pipe",
+  });
+  const porcelain =
+    statusProc.exitCode === 0 ? new TextDecoder().decode(statusProc.stdout).trim() : "<git failed>";
+  check("candidate worktree is clean", porcelain === "", porcelain === "" ? "no uncommitted changes" : porcelain.split("\n").slice(0, 5).join(" | "));
+
+  // ------------------------------------------------------------------
+  // Stage 1: versioned staging copy built from git archive of HEAD (#284)
+  // so provenance can honestly bind to committed contents only.
   // ------------------------------------------------------------------
   const stage = mkdtempSync(join(tmpdir(), "lugas-beta-stage-"));
   const stagePkg = join(stage, "package");
   mkdirSync(stagePkg, { recursive: true });
-  cpSync(ROOT, stagePkg, {
-    recursive: true,
-    filter: (src) => {
-      const rel = src.slice(ROOT.length);
-      if (!rel || rel === "/") return true; // root itself
-      return (
-        !rel.includes("/node_modules/") && !rel.endsWith("/node_modules") &&
-        !rel.includes("/.worktrees/") && !rel.endsWith("/.worktrees") &&
-        !rel.includes("/.git/") && !rel.endsWith("/.git") &&
-        !rel.startsWith("/benchmarks/results/") &&
-        !rel.startsWith("/docs/releases/")
-      );
-    },
-  });
+  if (porcelain !== "") process.exit(1);
+  const archive = run("git archive HEAD | tar -x -C " + JSON.stringify(stagePkg), ROOT);
+  check("staged from committed git tree (git archive HEAD)", archive.code === 0, archive.code === 0 ? "tracked files only" : archive.stderr.slice(0, 200));
+  if (archive.code !== 0) process.exit(1);
   const pkgJsonPath = join(stagePkg, "package.json");
-  const pkg = JSON.parse(readFileSync(pkgJsonPath, "utf8")) as {
+  type StagedPkg = {
     name: string;
     version: string;
+    private?: boolean;
     scripts: Record<string, string>;
     devDependencies?: Record<string, string>;
+    dependencies?: Record<string, string>;
+    optionalDependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
   };
+  const pkg = JSON.parse(readFileSync(pkgJsonPath, "utf8")) as StagedPkg;
   pkg.version = BETA_VERSION;
   delete pkg.scripts["release:package:rehearse"]; // rehearsal tooling is not shipped
+  // Publishability metadata (#278): the candidate must not carry private,
+  // must declare public access explicitly, and ships the CLI binary that the
+  // rehearsal then executes from the installed tarball.
+  delete pkg.private;
+  (pkg as StagedPkg & { publishConfig?: { access?: string } }).publishConfig = { access: "public" };
+  (pkg as StagedPkg & { bin?: Record<string, string> }).bin = { lugas: "./src/cli/main.ts" };
   writeFileSync(pkgJsonPath, JSON.stringify(pkg, null, 2) + "\n");
 
   // ------------------------------------------------------------------
@@ -189,55 +202,36 @@ console.log("TESTING-CONSUMER-OK");`,
     testRun.code === 0 ? testRun.stdout.trim() : testRun.stderr.slice(0, 300),
   );
 
-  // Consumer D: CLI module surface — main() and load-app are importable and
-  // parse correctly. (No bin entry is shipped pre-release; the CLI ships as
-  // an importable module until the packaging ADR wires a binary.)
+  // Consumer D: the REAL CLI, executed through the npm bin link created
+  // from the staged candidate (#283). `lugas routes <fixture>` must run an
+  // actual inspection command from the installed tarball.
   const cliConsumer = makeConsumer("consumer-cli");
   writeFileSync(
     join(cliConsumer, "fixture-app.ts"),
     `import { defineApp, route, text } from "lugas";
 export default defineApp({ routes: { "/x": { GET: route({ handler: () => text(200, "ok") }) } } });`,
   );
-  writeFileSync(
-    join(cliConsumer, "probe.ts"),
-    `import { main as _main } from "lugas/dist-cli-main"; // must NOT resolve — internal lockdown probe
-console.log("LEAK");`,
-  );
-  const leakProbe = run(`bun run probe.ts`, cliConsumer);
-  // Internal subpath must stay locked down behind the export map.
-  writeFileSync(
-    join(cliConsumer, "probe2.ts"),
-    `import { loadAppManifest } from "./internal-cli-probe.mjs";
-console.log("SHOULD-NOT-RUN");`,
-  );
-  // The public contract: "lugas" root + /client + /testing only.
-  const cliValid = makeConsumer("consumer-cli-valid");
-  writeFileSync(
-    join(cliValid, "fixture-app.ts"),
-    `import { defineApp, route, text } from "lugas";
-export default defineApp({ routes: { "/x": { GET: route({ handler: () => text(200, "ok") }) } } });`,
-  );
-  writeFileSync(
-    join(cliValid, "probe.ts"),
-    `// Prove the manifest/inspect pipeline works against the installed package
-// by importing its source-run equivalent: the packed src ships the CLI code,
-// exercised here through createTestServer already covered; this probe asserts
-// the exported surface list matches the freeze (no extra subpaths).
-const exports = ["."],
-      expected = [".", "./client", "./testing"];
-const pkg = (await import("lugas/package.json", { with: { type: "json" } })).default;
-const keys = Object.keys(pkg.exports ?? {}).sort();
-if (JSON.stringify(keys) !== JSON.stringify(expected.sort())) {
-  console.error("EXPORT-MISMATCH: " + JSON.stringify(keys));
-  process.exit(1);
-}
-console.log("CLI-CONSUMER-OK exports=" + keys.join(","));`,
-  );
-  const cliRun = run(`bun run probe.ts`, cliValid);
+  const cliRun = run(`./node_modules/.bin/lugas routes ./fixture-app.ts`, cliConsumer);
   check(
-    "CLI consumer verifies frozen export map from tarball",
-    cliRun.code === 0 && cliRun.stdout.includes("CLI-CONSUMER-OK"),
-    cliRun.code === 0 ? cliRun.stdout.trim() : cliRun.stderr.slice(0, 200),
+    "CLI consumer executes real 'lugas routes' command from tarball",
+    cliRun.code === 0 && cliRun.stdout.includes("lugas-manifest") && cliRun.stdout.includes("/x"),
+    cliRun.code === 0 ? "route table rendered" : cliRun.stderr.slice(0, 200),
+  );
+
+  // ------------------------------------------------------------------
+  // Stage 3b: publication validation (#278) — the EXACT command that ships
+  // in the report is executed with --dry-run (non-publishing). The final
+  // real command differs ONLY by removing --dry-run.
+  // ------------------------------------------------------------------
+  const npmVersion = run("npm --version", stagePkg).stdout.trim();
+  const publishDry = run(
+    `npm publish ${JSON.stringify(tgzSource)} --dry-run --access public --tag beta`,
+    stagePkg,
+  );
+  check(
+    "exact publish command passes --dry-run validation (--tag beta)",
+    publishDry.code === 0,
+    publishDry.code === 0 ? `npm ${npmVersion} accepted candidate; tag=beta access=public` : publishDry.stderr.slice(0, 300),
   );
 
   // ------------------------------------------------------------------
@@ -257,30 +251,41 @@ console.log("CLI-CONSUMER-OK exports=" + keys.join(","));`,
   };
   writeFileSync(join(OUT_DIR, "inventory.json"), JSON.stringify(inventory, null, 2));
 
-  const sbom = {
+  // SBOM derived FROM STAGED METADATA (#285) — never hardcoded results.
+  const prodDeps = [
+    ...Object.keys(pkg.dependencies ?? {}),
+    ...Object.keys(pkg.optionalDependencies ?? {}),
+    ...Object.keys(pkg.peerDependencies ?? {}),
+  ].sort();
+  writeFileSync(join(OUT_DIR, "sbom.json"), JSON.stringify({
     format: "lugas-sbom-v0",
     generatedAt: new Date().toISOString(),
     packageName: pkg.name,
     packageVersion: BETA_VERSION,
-    productionDependencies: [] as string[],
+    derivation: "staged package.json dependencies/optionalDependencies/peerDependencies",
+    productionDependencies: prodDeps,
     devDependencies: Object.keys(pkg.devDependencies ?? {}).map((d) => ({ name: d, scope: "dev" })),
     tarballEntryCount: entryCount,
-    zeroProductionRuntimeDependency: true,
-  };
-  writeFileSync(join(OUT_DIR, "sbom.json"), JSON.stringify(sbom, null, 2));
+    zeroProductionRuntimeDependency: prodDeps.length === 0,
+  }, null, 2));
 
   const commit = execSync("git rev-parse HEAD", { cwd: ROOT, encoding: "utf8" }).trim();
+  const treeHash = execSync("git rev-parse HEAD^{tree}", { cwd: ROOT, encoding: "utf8" }).trim();
   const provenance = {
-    format: "lugas-provenance-v0",
+    format: "lugas-provenance-v1",
     statementType: "https://lugasjs.dev/statements/rehearsal/v0",
     packageName: pkg.name,
     packageVersion: BETA_VERSION,
     sourceCommit: commit,
+    gitTreeHash: treeHash,
+    stagingMethod: "git archive HEAD (tracked files only; dirty worktree refused)",
     bunVersion: Bun.version,
+    npmVersion,
     platform: `${process.platform}-${process.arch}`,
     generatedAt: new Date().toISOString(),
     publishedToRegistry: false,
-    note: "REHEARSAL ONLY — no registry publication occurred; real publish requires owner approval (M6-010 / M6-GATE).",
+    publishCommandDryRunValidated: true,
+    note: "REHEARSAL ONLY — no registry publication occurred; real publish requires owner approval (M6-010 / M6-GATE) and differs from the validated command only by dropping --dry-run.",
   };
   writeFileSync(join(OUT_DIR, "provenance.json"), JSON.stringify(provenance, null, 2));
 
@@ -289,7 +294,7 @@ console.log("CLI-CONSUMER-OK exports=" + keys.join(","));`,
   writeFileSync(join(OUT_DIR, "SHA256SUMS"), sums.sort().join("\n") + "\n");
 
   check("checksums emitted", sums.length === 4, `${OUT_DIR}/SHA256SUMS`);
-  check("SBOM emitted with zero production deps", sbom.productionDependencies.length === 0, `${OUT_DIR}/sbom.json`);
+  check("SBOM shows zero production deps (derived)", prodDeps.length === 0, `${OUT_DIR}/sbom.json (derived from staged metadata)`);
   check("provenance statement marked unpublished", provenance.publishedToRegistry === false, `${OUT_DIR}/provenance.json`);
   check("tarball inventory recorded", inventory.files.length === entryCount, `${inventory.files.length} entries`);
 
@@ -306,7 +311,7 @@ console.log("CLI-CONSUMER-OK exports=" + keys.join(","));`,
 
   console.log(`
 Publication command (DOCUMENTED, NOT EXECUTED):
-    npm publish ./docs/releases/beta/${tgzName} --access public   # requires owner approval
+    npm publish ./docs/releases/beta/${tgzName} --access public --tag beta   # = validated dry-run minus --dry-run; requires owner approval
 
 Artifacts written to docs/releases/beta/: ${artifactNames.join(", ")}`);
 

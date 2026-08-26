@@ -3,10 +3,10 @@
   "statementType": "https://lugasjs.dev/statements/rehearsal/v0",
   "packageName": "lugas",
   "packageVersion": "0.1.0-beta.1",
-  "sourceCommit": "44805a054681ddffea4e969643593e28aa3b776c",
+  "sourceCommit": "252029a60438b634b0c66bb20a39da3c3378a585",
   "bunVersion": "1.4.0",
   "platform": "linux-x64",
-  "generatedAt": "2026-08-26T16:24:38.712Z",
+  "generatedAt": "2026-08-26T18:19:31.274Z",
   "publishedToRegistry": false,
   "note": "REHEARSAL ONLY — no registry publication occurred; real publish requires owner approval (M6-010 / M6-GATE)."
 }

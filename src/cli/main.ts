@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 /**
  * Lugas CLI entry point (M4-011).
  *
