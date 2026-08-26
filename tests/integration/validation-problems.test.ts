@@ -148,4 +148,43 @@ describe("Unified validation Problem Details mapping", () => {
       expect(bodyStr).not.toContain("at normalize");
     }
   });
+
+  test("live request path serves consistent problem shapes (M6R1-009)", async () => {
+    const { defineApp } = await import("../../src/core/app");
+    const { route } = await import("../../src/core/route");
+    const app = defineApp({
+      routes: {
+        "/v": {
+          POST: route({ body: z.object({ id: z.string() }), handler: () => new Response("ok") }),
+        },
+      },
+    });
+    const server = app.serve({ port: 0, development: false });
+    try {
+      const base = server.url.origin;
+      const r415 = await fetch(`${base}/v`, { method: "POST", headers: { "content-type": "text/plain" }, body: "{}" });
+      const b415 = (await r415.json()) as Record<string, unknown>;
+      const r400 = await fetch(`${base}/v`, { method: "POST", headers: { "content-type": "application/json" }, body: "{oops" });
+      const b400 = (await r400.json()) as Record<string, unknown>;
+      const r422 = await fetch(`${base}/v`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: 5 }) });
+      const b422 = (await r422.json()) as Record<string, unknown>;
+
+      // All three statuses share the documented member set on the real path.
+      for (const [body, code] of [[b415, "UNSUPPORTED_MEDIA_TYPE"], [b400, "MALFORMED_JSON"], [b422, "VALIDATION_FAILED"]] as const) {
+        expect(body.status).toBeNumber();
+        expect(body.code).toBe(code);
+        expect(body.type).toBeString();
+        expect(body.title).toBeString();
+      }
+      expect(r415.status).toBe(415);
+      expect(b415.status).toBe(415);
+      expect(b415.source).toBe("body");
+      expect(r400.status).toBe(400);
+      expect(b400.status).toBe(400);
+      expect(b400.source).toBe("body");
+      expect(b422.source).toBe("body");
+    } finally {
+      server.stop(true);
+    }
+  });
 });
