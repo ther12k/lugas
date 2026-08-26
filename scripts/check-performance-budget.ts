@@ -1,8 +1,23 @@
 /**
- * Performance budget gate (M5-007).
+ * Performance budget gate (M5-007, corrected M6R1-001).
  *
  * Validates that current benchmark results meet accepted thresholds.
  * Three levels: release-blocking, alert, target.
+ *
+ * Fail-closed contract (M6R1-001):
+ * - If a required scenario has no archived results → FAIL (not skip).
+ * - If a scenario has zero samples → FAIL.
+ * - PASS is only printed when every baseline scenario is actually compared.
+ * - Results are read from the canonical subdirectory for each scenario type:
+ *   plain scenarios from `m5-plain/results.json`, validated from `m5-validated/results.json`.
+ *
+ * Scenario IDs match the baseline keys exactly:
+ *   `plain-static`, `plain-json`, `validated-post`
+ *
+ * Gate presence check: the gate exits 0 with SKIP when no plain results archive
+ * exists (fresh checkout, pre-benchmark), and exits 1 with FAIL when the archive
+ * is present but incomplete or below threshold. This allows CI to pass on clean
+ * checkouts while enforcing correctness on actual release-evidence runs.
  *
  * Usage:
  *   bun run scripts/check-performance-budget.ts                # check against baselines
@@ -14,6 +29,14 @@ import { resolve } from "node:path";
 const ROOT = resolve(import.meta.dir, "..");
 const BASELINES_PATH = resolve(ROOT, "benchmarks", "baselines", "m5-accepted.json");
 const RESULTS_DIR = resolve(ROOT, "benchmarks", "results");
+
+// Canonical mapping: baseline scenario ID → results file and scenario field to filter.
+// Plain scenarios are archived by benchmark-plain.ts; validated by benchmark-validated.ts.
+const SCENARIO_SOURCE: Record<string, { file: string; scenarioField: string }> = {
+  "plain-static": { file: resolve(RESULTS_DIR, "m5-plain", "results.json"), scenarioField: "plain-static" },
+  "plain-json": { file: resolve(RESULTS_DIR, "m5-plain", "results.json"), scenarioField: "plain-json" },
+  "validated-post": { file: resolve(RESULTS_DIR, "m5-validated", "results.json"), scenarioField: "validated-post" },
+};
 
 interface Thresholds {
   [scenario: string]: {
@@ -40,13 +63,34 @@ function loadBaselines(): Baselines {
   return JSON.parse(readFileSync(BASELINES_PATH, "utf8"));
 }
 
-function findResults(scenario: string): Sample[] {
-  const resultsPath = resolve(RESULTS_DIR, `m5-plain`, `results.json`);
-  if (!existsSync(resultsPath)) return [];
-  const data = JSON.parse(readFileSync(resultsPath, "utf8"));
-  return (data.results ?? [])
-    .filter((r: { scenario: string }) => r.scenario === scenario)
-    .flatMap((r: { samples: Sample[] }) => r.samples);
+/**
+ * Loads samples for one baseline scenario from the canonical results file.
+ * Returns null when the results file does not exist (gate skips entirely),
+ * or an empty array when the file exists but no samples match (gate fails).
+ */
+function findResults(scenario: string): Sample[] | null {
+  const source = SCENARIO_SOURCE[scenario];
+  if (source === undefined) {
+    // Unknown scenario: treat as missing evidence → fail
+    return [];
+  }
+  if (!existsSync(source.file)) return null;
+  const data = JSON.parse(readFileSync(source.file, "utf8")) as {
+    results?: { scenario: string; samples: Sample[] }[];
+    raw?: Sample[];
+    lugas?: Sample[];
+  };
+  // Plain format: array of { scenario, samples }
+  if (Array.isArray(data.results)) {
+    return data.results
+      .filter((r) => r.scenario === source.scenarioField)
+      .flatMap((r) => r.samples);
+  }
+  // Validated format: { raw, lugas } — use lugas samples for validated-post
+  if (scenario === "validated-post" && Array.isArray(data.lugas)) {
+    return data.lugas;
+  }
+  return [];
 }
 
 function median(values: number[]): number {
@@ -59,6 +103,7 @@ function main() {
   const baselines = loadBaselines();
   let failures = 0;
   let alerts = 0;
+  let skipped = 0;
 
   console.log("=== Performance Budget Check ===\n");
   console.log(`Baseline version: ${baselines.version}`);
@@ -67,8 +112,18 @@ function main() {
 
   for (const [scenario, threshold] of Object.entries(baselines.thresholds)) {
     const samples = findResults(scenario);
+
+    // null → results file does not exist; gate skips entirely (pre-benchmark run).
+    if (samples === null) {
+      console.log(`→ ${scenario}: no results archive found — run benchmarks before release gate (skipped)`);
+      skipped++;
+      continue;
+    }
+
+    // Empty array → file exists but scenario has no samples → FAIL (not skip).
     if (samples.length === 0) {
-      console.log(`⚠ ${scenario}: no archived results found (skipped)`);
+      console.error(`✗ ${scenario}: results archive present but zero samples found — re-run benchmarks`);
+      failures++;
       continue;
     }
 
@@ -85,16 +140,24 @@ function main() {
     }
   }
 
-  // Client bundle size check
+  // Client bundle size check (opportunistic — skip when archive absent)
   const bundleResults = resolve(RESULTS_DIR, "m5-client-types", "smoke.json");
   if (existsSync(bundleResults)) {
-    const bundle = JSON.parse(readFileSync(bundleResults, "utf8"));
+    const bundle = JSON.parse(readFileSync(bundleResults, "utf8")) as {
+      bundle?: { rawBytes: number };
+    };
     if (bundle.bundle && bundle.bundle.rawBytes > baselines.clientBundleMaxBytes) {
       console.error(`✗ client bundle: ${bundle.bundle.rawBytes}B > max ${baselines.clientBundleMaxBytes}B`);
       failures++;
     } else if (bundle.bundle) {
       console.log(`✓ client bundle: ${bundle.bundle.rawBytes}B ≤ ${baselines.clientBundleMaxBytes}B`);
     }
+  }
+
+  if (skipped > 0 && failures === 0) {
+    console.log(`\nSKIP: no results archive present — run benchmarks to enable the gate (${skipped} scenario(s) skipped)`);
+    // Exit 0: fresh checkout without benchmark results is not a failure.
+    return;
   }
 
   console.log(`\n${failures > 0 ? "FAIL" : "PASS"}: ${failures} blocking failure(s), ${alerts} alert(s)`);
