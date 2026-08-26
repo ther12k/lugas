@@ -254,36 +254,39 @@ async function executeAsyncPipeline(
   descriptor: RouteDescriptor<never>,
   services: unknown,
   request: Request,
+  // Keys present in partialContext represent stages already completed by the
+  // synchronous caller (even when the resolved value is undefined or null).
+  // Use `key in partialContext` — never nullish coalescing — to test completion.
   partialContext: Partial<PipelineContext>,
 ): Promise<Response> {
   const { before: guards = [], params: paramsSchema, query: querySchema, headers: headersSchema } = descriptor as any;
-  const completed = new Set<string>();
   const userHandler = descriptor.handler as (context: PipelineContext) => Response | Promise<Response>;
   const base = { services };
 
+  // Headers: skip if the sync portion already ran this stage (key present).
   let headersData = partialContext.headers;
-  if (!completed.has('headers') && headersSchema !== undefined) {
+  if (!("headers" in partialContext) && headersSchema !== undefined) {
     const hRes = await validateHeaders(headersSchema, request);
     if (!hRes.ok) return hRes.response;
     headersData = hRes.data;
-    completed.add("headers");
   }
 
+  // Params: skip if the sync portion already ran this stage (key present).
+  // Do NOT use `?? rawParams` — a null/undefined transformed value is valid.
   const rawParams = (request as Request & { params?: Record<string, string> }).params ?? {};
-  let paramsData = partialContext.params ?? rawParams;
-  if (!completed.has('params') && paramsSchema !== undefined) {
+  let paramsData: unknown = "params" in partialContext ? partialContext.params : rawParams;
+  if (!("params" in partialContext) && paramsSchema !== undefined) {
     const pRes = await validateParams(paramsSchema, rawParams);
     if (!pRes.ok) return pRes.response;
     paramsData = pRes.data;
-    completed.add("params");
   }
 
+  // Query: skip if the sync portion already ran this stage (key present).
   let queryData = partialContext.query;
-  if (!completed.has('query') && querySchema !== undefined) {
+  if (!("query" in partialContext) && querySchema !== undefined) {
     const qRes = await validateQuery(querySchema, request);
     if (!qRes.ok) return qRes.response;
     queryData = qRes.data;
-    completed.add("query");
   }
 
   let guardContext = {};
