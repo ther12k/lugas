@@ -56,7 +56,6 @@ export function loadAppManifest(
   const scriptPath = join(dir, "load-child.ts");
   writeFileSync(scriptPath, CHILD_SCRIPT);
 
-  let timedOut = false;
   try {
     const proc = Bun.spawnSync(
       [process.execPath, "run", scriptPath, resolvedPath],
@@ -69,9 +68,9 @@ export function loadAppManifest(
       },
     );
 
-    if (proc.signalCode === 'SIGKILL' || (proc.exitCode !== null && proc.exitCode > 128)) {
-      timedOut = true;
-    }
+    // M6R1-007: Bun reports timeout via exitedDueToTimeout — the contract
+    // source of truth, replacing the signal/exit-code heuristic.
+    const timedOut = proc.exitedDueToTimeout === true;
     const stdout = new TextDecoder().decode(proc.stdout).trim();
     const stderr = new TextDecoder().decode(proc.stderr).trim();
 
