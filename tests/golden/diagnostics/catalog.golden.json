@@ -162,6 +162,12 @@
     "hint": "paths must start with '/' and follow Bun route syntax"
   },
   {
+    "code": "LUGAS_CLI_001",
+    "thrownBy": "lugas CLI",
+    "meaning": "invalid CLI option value",
+    "hint": "--timeout must be a positive integer in milliseconds"
+  },
+  {
     "code": "LUGAS_TEST_001",
     "thrownBy": "createTestServer()",
     "meaning": "forbidden server override option",

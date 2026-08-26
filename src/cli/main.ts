@@ -35,7 +35,11 @@ function parseArgs(argv: string[]): CliArgs {
       return args;
     }
     if (arg === "--timeout" && argv[i + 1]) {
-      args.timeout = Number.parseInt(argv[i + 1]!, 10);
+      const raw = argv[i + 1]!;
+      if (!/^\d+$/.test(raw) || Number.parseInt(raw, 10) <= 0) {
+        throw new RangeError(`LUGAS_CLI_001: --timeout must be a positive integer in milliseconds, got '${raw}'`);
+      }
+      args.timeout = Number.parseInt(raw, 10);
       i += 2;
       continue;
     }
@@ -98,6 +102,7 @@ export function main(argv: string[]): void {
         process.exit(3);
         break;
       }
+      // (M6R1-007: --timeout validity is enforced in parseArgs)
       const result = loadAppManifest(args.entry, { timeoutMs: args.timeout });
       if (!result.ok) {
         console.error(`error: ${result.message}`);
