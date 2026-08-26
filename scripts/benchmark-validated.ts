@@ -11,7 +11,7 @@ import { resolve } from "node:path";
 const ROOT = resolve(import.meta.dir, "..");
 const RESULTS_DIR = resolve(ROOT, "benchmarks", "results", "m5-validated");
 const RUNS = 5;
-const DURATION_MS = 2_000;
+const DURATION_MS = Number(process.env.BENCH_DURATION_MS ?? 2_000);
 const CONCURRENCY = 8;
 
 type Sample = { rps: number; p50us: number; p95us: number; p99us: number; total: number };
@@ -22,6 +22,7 @@ async function measure(url: string): Promise<Sample> {
   let total = 0;
   const body = JSON.stringify({ name: "Ada", email: "ada@example.com" });
 
+  let firstError: Error | undefined;
   const workers = Array.from({ length: CONCURRENCY }, async () => {
     while (Date.now() < deadline) {
       const start = performance.now();
@@ -30,12 +31,24 @@ async function measure(url: string): Promise<Sample> {
         headers: { "content-type": "application/json", authorization: "Bearer t" },
         body,
       });
-      await res.arrayBuffer();
+      // M6R2 #281: only contract-satisfying responses count as throughput.
+      if (res.status !== 201) {
+        firstError ??= new Error(`contract violated: status ${res.status} != 201`);
+        break;
+      }
+      const text = await res.text();
+      if (!text.includes("\"ok\":true")) {
+        firstError ??= new Error("contract violated: body missing ok:true");
+        break;
+      }
       latencies.push(Math.round((performance.now() - start) * 1000));
       total++;
     }
   });
   await Promise.all(workers);
+  if (firstError !== undefined) {
+    throw new Error(`validated benchmark: ${firstError.message}`);
+  }
 
   latencies.sort((a, b) => a - b);
   const pct = (p: number) => latencies[Math.min(Math.ceil((p / 100) * latencies.length) - 1, latencies.length - 1)] ?? 0;
@@ -92,7 +105,9 @@ async function main() {
   console.log(`\nArchived to ${RESULTS_DIR}/results.json`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (import.meta.main) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
