@@ -148,12 +148,15 @@ export function prepareApp<TServices>(config: {
         continue;
       }
       for (const [method, value] of Object.entries(plain)) {
-        // M5R1-003: validate method keys against the supported set
-        if (method !== "ALL" && !VALID_METHODS.has(method)) {
+        // M5R1-003: validate method keys against the supported set.
+        // M6R1-010: "ALL" is rejected too — Bun 1.4.0 does not accept it as a
+        // method-map key (raw TypeError at serve time), so accepting it here
+        // would defer the failure past Lugas diagnostics.
+        if (!VALID_METHODS.has(method)) {
           throw diagnostic(
             "LUGAS_ROUTES_002",
             `unsupported route entry at ${method} ${path}`,
-            { hint: "use uppercase HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, or ALL", context: { method, path } },
+            { hint: "use uppercase HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS — declare each method explicitly; there is no ALL key", context: { method, path } },
           );
         }
         const prior = methodClaims.get(method);
