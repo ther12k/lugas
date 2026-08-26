@@ -8,6 +8,7 @@
  */
 import { diagnostic } from "../internal/diagnostics";
 import { brand } from "../internal/brands";
+import { assertValidRoutePath } from "../internal/path";
 import type { ModuleDescriptor } from "./types";
 
 export type ModuleConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = {
@@ -37,6 +38,10 @@ export function defineModule<
   }
   const HTTP_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
   const seen = new Set<string>();
+  // M6R1-011: module paths share the canonical validator with root routes.
+  for (const [path] of Object.entries(config.routes)) {
+    assertValidRoutePath(path, "module");
+  }
   for (const [path, entry] of Object.entries(config.routes)) {
     if (typeof entry !== "object" || entry === null) {
       continue; // native Response/Bun.file values and descriptors validated at composition
