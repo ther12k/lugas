@@ -54,9 +54,18 @@ function stageTarball(): Staged | null {
     },
   });
   const pkgPath = join(stagePkg, "package.json");
-  const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { version: string; scripts: Record<string, string> };
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as {
+    version: string;
+    private?: boolean;
+    scripts: Record<string, string>;
+  } & Record<string, unknown>;
+  // Mirror the canonical rehearsal staging transformation (#278/#283):
+  // candidate version, shippable metadata, and the CLI bin mapping.
   pkg.version = BETA_VERSION;
   delete pkg.scripts["release:package:rehearse"];
+  delete pkg.private;
+  pkg.publishConfig = { access: "public" };
+  pkg.bin = { lugas: "./src/cli/main.ts" };
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
 
   try {
@@ -166,7 +175,7 @@ console.log("TESTING-OK");`,
     }
   });
 
-  test("packed export map is frozen to ., ./client, ./testing", () => {
+  test("packed export map exposes only root, client, and testing subpaths", () => {
     const staged2 = stageTarball();
     if (!staged2) throw new Error("stage failed");
     const { stage, tgzPath } = staged2;
@@ -177,6 +186,30 @@ console.log("TESTING-OK");`,
       expect(Object.keys(installedExports.exports).sort()).toEqual([".", "./client", "./testing"]);
     } finally {
       rmSync(stage, { recursive: true, force: true });
+    }
+  });
+
+  test("CLI executes a real route inspection through the installed bin link", () => {
+    const stagedLocal = stageTarball();
+    if (!stagedLocal) throw new Error("stage failed");
+    const dir = installConsumer(stagedLocal.stage, "t-cli", stagedLocal.tgzPath);
+    try {
+      writeFileSync(
+        join(dir, "fixture-app.ts"),
+        `import { defineApp, route, text } from "lugas";
+export default defineApp({ routes: { "/x": { GET: route({ handler: () => text(200, "ok") }) } } });`,
+      );
+      const bin = join(dir, "node_modules", ".bin", "lugas");
+      expect(existsSync(bin)).toBe(true);
+      const proc = Bun.spawnSync([process.execPath, bin, "routes", join(dir, "fixture-app.ts")], {
+        cwd: dir, stdout: "pipe", stderr: "pipe",
+      });
+      const stdout = new TextDecoder().decode(proc.stdout);
+      expect(proc.exitCode).toBe(0);
+      expect(stdout).toContain("lugas-manifest");
+      expect(stdout).toContain("/x");
+    } finally {
+      rmSync(stagedLocal.stage, { recursive: true, force: true });
     }
   });
 });

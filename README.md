@@ -2,7 +2,7 @@
 
 **Lugas** is a small, explicit, Bun-native TypeScript framework for humans and coding agents: raw `Bun.serve` with the missing structure — typed routes, optional validation, typed guards, predictable errors, an explicit end-to-end client, testing helpers, and deterministic inspection.
 
-> **Status:** design baseline. Nothing here is implemented, benchmarked, or published yet. Every design concept is `draft` until an ADR says otherwise, and every performance figure is a budget, not a result.
+> **Status:** pre-release implementation candidate. The framework core, typed client, testing helpers, CLI inspection, and benchmark suites are implemented and gated by `bun run verify` (see `docs/reports/` for per-issue evidence). Nothing is published to any registry; the v0.1.0-beta candidate exists as a locally packed tarball pending owner release decisions (M6).
 
 ## Repository map
 
