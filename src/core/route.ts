@@ -86,7 +86,7 @@ export function route<
   return brand(
     Object.freeze({
       handler: config.handler,
-      before: (config.before ?? []) as TGuards,
+      before: Object.freeze([...(config.before ?? [])]) as unknown as TGuards,
       params: config.params,
       query: config.query,
       headers: config.headers,
