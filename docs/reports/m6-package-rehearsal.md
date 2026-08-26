@@ -8,7 +8,7 @@ Generated: 2026-08-26T16:20Z
 
 ## Result
 
-REHEARSAL PASSED — 12/12 checks green. The exact beta tarball
+REHEARSAL PASSED — 15/15 checks green. The exact beta tarball
 (`lugas-0.1.0-beta.1.tgz`, 69 entries) was packed from a staged copy,
 installed into three real consumers, and every consumer ran from the
 tarball alone. **No publication occurred**; the registry command is
@@ -21,7 +21,10 @@ documented below but was not executed.
 | Server | `defineApp` + `route` + `json` from `"lugas"`; manifest emitted (`lugas-manifest-v1`) | pass |
 | Browser client | `createClient` from `"lugas/client"`, Bun.build browser target, executed under Node with no Bun global | pass |
 | Testing | `createTestServer` round-trip from `"lugas/testing"`: HTTP fetch `/hi` → 200 `{hello:"world"}`, idempotent stop | pass |
-| Export freeze | installed `node_modules/lugas/package.json` exports exactly `.`, `./client`, `./testing`; version `0.1.0-beta.1` | pass |
+| Export lockdown | installed package exposes exactly `.`, `./client`, `./testing` subpaths; version `0.1.0-beta.1` | pass |
+| CLI (real) | `lugas routes <fixture>` executed through the npm bin link created from the staged candidate's `bin` mapping; route table rendered | pass |
+| Publication validation | exact command `npm publish <tgz> --dry-run --access public --tag beta` exit 0 on npm 11.6.1 | pass |
+| Candidate binding | dirty-tree refusal + staging from `git archive HEAD` only | pass |
 
 Repeatable test suite: `tests/release/package-consumers/consumers.test.ts`
 (5 tests, packs fresh each run, skips cleanly if npm is unavailable).
@@ -53,8 +56,11 @@ generation time by design.
 ## Publication command (DOCUMENTED, NOT EXECUTED)
 
 ```
-npm publish ./docs/releases/beta/lugas-0.1.0-beta.1.tgz --access public
+npm publish ./docs/releases/beta/lugas-0.1.0-beta.1.tgz --access public --tag beta
 ```
+
+This EXACT command (with `--dry-run`) was executed successfully during the
+rehearsal; the real publication differs only by dropping `--dry-run`.
 
 Execution is gated on owner decisions in #109/#110 and the M6-010/M6-GATE
 sequence. The private repo must not be published without explicit owner
