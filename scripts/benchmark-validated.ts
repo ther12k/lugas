@@ -86,7 +86,8 @@ async function main() {
   console.log(`| raw-bun | ${rawRps} | ${median(rawSamples.map(s => s.p99us))} |`);
   console.log(`| lugas | ${lgRps} | ${median(lugasSamples.map(s => s.p99us))} | — overhead: ${overheadPct}% |`);
 
-  const env = { bunVersion: Bun.version, timestamp: new Date().toISOString() };
+  // M6R2 #280: archive binds to candidate commit so the release gate can reject stale evidence.
+  const env = { bunVersion: Bun.version, commit: execSync("git rev-parse HEAD", { encoding: "utf8" }).trim(), timestamp: new Date().toISOString() };
   writeFileSync(resolve(RESULTS_DIR, "results.json"), JSON.stringify({ env, raw: rawSamples, lugas: lugasSamples }, null, 2));
   console.log(`\nArchived to ${RESULTS_DIR}/results.json`);
 }
