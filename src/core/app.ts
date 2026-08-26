@@ -49,9 +49,13 @@ export function defineApp<
     throw diagnostic("LUGAS_APP_001", "defineApp(): config must be an object", { hint: "pass defineApp({ routes }) with an object literal" });
   }
 
-  // M5R1 correction; M6R1-011: shared canonical path validator — stable
-  // LUGAS_ROUTES_004 diagnostic instead of a plain Error.
+  // M6R2 #286: route-map SHAPE first (null/arrays/non-objects get the stable
+  // LUGAS_APP_006 diagnostic, never a native TypeError), then per-path syntax
+  // through the shared canonical validator (M5R1; M6R1-011).
   if (config.routes !== undefined) {
+    if (typeof config.routes !== "object" || config.routes === null || Array.isArray(config.routes)) {
+      throw diagnostic("LUGAS_APP_006", "defineApp(): 'routes' must be an object keyed by full path", { hint: 'use string paths like "/users/:id"' });
+    }
     for (const [path] of Object.entries(config.routes)) {
       assertValidRoutePath(path, "app");
     }
@@ -73,7 +77,13 @@ export function defineApp<
     if (!Array.isArray(config.modules)) throw diagnostic("LUGAS_APP_003", "defineApp(): 'modules' must be an array", { hint: "wrap modules: modules: [defineModule(...)]" });
     const names = new Set<string>();
     for (const module_ of config.modules) {
-      if (typeof module_ !== "object" || module_ === null || typeof (module_ as ModuleDescriptor<TServices>).name !== "string") {
+      // M6R2 #287: full structural shape — name AND a routes map.
+      if (
+        typeof module_ !== "object" || module_ === null ||
+        typeof (module_ as ModuleDescriptor<TServices>).name !== "string" ||
+        typeof (module_ as ModuleDescriptor<TServices>).routes !== "object" ||
+        (module_ as ModuleDescriptor<TServices>).routes === null
+      ) {
         throw diagnostic("LUGAS_APP_004", "defineApp(): 'modules' entries must be defineModule() descriptors", {
           hint: "create modules with defineModule({ name, routes })",
         });

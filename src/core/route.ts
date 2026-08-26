@@ -78,7 +78,14 @@ export function route<
   if (config.before !== undefined) {
     if (!Array.isArray(config.before)) throw diagnostic("LUGAS_ROUTE_004", "route(): 'before' must be an array of guard descriptors", { hint: "list guards in execution order: before: [authGuard]" });
     for (const g of config.before) {
-      if (typeof g !== "object" || g === null || typeof (g as GuardDescriptor).name !== "string") {
+      // M6R2 #287: full structural shape — guards are named AND their
+      // handler is a function, so malformed JS objects cannot slip past the
+      // factory boundary to fail deep in the request path.
+      if (
+        typeof g !== "object" || g === null ||
+        typeof (g as GuardDescriptor).name !== "string" ||
+        typeof (g as GuardDescriptor).handler !== "function"
+      ) {
         throw diagnostic("LUGAS_ROUTE_005", "route(): 'before' entries must be guard() descriptors", { hint: "create guards with guard({ name, handler })" });
       }
     }
