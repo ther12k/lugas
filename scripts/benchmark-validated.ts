@@ -91,4 +91,7 @@ async function main() {
   console.log(`\nArchived to ${RESULTS_DIR}/results.json`);
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
