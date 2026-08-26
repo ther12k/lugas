@@ -27,9 +27,9 @@ describe("method key validation (M5R1-003)", () => {
     }
   });
 
-  test("accepts ALL for catch-all", () => {
+  test("rejects ALL (Bun 1.4.0 method maps have no ALL key — M6R1-010)", () => {
     expect(() =>
       defineApp({ routes: { "/all": { ALL: () => new Response("ok") } } as never }),
-    ).not.toThrow();
+    ).toThrow(/unsupported route entry/);
   });
 });

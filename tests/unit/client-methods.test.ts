@@ -13,9 +13,7 @@ const app = defineApp({
     "/submit": {
       POST: route({ handler: () => json(201, { done: true }) }),
     },
-    "/any": {
-      ALL: route({ handler: () => new Response("any") }),
-    },
+    "/any": route({ handler: () => new Response("any") }),
   },
 });
 
