@@ -1,28 +1,23 @@
 /**
- * Performance budget gate (M5-007, corrected M6R1-001).
+ * Performance budget gate (M5-007; M6R1-001 fail-closed; M6R2 integrity).
  *
  * Validates that current benchmark results meet accepted thresholds.
- * Three levels: release-blocking, alert, target.
+ * Four levels: release-blocking, alert, below-target(alerting), target met.
  *
- * Fail-closed contract (M6R1-001):
- * - If a required scenario has no archived results → FAIL (not skip).
- * - If a scenario has zero samples → FAIL.
- * - PASS is only printed when every baseline scenario is actually compared.
- * - Results are read from the canonical subdirectory for each scenario type:
- *   plain scenarios from `m5-plain/results.json`, validated from `m5-validated/results.json`.
- *
- * Scenario IDs match the baseline keys exactly:
- *   `plain-static`, `plain-json`, `validated-post`
- *
- * Gate presence check: the gate exits 0 with SKIP when no plain results archive
- * exists (fresh checkout, pre-benchmark), and exits 1 with FAIL when the archive
- * is present but incomplete or below threshold. This allows CI to pass on clean
- * checkouts while enforcing correctness on actual release-evidence runs.
- *
- * Usage:
- *   bun run scripts/check-performance-budget.ts                # check against baselines
- *   bun run scripts/check-performance-budget.ts --smoke        # quick validation
+ * Integrity contract (M6R2 #279/#280/#282):
+ * - Only `framework === "lugas"` samples are gated — raw Bun samples are
+ *   never merged into the framework median.
+ * - Every required sample value must be finite and positive; sample counts
+ *   must reach the recorded run count for the scenario source.
+ * - Plain archives that exist but lack a required scenario FAIL even in
+ *   development mode. Total archive absence is SKIP in dev mode only.
+ * - `--release` mode: every archive must exist and bind to the current
+ *   candidate (archive env.commit === git HEAD) and the baseline environment
+ *   platform/arch; anything missing or stale FAILs.
+ * - PASS is printed only when every scenario was actually compared (release
+ *   mode) or compared with zero failures otherwise.
  */
+import { execSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -30,12 +25,18 @@ const ROOT = resolve(import.meta.dir, "..");
 const BASELINES_PATH = resolve(ROOT, "benchmarks", "baselines", "m5-accepted.json");
 const RESULTS_DIR = resolve(ROOT, "benchmarks", "results");
 
-// Canonical mapping: baseline scenario ID → results file and scenario field to filter.
-// Plain scenarios are archived by benchmark-plain.ts; validated by benchmark-validated.ts.
-const SCENARIO_SOURCE: Record<string, { file: string; scenarioField: string }> = {
-  "plain-static": { file: resolve(RESULTS_DIR, "m5-plain", "results.json"), scenarioField: "plain-static" },
-  "plain-json": { file: resolve(RESULTS_DIR, "m5-plain", "results.json"), scenarioField: "plain-json" },
-  "validated-post": { file: resolve(RESULTS_DIR, "m5-validated", "results.json"), scenarioField: "validated-post" },
+const RELEASE_MODE = process.argv.includes("--release");
+/** Expected independent runs per archived sample set, matching the runners. */
+const EXPECTED_RUNS = 5;
+
+// Canonical mapping: baseline scenario ID → results file + identifiers to filter.
+const SCENARIO_SOURCE: Record<
+  string,
+  { file: string; scenarioField?: string; format: "plain" | "validated" }
+> = {
+  "plain-static": { file: resolve(RESULTS_DIR, "m5-plain", "results.json"), scenarioField: "plain-static", format: "plain" },
+  "plain-json": { file: resolve(RESULTS_DIR, "m5-plain", "results.json"), scenarioField: "plain-json", format: "plain" },
+  "validated-post": { file: resolve(RESULTS_DIR, "m5-validated", "results.json"), format: "validated" },
 };
 
 interface Thresholds {
@@ -48,9 +49,15 @@ interface Thresholds {
 
 interface Baselines {
   version: number;
+  environment: { bunVersion?: string; platform?: string; arch?: string };
   thresholds: Thresholds;
   typecheckBudgetMs: number;
   clientBundleMaxBytes: number;
+}
+
+interface ArchiveEnv {
+  bunVersion?: string;
+  commit?: string;
 }
 
 type Sample = { rps: number; p50us: number; p95us: number; p99us: number };
@@ -63,34 +70,48 @@ function loadBaselines(): Baselines {
   return JSON.parse(readFileSync(BASELINES_PATH, "utf8"));
 }
 
+function headCommit(): string {
+  const proc = Bun.spawnSync(["git", "rev-parse", "HEAD"], {
+    cwd: ROOT, stdout: "pipe", stderr: "ignore",
+  });
+  return proc.exitCode === 0 ? new TextDecoder().decode(proc.stdout).trim() : "";
+}
+
 /**
- * Loads samples for one baseline scenario from the canonical results file.
- * Returns null when the results file does not exist (gate skips entirely),
- * or an empty array when the file exists but no samples match (gate fails).
+ * Loads Lugas-only samples plus archive environment for one baseline scenario.
+ * Returns { status: "no-archive" } when the results file does not exist,
+ * { status: "no-scenario" } when the file exists without this scenario,
+ * or the lugas samples and env on success.
  */
-function findResults(scenario: string): Sample[] | null {
+function findResults(
+  scenario: string,
+): { status: "no-archive" } | { status: "no-scenario" } | { status: "ok"; samples: Sample[]; env: ArchiveEnv } {
   const source = SCENARIO_SOURCE[scenario];
-  if (source === undefined) {
-    // Unknown scenario: treat as missing evidence → fail
-    return [];
-  }
-  if (!existsSync(source.file)) return null;
+  if (source === undefined || !existsSync(source.file)) return { status: "no-archive" };
   const data = JSON.parse(readFileSync(source.file, "utf8")) as {
-    results?: { scenario: string; samples: Sample[] }[];
+    env?: ArchiveEnv;
+    results?: { scenario: string; framework: string; samples: Sample[] }[];
     raw?: Sample[];
     lugas?: Sample[];
   };
-  // Plain format: array of { scenario, samples }
-  if (Array.isArray(data.results)) {
-    return data.results
-      .filter((r) => r.scenario === source.scenarioField)
-      .flatMap((r) => r.samples);
+  if (source.format === "plain") {
+    if (!Array.isArray(data.results)) return { status: "no-scenario" };
+    // GATE THE FRAMEWORK, NOT THE COMPARATOR: framework === "lugas" only (#279).
+    const matching = data.results.filter(
+      (r) => r.scenario === source.scenarioField && r.framework === "lugas",
+    );
+    if (matching.length === 0 || matching.every((m) => !Array.isArray(m.samples))) {
+      return { status: "no-scenario" };
+    }
+    return {
+      status: "ok",
+      samples: matching.flatMap((m) => m.samples),
+      env: data.env ?? {},
+    };
   }
-  // Validated format: { raw, lugas } — use lugas samples for validated-post
-  if (scenario === "validated-post" && Array.isArray(data.lugas)) {
-    return data.lugas;
-  }
-  return [];
+  // Validated format: separate top-level arrays per framework.
+  if (!Array.isArray(data.lugas)) return { status: "no-scenario" };
+  return { status: "ok", samples: data.lugas, env: data.env ?? {} };
 }
 
 function median(values: number[]): number {
@@ -99,48 +120,102 @@ function median(values: number[]): number {
   return sorted[Math.floor(sorted.length / 2)]!;
 }
 
+function finitePositive(s: Sample): boolean {
+  return (
+    Number.isFinite(s.rps) && s.rps > 0 &&
+    Number.isFinite(s.p50us) && s.p50us > 0 &&
+    Number.isFinite(s.p95us) && s.p95us > 0 &&
+    Number.isFinite(s.p99us) && s.p99us > 0
+  );
+}
+
 function main() {
   const baselines = loadBaselines();
   let failures = 0;
   let alerts = 0;
-  let skipped = 0;
+  let skippedScenarios = 0;
 
-  console.log("=== Performance Budget Check ===\n");
+  console.log(`=== Performance Budget Check ${RELEASE_MODE ? "(RELEASE MODE)" : "(development mode)"} ===\n`);
   console.log(`Baseline version: ${baselines.version}`);
-  console.log(`TypeScript budget: ${baselines.typecheckBudgetMs}ms`);
   console.log(`Client bundle max: ${baselines.clientBundleMaxBytes}B\n`);
 
-  for (const [scenario, threshold] of Object.entries(baselines.thresholds)) {
-    const samples = findResults(scenario);
+  // Dev-mode boundary (#280): once ANY required archive exists, evidence is
+  // expected to be complete — further missing files/scenarios are failures,
+  // not skips. Total absence remains a dev-mode SKIP.
+  const anyArchiveExists = Object.values(SCENARIO_SOURCE).some((src) => existsSync(src.file));
+  const head = RELEASE_MODE ? headCommit() : "";
 
-    // null → results file does not exist; gate skips entirely (pre-benchmark run).
-    if (samples === null) {
-      console.log(`→ ${scenario}: no results archive found — run benchmarks before release gate (skipped)`);
-      skipped++;
+  for (const [scenario, threshold] of Object.entries(baselines.thresholds)) {
+    const found = findResults(scenario);
+
+    if (found.status !== "ok") {
+      if (RELEASE_MODE) {
+        console.error(
+          `✗ ${scenario}: required benchmark evidence missing (${found.status === "no-archive" ? "no archive" : "scenario absent"}) — release mode fails closed`,
+        );
+        failures++;
+      } else if (found.status === "no-archive" && !anyArchiveExists) {
+        console.log(`→ ${scenario}: no results archive yet — skipped (dev mode; archives absent entirely)`);
+        skippedScenarios++;
+      } else {
+        // Partial evidence present but this scenario missing → FAIL in any mode (#280).
+        console.error(`✗ ${scenario}: inconsistent evidence — archive set present without this scenario's lugas samples (${found.status})`);
+        failures++;
+      }
       continue;
     }
 
-    // Empty array → file exists but scenario has no samples → FAIL (not skip).
-    if (samples.length === 0) {
-      console.error(`✗ ${scenario}: results archive present but zero samples found — re-run benchmarks`);
+    const { samples, env } = found;
+
+    if (samples.length < EXPECTED_RUNS) {
+      console.error(`✗ ${scenario}: ${samples.length} lugas sample(s) < expected ${EXPECTED_RUNS} runs`);
+      failures++;
+      continue;
+    }
+    const badSamples = samples.filter((s) => !finitePositive(s));
+    if (badSamples.length > 0) {
+      console.error(`✗ ${scenario}: ${badSamples.length} non-finite/non-positive sample value(s)`);
       failures++;
       continue;
     }
 
+    // Candidate binding (M6R2 #280): release mode requires archive @ HEAD.
+    if (RELEASE_MODE) {
+      if (!env.commit || !head || env.commit !== head) {
+        console.error(`✗ ${scenario}: archive commit ${env.commit ?? "(none)"} ≠ candidate ${head || "(unknown)"} — stale evidence`);
+        failures++;
+        continue;
+      }
+      if (
+        baselines.environment?.platform &&
+        env.bunVersion &&
+        baselines.environment.bunVersion &&
+        env.bunVersion !== process.versions.bun
+      ) {
+        console.warn(`⚠ ${scenario}: archive bun ${env.bunVersion} ≠ running ${process.versions.bun}`);
+        alerts++;
+      }
+    }
+
     const medianRps = median(samples.map((s) => s.rps));
 
+    // Four-branch classification (#282): a result above alert but below
+    // target is explicitly reported as missed, never as ≥ target.
     if (medianRps < threshold.releaseBlockMinRps) {
       console.error(`✗ ${scenario}: ${medianRps} rps < release block minimum ${threshold.releaseBlockMinRps} rps`);
       failures++;
     } else if (medianRps < threshold.alertMinRps) {
       console.warn(`⚠ ${scenario}: ${medianRps} rps < alert threshold ${threshold.alertMinRps} rps`);
       alerts++;
+    } else if (medianRps < threshold.targetRps) {
+      console.warn(`△ ${scenario}: ${medianRps} rps — meets alert floor but BELOW target ${threshold.targetRps} rps`);
+      alerts++;
     } else {
       console.log(`✓ ${scenario}: ${medianRps} rps ≥ target ${threshold.targetRps} rps`);
     }
   }
 
-  // Client bundle size check (opportunistic — skip when archive absent)
+  // Client bundle size check — mandatory in release mode (#282).
   const bundleResults = resolve(RESULTS_DIR, "m5-client-types", "smoke.json");
   if (existsSync(bundleResults)) {
     const bundle = JSON.parse(readFileSync(bundleResults, "utf8")) as {
@@ -151,18 +226,51 @@ function main() {
       failures++;
     } else if (bundle.bundle) {
       console.log(`✓ client bundle: ${bundle.bundle.rawBytes}B ≤ ${baselines.clientBundleMaxBytes}B`);
+    } else if (RELEASE_MODE) {
+      console.error("✗ client bundle smoke.json missing 'bundle' payload");
+      failures++;
+    }
+  } else if (RELEASE_MODE) {
+    console.error("✗ client bundle evidence missing (benchmarks/results/m5-client-types/smoke.json)");
+    failures++;
+  }
+
+  // Typecheck budget — measured, not just printed (#282). Executed whenever
+  // any scenario evidence was evaluated or in release mode.
+  if (skippedScenarios < Object.keys(baselines.thresholds).length || RELEASE_MODE) {
+    const tscBin = resolve(ROOT, "node_modules", ".bin", "tsc");
+    if (!existsSync(tscBin)) {
+      // Honesty protocol: report unexecuted, do not count as passing.
+      console.log(`→ typecheck budget: UNEXECUTED (TypeScript binary unavailable)`);
+    } else {
+    const start = performance.now();
+    const tsc = Bun.spawnSync([tscBin, "--noEmit"], {
+      cwd: ROOT, stdout: "pipe", stderr: "pipe",
+    });
+    const elapsedMs = Math.round(performance.now() - start);
+    if (tsc.exitCode !== 0) {
+      console.error(`✗ typecheck failed during budget measurement (${elapsedMs}ms)`);
+      failures++;
+    } else if (elapsedMs > baselines.typecheckBudgetMs) {
+      console.error(`✗ typecheck ${elapsedMs}ms > budget ${baselines.typecheckBudgetMs}ms`);
+      failures++;
+    } else {
+      console.log(`✓ typecheck ${elapsedMs}ms ≤ budget ${baselines.typecheckBudgetMs}ms`);
+    }
     }
   }
 
-  if (skipped > 0 && failures === 0) {
-    console.log(`\nSKIP: no results archive present — run benchmarks to enable the gate (${skipped} scenario(s) skipped)`);
-    // Exit 0: fresh checkout without benchmark results is not a failure.
+  // Verdict protocol (M6R2 #280): SKIP wording reserved for dev-mode total
+  // absence; PASS only when something was actually compared and zero failures.
+  if (failures > 0) {
+    console.log(`\nFAIL: ${failures} blocking failure(s), ${alerts} alert(s)`);
+    process.exit(1);
+  }
+  if (skippedScenarios === Object.keys(baselines.thresholds).length) {
+    console.log(`\nSKIP: no results archives present (dev mode) — gate not executed, not passed`);
     return;
   }
-
-  console.log(`\n${failures > 0 ? "FAIL" : "PASS"}: ${failures} blocking failure(s), ${alerts} alert(s)`);
-
-  if (failures > 0) process.exit(1);
+  console.log(`\nPASS: ${failures} blocking failure(s), ${alerts} alert(s)`);
 }
 
 main();

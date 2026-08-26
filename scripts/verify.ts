@@ -56,9 +56,13 @@ async function main(): Promise<number> {
   // Performance gate (M6R1-001): runs when benchmark results archive is present.
   // SKIP on a clean checkout (no benchmarks run yet); FAIL when archive present but gate fails.
   const perfGatePath = `${import.meta.dir}/check-performance-budget.ts`;
+  const perfGateArgv = [perfGatePath];
   const plainResultsPath = resolve(import.meta.dir, "..", "benchmarks", "results", "m5-plain", "results.json");
   if (await Bun.file(plainResultsPath).exists()) {
-    const perfResult = await run("perf-gate", ["bun", "run", perfGatePath]);
+    // M6R2 #282: release verification invokes the gate in --release mode;
+    // LUGAS_PERF_RELEASE=1 is set by release tooling (#114 flow).
+    const perfArgs = process.env.LUGAS_PERF_RELEASE === "1" ? [...perfGateArgv, "--release"] : perfGateArgv;
+    const perfResult = await run("perf-gate", ["bun", "run", ...perfArgs]);
     results.push(perfResult);
     console.log(`== perf-gate ==\n${perfResult.status}: ${perfResult.output || "(no output)"}`);
   } else {
