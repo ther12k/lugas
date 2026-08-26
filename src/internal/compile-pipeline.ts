@@ -257,29 +257,33 @@ async function executeAsyncPipeline(
   partialContext: Partial<PipelineContext>,
 ): Promise<Response> {
   const { before: guards = [], params: paramsSchema, query: querySchema, headers: headersSchema } = descriptor as any;
+  const completed = new Set<string>();
   const userHandler = descriptor.handler as (context: PipelineContext) => Response | Promise<Response>;
   const base = { services };
 
   let headersData = partialContext.headers;
-  if (partialContext.headers === undefined && headersSchema !== undefined) {
+  if (!completed.has('headers') && headersSchema !== undefined) {
     const hRes = await validateHeaders(headersSchema, request);
     if (!hRes.ok) return hRes.response;
     headersData = hRes.data;
+    completed.add("headers");
   }
 
   const rawParams = (request as Request & { params?: Record<string, string> }).params ?? {};
   let paramsData = partialContext.params ?? rawParams;
-  if (partialContext.params === undefined && paramsSchema !== undefined) {
+  if (!completed.has('params') && paramsSchema !== undefined) {
     const pRes = await validateParams(paramsSchema, rawParams);
     if (!pRes.ok) return pRes.response;
     paramsData = pRes.data;
+    completed.add("params");
   }
 
   let queryData = partialContext.query;
-  if (partialContext.query === undefined && querySchema !== undefined) {
+  if (!completed.has('query') && querySchema !== undefined) {
     const qRes = await validateQuery(querySchema, request);
     if (!qRes.ok) return qRes.response;
     queryData = qRes.data;
+    completed.add("query");
   }
 
   let guardContext = {};

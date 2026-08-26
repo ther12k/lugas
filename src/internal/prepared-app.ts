@@ -128,7 +128,12 @@ export function prepareApp<TServices>(config: {
     if (kind.kind === "native-response") return kind.response;
     if (kind.kind === "native-file") return kind.file;
     if (kind.kind === "native-dir") return { dir: kind.path };
-    return kind.map;
+    // M5R1 correction: nested method maps must fail closed
+    if (kind.kind === "native-method-map") {
+      throw diagnostic("LUGAS_ROUTES_002", `nested method map is not allowed at ${method} ${path}`, { context: { method, path } });
+    }
+    // All route kinds handled above; this line is unreachable.
+    throw diagnostic("LUGAS_ROUTES_002", `unreachable: unhandled route kind at ${method} ${path}`);
   };
 
   const compiled: Record<string, unknown> = {};
