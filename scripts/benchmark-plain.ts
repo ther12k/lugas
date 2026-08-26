@@ -13,35 +13,65 @@ import { resolve } from "node:path";
 const ROOT = resolve(import.meta.dir, "..");
 const RESULTS_DIR = resolve(ROOT, "benchmarks", "results", "m5-plain");
 const RUNS = 5;
-const DURATION_MS = 2_000;
+const DURATION_MS = Number(process.env.BENCH_DURATION_MS ?? 2_000);
 const CONCURRENCY = 8;
 
 type Sample = { rps: number; p50us: number; p95us: number; p99us: number; total: number };
 type ScenarioResult = { scenario: string; framework: string; samples: Sample[] };
 
+/** One benchmark contract: expected status + body marker for a scenario. */
+export type Expectation = { status: number; bodyIncludes?: string };
+
+/**
+ * Asserts one exchange against the scenario contract (M6R2 #281). A fast 404
+ * or 500 must never register as throughput; the first violation aborts
+ * evidence generation entirely.
+ */
+export async function assertContract(res: Response, expected: Expectation): Promise<void> {
+  if (res.status !== expected.status) {
+    throw new Error(`benchmark contract violated: status ${res.status} != ${expected.status}`);
+  }
+  if (expected.bodyIncludes !== undefined) {
+    const text = await res.text();
+    if (!text.includes(expected.bodyIncludes)) {
+      throw new Error(`benchmark contract violated: body missing '${expected.bodyIncludes}'`);
+    }
+  }
+}
+
 async function measure(
   label: string,
   createServer: () => { url: string; stop: () => void },
   path: string,
+  expected: Expectation,
 ): Promise<Sample> {
   const { url, stop } = createServer();
   try {
-    // Warmup
-    await fetch(new URL(path, url));
+    // Warmup — contract-asserted like every measured request.
+    await assertContract(await fetch(new URL(path, url)), expected);
     const deadline = Date.now() + DURATION_MS;
     const latencies: number[] = [];
     let total = 0;
+    let firstError: Error | undefined;
 
     const workers = Array.from({ length: CONCURRENCY }, async () => {
       while (Date.now() < deadline) {
         const start = performance.now();
-        const res = await fetch(new URL(path, url));
-        await res.arrayBuffer();
+        try {
+          const res = await fetch(new URL(path, url));
+          await assertContract(res, expected);
+        } catch (error) {
+          firstError ??= error as Error;
+          break; // stop generating evidence on first violation
+        }
         latencies.push(Math.round((performance.now() - start) * 1000));
         total++;
       }
     });
     await Promise.all(workers);
+    if (firstError !== undefined) {
+      throw new Error(`${label}: ${firstError.message}`);
+    }
 
     latencies.sort((a, b) => a - b);
     const pct = (p: number) => latencies[Math.min(Math.ceil((p / 100) * latencies.length) - 1, latencies.length - 1)] ?? 0;
@@ -126,7 +156,7 @@ async function main() {
   // Raw Bun static
   const rawStaticSamples: Sample[] = [];
   for (let i = 0; i < RUNS; i++) {
-    const s = await measure(`raw-static`, rawBunStatic, "/static");
+    const s = await measure(`raw-static`, rawBunStatic, "/static", { status: 200, bodyIncludes: "static" });
     rawStaticSamples.push(s);
     console.log(`raw-bun /static run=${i + 1}: ${s.rps} rps`);
   }
@@ -135,7 +165,7 @@ async function main() {
   // Lugas static
   const lugasStaticSamples: Sample[] = [];
   for (let i = 0; i < RUNS; i++) {
-    const s = await measure(`lugas-static`, lugasApp, "/static");
+    const s = await measure(`lugas-static`, lugasApp, "/static", { status: 200, bodyIncludes: "static" });
     lugasStaticSamples.push(s);
     console.log(`lugas /static run=${i + 1}: ${s.rps} rps`);
   }
@@ -144,7 +174,7 @@ async function main() {
   // Raw Bun JSON
   const rawJsonSamples: Sample[] = [];
   for (let i = 0; i < RUNS; i++) {
-    const s = await measure(`raw-json`, rawBunJson, "/json");
+    const s = await measure(`raw-json`, rawBunJson, "/json", { status: 200, bodyIncludes: "ok" });
     rawJsonSamples.push(s);
     console.log(`raw-bun /json run=${i + 1}: ${s.rps} rps`);
   }
@@ -153,7 +183,7 @@ async function main() {
   // Lugas JSON
   const lugasJsonSamples: Sample[] = [];
   for (let i = 0; i < RUNS; i++) {
-    const s = await measure(`lugas-json`, lugasApp, "/json");
+    const s = await measure(`lugas-json`, lugasApp, "/json", { status: 200, bodyIncludes: "ok" });
     lugasJsonSamples.push(s);
     console.log(`lugas /json run=${i + 1}: ${s.rps} rps`);
   }
@@ -184,4 +214,9 @@ async function main() {
   console.log(`\nRaw data archived to ${RESULTS_DIR}/results.json`);
 }
 
-main().catch(console.error);
+if (import.meta.main) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
