@@ -80,7 +80,8 @@ async function main() {
     timestamp: new Date().toISOString(),
   };
 
-  writeFileSync(resolve(RESULTS_DIR, smoke ? "smoke.json" : "results.json"), JSON.stringify(results, null, 2));
+  writeFileSync(resolve(RESULTS_DIR, "results.json"), JSON.stringify(results, null, 2));
+  writeFileSync(resolve(RESULTS_DIR, "smoke.json"), JSON.stringify(results, null, 2));
   console.log(`\nResults written to ${RESULTS_DIR}/`);
 
   function expectNoServerCode(text: string): void {

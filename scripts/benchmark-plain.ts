@@ -145,7 +145,7 @@ async function main() {
   const env = {
     bunVersion: Bun.version,
     cpuModel: (() => { try { return execSync("lscpu | grep 'Model name' | head -1", { encoding: "utf8" }).split(":").pop()?.trim() ?? ""; } catch { return ""; } })(),
-    commit: execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim(),
+    commit: execSync("git rev-parse HEAD", { encoding: "utf8" }).trim(),
     timestamp: new Date().toISOString(),
   };
 
