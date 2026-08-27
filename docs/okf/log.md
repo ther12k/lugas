@@ -22,7 +22,6 @@
 - M0-009 recommends stateless bound type definitions with explicit generic escape hatch for M1.
 - M1 implementation is authorized; owner-blocked package/license/publication decisions remain unchanged.
 
-
 ## 2026-08-21 — M1 gate passed locally
 
 - M1-001 through M1-018 merged with evidence; local clean verification: 111 tests pass, 1 documented Bun leak characterization skip, 0 failures, typecheck/docs/diff pass.
@@ -36,7 +35,6 @@
 - Sequential guard execution, typed context enrichment, short-circuit response unions, adversarial security matrix, and bounded fuzz tests closed.
 - M3 typed client implementation is authorized after gate merge.
 
-
 ## 2026-08-23 — M3 gate passed locally
 
 - M3-001 through M3-018 merged with evidence; clean-checkout reproduction: 367 tests pass, 1 documented skip, 0 failures, typecheck/docs/diff pass.
@@ -45,3 +43,40 @@
 - Type-cost gate ACCEPTED: 500-route cold check 166–339 ms / 111 MB with deterministic instantiation counts (177,486); 1,000-route stress reported practical. Generated-client fallback not adopted.
 - Stable diagnostics catalog LUGAS_CLIENT_001–010 documented in `docs/client-error-semantics.md`.
 - M4 implementation is authorized after gate merge; GitHub Actions remains blocked by account billing/spending-limit condition.
+
+## 2026-08-24 — M4 gate passed
+
+- M4-001 through M4-017 merged with evidence.
+- Runtime manifest truthfulness delivered (`lugas-manifest-v1` format); reading `app.manifest` starts no server and invokes no handlers.
+- CLI inspection tooling delivered (`lugas routes`, `lugas inspect`) with subprocess isolation and timeout protection.
+- `lugas/testing` subpath exported with `createTestServer` lifecycle management and real typed client integration.
+
+## 2026-08-25 — M4R1 review corrections gate passed
+
+- M4R1-001 through M4R1-008 merged with evidence.
+- Canonical `PreparedApp` graph architecture established.
+- Exact wildcard matching, error policy wrappers, and server/client response typing invariants closed.
+
+## 2026-08-25 — M5 private alpha hardening passed
+
+- M5-001 through M5-017 merged with evidence.
+- Controlled benchmarks established against raw Bun and Elysia comparators.
+- 10,000-route stress testing, pipeline stress, cancellation invariants, and private alpha release packet assembled.
+
+## 2026-08-26 — M5R1 review corrections gate passed
+
+- M5R1-001 through M5R1-003 merged with evidence.
+- Benchmark comparator alignment, guard chain freezing, and async sentinel fixes resolved.
+
+## 2026-08-27 — M6 beta release gate passed (v0.1.0-beta.1)
+
+- M6-001 through M6-010 and M6-GATE merged with evidence.
+- Public API frozen (M6-001); migration guides published (M6-002).
+- Publication rehearsal verified (M6-003/M6R1-006, 15/15 checks green).
+- Owner decisions approved: naming ODR-0001 (`lugas` on npm), license & governance ODR-0002 (Apache-2.0, `NOTICE`, `SECURITY.md`, `GOVERNANCE.md`).
+- Compatibility matrix finalized (M6-006/M6-006-EH: 6/6 CI matrix cells green across Ubuntu/macOS/Windows × Bun 1.4, mechanically verified by `verify:compatibility-report`).
+- Defect triage enforced zero P0/P1 defects across M6R1 and M6R2 correction waves.
+- Clean-room agent review passed with zero defects (`tests/clean-room/billing-service.test.ts`, 8/8 pass).
+- Release-mode performance budget gate passed (plain-static 137k rps, plain-json 107k rps, validated-post 66k rps, typecheck 833ms, client bundle 14.9kB).
+- Release packet assembled in `docs/releases/beta/RELEASE_PACKET.md` with cryptographic manifest in `SHA256SUMS`.
+- **Verdict: GO.** LugasJS v0.1.0-beta.1 release candidate approved for publication.
