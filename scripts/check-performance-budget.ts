@@ -216,9 +216,11 @@ function main() {
   }
 
   // Client bundle size check — mandatory in release mode (#282).
-  const bundleResults = resolve(RESULTS_DIR, "m5-client-types", "smoke.json");
-  if (existsSync(bundleResults)) {
-    const bundle = JSON.parse(readFileSync(bundleResults, "utf8")) as {
+  const bundleResultsPath = existsSync(resolve(RESULTS_DIR, "m5-client-types", "smoke.json"))
+    ? resolve(RESULTS_DIR, "m5-client-types", "smoke.json")
+    : resolve(RESULTS_DIR, "m5-client-types", "results.json");
+  if (existsSync(bundleResultsPath)) {
+    const bundle = JSON.parse(readFileSync(bundleResultsPath, "utf8")) as {
       bundle?: { rawBytes: number };
     };
     if (bundle.bundle && bundle.bundle.rawBytes > baselines.clientBundleMaxBytes) {
@@ -227,11 +229,11 @@ function main() {
     } else if (bundle.bundle) {
       console.log(`✓ client bundle: ${bundle.bundle.rawBytes}B ≤ ${baselines.clientBundleMaxBytes}B`);
     } else if (RELEASE_MODE) {
-      console.error("✗ client bundle smoke.json missing 'bundle' payload");
+      console.error("✗ client bundle evidence missing 'bundle' payload");
       failures++;
     }
   } else if (RELEASE_MODE) {
-    console.error("✗ client bundle evidence missing (benchmarks/results/m5-client-types/smoke.json)");
+    console.error("✗ client bundle evidence missing (benchmarks/results/m5-client-types/smoke.json or results.json)");
     failures++;
   }
 
