@@ -10,12 +10,17 @@ tags:
 
 # M6 Compatibility Matrix — Final
 
-Beta candidate: commit `5324aee` (main after M6R2 runtime-boundary merge).
-Generated: 2026-08-26.
+Two distinct runs matter and must not be conflated:
+
+| Run | Commit | What it proves |
+|---|---|---|
+| [33000006619](https://github.com/ther12k/lugas/actions/runs/33000006619) | `5324aee` (pre-PR beta candidate) | 6/6 matrix cells green on the compatibility payload itself |
+| **[33021193847](https://github.com/ther12k/lugas/actions/runs/33021193847)** | `d9cfd08` (merged tree incl. verifier step) | **final merged-tree result including `verify:compatibility-report`** — the authoritative reference |
 
 ## Matrix evidence (CI, `.github/workflows/compatibility.yml`)
 
-Latest run on the beta candidate: [run 33000006619](https://github.com/ther12k/lugas/actions/runs/33000006619) — **all 6 cells green**:
+Merged-tree run 33021193847 — **all 6 cells green**, now also executing
+`tests/cli/` per cell (CLI is spawn/signal-heavy where platforms differ):
 
 | OS \ Bun | 1.4.0 | 1.4.x (latest patch) |
 |---|---|---|
@@ -23,14 +28,19 @@ Latest run on the beta candidate: [run 33000006619](https://github.com/ther12k/l
 | macos-latest | ✅ success | ✅ success |
 | windows-latest | ✅ success | ✅ success |
 
-Per-cell jobs: typecheck → unit+conformance tests → security tests.
-Run history at the candidate: every workflow invocation on `5324aee` and its
-immediate M6R2 predecessors concluded `success` (10+ consecutive green runs).
+Per-cell jobs: env archival (`bun --version`, runner OS/arch) → verifier →
+typecheck → unit+conformance → CLI tests → security tests.
+Run history: every workflow invocation across the M6R2 series concluded
+`success` (10+ consecutive green runs).
+
+Exact resolved Bun versions per cell are archived in each run's job summary;
+on the local linux-x64 verification cell the resolved version was **1.4.0**
+(`1.4.x` selector cells resolve at run time by design — setup-bun pins latest 1.4 patch).
 
 ## Deep local verification (linux-x64)
 
-Full gate on the exact candidate: `bun run verify` → **605 pass / 0 fail /
-1 documented skip**, typecheck clean, OKF docs clean. Covers integration,
+Full gate on the exact candidate: `bun test` → **605 pass / 0 fail /
+1 documented skip**; typecheck clean; OKF docs clean. Covers integration,
 security, fuzz, golden, conformance, and type suites — deeper than the matrix
 cell scope by design (matrix runs a fast portable subset).
 
@@ -55,10 +65,11 @@ real-browser execution beyond bundle-level proof), and generation source.
 
 ## Limitations
 
-- Matrix cells exercise typecheck + unit/conformance + security; the deepest
-  suites (integration/package-consumers/benchmarks) are Linux-only CI-local —
+- Matrix cells exercise typecheck + unit/conformance + CLI + security; the deepest
+  suites (integration/package-consumers/benchmarks) remain Linux-only CI-local —
   acceptable for beta per the portable-subset strategy; full-matrix depth is a
-  post-beta candidate improvement.
+  post-beta improvement.
+- actions/checkout was raised v4→v5 in this correction (Node20 deprecation warnings).
 - The "1.4.x" cell tracks the latest 1.4 patch available at run time; the
   release-date rerun requirement (M6-009) re-executes this matrix near GA.
 

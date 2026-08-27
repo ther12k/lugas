@@ -16,15 +16,16 @@ implied by broad semver ranges.
 
 ## Runtime (server core + CLI + testing helpers)
 
-| Component | Bun | Linux x86-64 | macOS arm64 | Windows x64 |
-|---|---|---|---|---|
-| Server core | **1.4.0** | ✅ | ✅ | ✅ |
-| Server core | **1.4.x latest patch** (tested near release) | ✅ | ✅ | ✅ |
+The CLI is verified per-platform in the same matrix (`tests/cli/` covers process spawning, signals, and timeouts — the areas where OSes differ).
 
-Bun outside `1.4.x` is unsupported: the framework pins to Bun 1.4 through the
-1.x line (native `Bun.serve({ routes })` method-map semantics, spawn timeout
-properties, filesystem semantics). Other Bun majors are neither tested nor
-claimed.
+Resolved patch values below are lock/CI-resolved; the "1.4.x latest patch" selector resolves at matrix run time and the exact version is archived per cell in CI ([matrix evidence](reports/m6-compatibility.md)).
+
+| Server core / CLI | Declared selector | Exact tested | Linux x86-64 | macOS arm64 | Windows x64 |
+|---|---|---|---|---|---|
+| Server core | **1.4.0** | 1.4.0 | ✅ | ✅ | ✅ |
+| Server core | **1.4.x** latest patch near release | recorded in CI summary per run | ✅ | ✅ | ✅ |
+
+Bun outside **1.4.x (patch releases)** is unsupported: through its own 1.x line, Lugas pins to Bun 1.4 only (native `Bun.serve({ routes })` method-map semantics, spawn timeout properties, filesystem semantics). Other Bun majors are neither tested nor claimed.
 
 ## Type checking
 
@@ -37,11 +38,11 @@ Other TypeScript versions are untested; strict-mode flags in use include
 
 ## Validators (Standard Schema v1)
 
-| Validator | Tested versions | Status |
-|---|---|---|
-| Zod | ^4.4.3 | ✅ unit/integration/fuzz suites (linux-x64) |
-| Valibot | ^1.4.2 | ✅ unit/integration suites (linux-x64) |
-| Any Standard Schema v1 implementation | spec 1.1.0 contract | ✅ structural conformance suite (linux-x64) |
+| Validator | Declared range | Exact version tested (lock-resolved) | Status |
+|---|---|---|---|
+| Zod | ^4.4.3 | 4.4.3 | ✅ unit/integration/fuzz suites (linux-x64) |
+| Valibot | ^1.4.2 | 1.4.2 | ✅ unit/integration suites (linux-x64) |
+| Any Standard Schema v1 implementation | spec ^1.1.0 | 1.1.0 | ✅ structural conformance suite (linux-x64) |
 
 Validator coverage on macOS/Windows follows the CI matrix (typecheck +
 conformance + security only); validator-specific integration suites execute
@@ -63,8 +64,10 @@ on Linux CI.
 ## How this was verified
 
 - Matrix: `.github/workflows/compatibility.yml` — 3 OS × 2 Bun = 6 cells,
-  all green on the beta candidate ([latest run](https://github.com/ther12k/lugas/actions/runs/33000006619), commit `5324aee`, 2026-08-26).
-- Local deep verification (full `bun run verify`: typecheck, 604 tests incl.
+  all green. Authoritative merged-tree run (incl. this doc's verifier):
+  [33021193847](https://github.com/ther12k/lugas/actions/runs/33021193847) @ `d9cfd08`;
+  pre-PR candidate run: [33000006619](https://github.com/ther12k/lugas/actions/runs/33000006619) @ `5324aee`.
+- Local deep verification (full `bun run verify`: typecheck, 605 tests incl.
   security/integration/conformance/docs/golden): linux-x64, Bun 1.4.0, TS 7.0.2.
 - Matrix cells run: `bun install --frozen-lockfile`, `bun run typecheck`,
   unit+conformance tests, security tests.
