@@ -100,12 +100,19 @@ describe("runner failure semantics (M6R2 #281)", () => {
         expect(readFileSync(validatedArchive).equals(preExisting.validated), "validated archive mutated").toBe(true);
       }
     } finally {
-      // Restore original state if a violation created/overwrote an archive.
-      if (preExisting.plain === null && existsSync(plainArchive)) {
-        rmSync(plainArchive);
+      // True self-restoration (#M6R3): a violation that CREATED an archive is
+      // removed; a violation that OVERWROTE an existing archive has its exact
+      // snapshot bytes written back — the failure path is precisely when
+      // test isolation matters most.
+      if (preExisting.plain === null) {
+        rmSync(plainArchive, { force: true });
+      } else if (existsSync(plainArchive)) {
+        writeFileSync(plainArchive, preExisting.plain);
       }
-      if (preExisting.validated === null && existsSync(validatedArchive)) {
-        rmSync(validatedArchive);
+      if (preExisting.validated === null) {
+        rmSync(validatedArchive, { force: true });
+      } else if (existsSync(validatedArchive)) {
+        writeFileSync(validatedArchive, preExisting.validated);
       }
     }
   }, 120_000);

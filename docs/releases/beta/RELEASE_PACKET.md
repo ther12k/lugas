@@ -1,8 +1,8 @@
 # LugasJS v0.1.0-beta.1 Release Packet
 
 **Candidate Version:** `0.1.0-beta.1`  
-**Candidate Commit:** `1ba4e5dd28d7a061de2993fc60aa6de98f58f9eb` (`1ba4e5d`)  
-**Generated:** 2026-08-27T03:54:25.852Z  
+**Candidate Commit:** `d2a07b213bc719097c88340a177e68737aa10301` (`d2a07b2`)  
+**Generated:** 2026-08-28T17:38:21.040Z  
 **Runtime:** Bun 1.4.0 · TypeScript 7.0.2 · Linux x86-64 / macOS arm64 / Windows x64  
 **Package:** `lugas` (unscoped) · License: Apache-2.0 · Repo: `ther12k/lugas`
 
@@ -41,6 +41,7 @@ Publication remains strictly gated on owner approval in **M6-GATE**.
 - [`docs/reports/gates/M4R1-GATE.md`](../../reports/gates/M4R1-GATE.md)
 - [`docs/reports/gates/M5.md`](../../reports/gates/M5.md)
 - [`docs/reports/gates/M5R1-GATE.md`](../../reports/gates/M5R1-GATE.md)
+- [`docs/reports/gates/M6.md`](../../reports/gates/M6.md)
 
 ### M6 Candidate Review Reports
 - [`docs/reports/m6-api-freeze.md`](../../reports/m6-api-freeze.md) — Public API candidate freeze
@@ -56,9 +57,9 @@ Publication remains strictly gated on owner approval in **M6-GATE**.
 
 | Scenario / Metric | Release Floor | Alert Floor | Target | Candidate Measured | Result |
 |---|---|---|---|---|---|
-| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **137,238 rps** | ✅ Exceeded |
-| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **107,644 rps** | ✅ Exceeded |
-| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **66,827 rps** | ✅ Exceeded (11.4% overhead) |
+| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **126,109 rps** | ✅ Exceeded |
+| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **94,588 rps** | ✅ Exceeded |
+| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **58,975 rps** | ✅ Exceeded (11.4% overhead) |
 | Typecheck Duration | — | — | < 2,000ms | **833ms** | ✅ Target Met |
 | Client Bundle Size | — | — | < 25,000 B | **14,900 B** (~4.1 kB gzip) | ✅ Target Met |
 

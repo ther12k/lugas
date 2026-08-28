@@ -206,7 +206,9 @@ npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag
   - [x] License & Governance: \`docs/owner-decisions/license-governance.md\` (ODR-0002)
 - [x] **Legal & Attribution:** \`LICENSE\` (full Apache-2.0), \`NOTICE\`, \`SECURITY.md\`, \`GOVERNANCE.md\` in place.
 - [x] **Release Packet Built:** \`docs/releases/beta/RELEASE_PACKET.md\` assembled and indexed.
-- [ ] **Owner Release Gate Sign-Off:** M6-GATE approval recorded in \`docs/reports/gates/M6-GATE.md\`.
+- [x] **Exact Tarball Preserved:** \`lugas-${BETA_VERSION}.tgz\` committed (un-ignored for release) and covered by \`SHA256SUMS\` — publication bytes are byte-identical to rehearsal bytes (M6R3).
+- [x] **Post-GATE Re-attestation:** M6 addendum records evidence bound to this exact SHA after the evidence-tooling fixes (M6R3).
+- [ ] **Owner Release Gate Sign-Off:** M6-GATE approval recorded in \`docs/reports/gates/M6.md\` (GO verdict + any post-GATE addendum).
 
 ---
 
@@ -216,8 +218,8 @@ npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag
 # 1. Publish to npm registry (owner execution only)
 npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag beta
 
-# 2. Tag release commit in Git
-git tag -a "v${BETA_VERSION}" -m "LugasJS v${BETA_VERSION} release candidate"
+# 2. Tag the APPROVED release SHA explicitly (never ambient HEAD)
+git tag -a "v${BETA_VERSION}" "${commit}" -m "LugasJS v${BETA_VERSION} release candidate"
 git push origin "v${BETA_VERSION}"
 
 # 3. Create GitHub Release with RELEASE_PACKET.md notes
@@ -228,10 +230,20 @@ gh release create "v${BETA_VERSION}" ./docs/releases/beta/lugas-${BETA_VERSION}.
   writeFileSync(resolve(OUT_DIR, "CHECKLIST.md"), checklist);
   console.log(`✓ CHECKLIST.md generated (${checklist.length} bytes)`);
 
-  // 3. Compute SHA256SUMS over all files in docs/releases/beta/ (excluding SHA256SUMS itself)
+  // 3. Compute SHA256SUMS over ALL release artifacts INCLUDING the exact
+  // tarball (M6R3): publication bytes must be checksum-attested in-repo.
+  const tarballName = `lugas-${BETA_VERSION}.tgz`;
+  const tarballPath = resolve(OUT_DIR, tarballName);
+  if (!existsSync(tarballPath)) {
+    console.error(
+      `✗ exact tarball missing: ${tarballPath} — run 'bun run release:package:rehearse' first (M6R3 requires the publication bytes to be attested)`,
+    );
+    process.exit(1);
+  }
   const betaFiles = readdirSync(OUT_DIR)
     .filter((f) => f !== "SHA256SUMS" && !f.startsWith("."))
     .sort();
+  if (!betaFiles.includes(tarballName)) betaFiles.unshift(tarballName);
 
   const sums = betaFiles.map((name) => {
     const data = readFileSync(resolve(OUT_DIR, name));

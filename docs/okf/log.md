@@ -80,3 +80,12 @@
 - Release-mode performance budget gate passed (plain-static 137k rps, plain-json 107k rps, validated-post 66k rps, typecheck 833ms, client bundle 14.9kB).
 - Release packet assembled in `docs/releases/beta/RELEASE_PACKET.md` with cryptographic manifest in `SHA256SUMS`.
 - **Verdict: GO.** LugasJS v0.1.0-beta.1 release candidate approved for publication.
+
+## 2026-08-28 — M6R3 post-GATE re-attestation
+
+- Narrow re-attestation after post-GATE evidence-tooling fixes; shipped payload (`src/**` + npm allowlist) unchanged between `ad799b6` (original GO) and candidate `d2a07b2`.
+- Release-mode gate hardened: typecheck budget fails closed when unmeasured; smoke archive-suppression flag rejected in release runs.
+- Benchmark smoke runs can no longer poison the perf gate (`LUGAS_BENCH_NO_ARCHIVE=1` + byte-exact archive snapshot restore in the validity suite).
+- Exact tarball committed and attested: `SHA256SUMS` now includes `lugas-0.1.0-beta.1.tgz` (sha256 `347f11c2…`); `build-beta-packet.ts` fails closed without it.
+- All release metadata (packet, checklist, provenance, inventory) regenerated and bound to `d2a07b2`; tag command pins the explicit SHA.
+- Standing verdict: **GO — reaffirmed** for `d2a07b2`; publication remains an owner action per `docs/releases/beta/CHECKLIST.md`.
