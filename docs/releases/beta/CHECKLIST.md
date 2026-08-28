@@ -1,6 +1,6 @@
 # LugasJS v0.1.0-beta.1 Pre-Publication Checklist
 
-**Candidate:** `1ba4e5dd28d7a061de2993fc60aa6de98f58f9eb`  
+**Candidate:** `d2a07b213bc719097c88340a177e68737aa10301`  
 **Target Package:** `lugas@0.1.0-beta.1`  
 **Registry Target:** `https://registry.npmjs.org/` with tag `beta`
 
@@ -19,7 +19,9 @@
   - [x] License & Governance: `docs/owner-decisions/license-governance.md` (ODR-0002)
 - [x] **Legal & Attribution:** `LICENSE` (full Apache-2.0), `NOTICE`, `SECURITY.md`, `GOVERNANCE.md` in place.
 - [x] **Release Packet Built:** `docs/releases/beta/RELEASE_PACKET.md` assembled and indexed.
-- [ ] **Owner Release Gate Sign-Off:** M6-GATE approval recorded in `docs/reports/gates/M6-GATE.md`.
+- [x] **Exact Tarball Preserved:** `lugas-0.1.0-beta.1.tgz` committed (un-ignored for release) and covered by `SHA256SUMS` — publication bytes are byte-identical to rehearsal bytes (M6R3).
+- [x] **Post-GATE Re-attestation:** M6 addendum records evidence bound to this exact SHA after the evidence-tooling fixes (M6R3).
+- [ ] **Owner Release Gate Sign-Off:** M6-GATE approval recorded in `docs/reports/gates/M6.md` (GO verdict + any post-GATE addendum).
 
 ---
 
@@ -29,8 +31,8 @@
 # 1. Publish to npm registry (owner execution only)
 npm publish ./docs/releases/beta/lugas-0.1.0-beta.1.tgz --access public --tag beta
 
-# 2. Tag release commit in Git
-git tag -a "v0.1.0-beta.1" -m "LugasJS v0.1.0-beta.1 release candidate"
+# 2. Tag the APPROVED release SHA explicitly (never ambient HEAD)
+git tag -a "v0.1.0-beta.1" "d2a07b213bc719097c88340a177e68737aa10301" -m "LugasJS v0.1.0-beta.1 release candidate"
 git push origin "v0.1.0-beta.1"
 
 # 3. Create GitHub Release with RELEASE_PACKET.md notes
