@@ -135,6 +135,13 @@ function main() {
   let alerts = 0;
   let skippedScenarios = 0;
 
+  // Release runs are evidence runs: the smoke-only archive-suppression flag
+  // must never leak into a release execution (#M6R3).
+  if (RELEASE_MODE && process.env.LUGAS_BENCH_NO_ARCHIVE === "1") {
+    console.error("✗ LUGAS_BENCH_NO_ARCHIVE=1 is invalid in --release mode — release runs must archive evidence");
+    process.exit(1);
+  }
+
   console.log(`=== Performance Budget Check ${RELEASE_MODE ? "(RELEASE MODE)" : "(development mode)"} ===\n`);
   console.log(`Baseline version: ${baselines.version}`);
   console.log(`Client bundle max: ${baselines.clientBundleMaxBytes}B\n`);
@@ -242,8 +249,14 @@ function main() {
   if (skippedScenarios < Object.keys(baselines.thresholds).length || RELEASE_MODE) {
     const tscBin = resolve(ROOT, "node_modules", ".bin", "tsc");
     if (!existsSync(tscBin)) {
-      // Honesty protocol: report unexecuted, do not count as passing.
-      console.log(`→ typecheck budget: UNEXECUTED (TypeScript binary unavailable)`);
+      if (RELEASE_MODE) {
+        // Fail closed: a release gate that never measured the typecheck
+        // budget must not print PASS (#M6R3).
+        console.error("✗ typecheck budget UNEXECUTED in --release mode (TypeScript binary unavailable)");
+        failures++;
+      } else {
+        console.log(`→ typecheck budget: UNEXECUTED (TypeScript binary unavailable)`);
+      }
     } else {
     const start = performance.now();
     const tsc = Bun.spawnSync([tscBin, "--noEmit"], {
