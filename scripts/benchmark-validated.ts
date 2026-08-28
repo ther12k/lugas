@@ -101,6 +101,11 @@ async function main() {
 
   // M6R2 #280: archive binds to candidate commit so the release gate can reject stale evidence.
   const env = { bunVersion: Bun.version, commit: execSync("git rev-parse HEAD", { encoding: "utf8" }).trim(), timestamp: new Date().toISOString() };
+  // Archive — skipped under LUGAS_BENCH_NO_ARCHIVE (short smoke runs).
+  if (process.env.LUGAS_BENCH_NO_ARCHIVE === "1") {
+    console.log(`\n(archive skipped: LUGAS_BENCH_NO_ARCHIVE=1)`);
+    return;
+  }
   writeFileSync(resolve(RESULTS_DIR, "results.json"), JSON.stringify({ env, raw: rawSamples, lugas: lugasSamples }, null, 2));
   console.log(`\nArchived to ${RESULTS_DIR}/results.json`);
 }

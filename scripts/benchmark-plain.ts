@@ -209,7 +209,13 @@ async function main() {
     );
   }
 
-  // Archive
+  // Archive — skipped under LUGAS_BENCH_NO_ARCHIVE (short smoke runs from the
+  // benchmark-validity test suite); short-run data would otherwise poison the
+  // perf gate with slow, non-representative samples (#M6-009 follow-up).
+  if (process.env.LUGAS_BENCH_NO_ARCHIVE === "1") {
+    console.log(`\n(archive skipped: LUGAS_BENCH_NO_ARCHIVE=1)`);
+    return;
+  }
   writeFileSync(resolve(RESULTS_DIR, "results.json"), JSON.stringify({ env, results }, null, 2));
   console.log(`\nRaw data archived to ${RESULTS_DIR}/results.json`);
 }
