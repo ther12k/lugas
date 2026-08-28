@@ -6,7 +6,7 @@
  * and runner failures produce nonzero exits.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { assertContract } from "../../scripts/benchmark-plain";
@@ -57,7 +57,7 @@ describe("runner failure semantics (M6R2 #281)", () => {
         cwd: ROOT,
         stdout: "pipe",
         stderr: "pipe",
-        env: { ...process.env, BENCH_DURATION_MS: "150" },
+        env: { ...process.env, BENCH_DURATION_MS: "150", LUGAS_BENCH_NO_ARCHIVE: "1" },
       });
       const err = new TextDecoder().decode(proc.stderr);
       expect(proc.exitCode).not.toBe(0);
@@ -67,15 +67,46 @@ describe("runner failure semantics (M6R2 #281)", () => {
     }
   }, 60_000);
 
-  test("healthy short smoke of both runners completes green", () => {
-    for (const script of ["benchmark-plain.ts", "benchmark-validated.ts"]) {
-      const proc = Bun.spawnSync(["bun", "run", resolve(ROOT, "scripts", script)], {
-        cwd: ROOT,
-        stdout: "pipe",
-        stderr: "pipe",
-        env: { ...process.env, BENCH_DURATION_MS: "120" },
-      });
-      expect(proc.exitCode, `${script} exit`).toBe(0);
+  test("healthy short smoke of both runners completes green WITHOUT polluting archives", () => {
+    // Snapshot any pre-existing archives so the check is self-contained.
+    const plainArchive = resolve(ROOT, "benchmarks/results/m5-plain/results.json");
+    const validatedArchive = resolve(ROOT, "benchmarks/results/m5-validated/results.json");
+    const preExisting = {
+      plain: existsSync(plainArchive) ? readFileSync(plainArchive) : null,
+      validated: existsSync(validatedArchive) ? readFileSync(validatedArchive) : null,
+    };
+
+    try {
+      for (const script of ["benchmark-plain.ts", "benchmark-validated.ts"]) {
+        const proc = Bun.spawnSync(["bun", "run", resolve(ROOT, "scripts", script)], {
+          cwd: ROOT,
+          stdout: "pipe",
+          stderr: "pipe",
+          env: { ...process.env, BENCH_DURATION_MS: "120", LUGAS_BENCH_NO_ARCHIVE: "1" },
+        });
+        expect(proc.exitCode, `${script} exit`).toBe(0);
+      }
+
+      // Smoke runs must not write or modify archives: 120ms samples would
+      // poison the perf gate with non-representative data on slow machines.
+      if (preExisting.plain === null) {
+        expect(existsSync(plainArchive), "plain archive created by smoke").toBe(false);
+      } else {
+        expect(readFileSync(plainArchive).equals(preExisting.plain), "plain archive mutated").toBe(true);
+      }
+      if (preExisting.validated === null) {
+        expect(existsSync(validatedArchive), "validated archive created by smoke").toBe(false);
+      } else {
+        expect(readFileSync(validatedArchive).equals(preExisting.validated), "validated archive mutated").toBe(true);
+      }
+    } finally {
+      // Restore original state if a violation created/overwrote an archive.
+      if (preExisting.plain === null && existsSync(plainArchive)) {
+        rmSync(plainArchive);
+      }
+      if (preExisting.validated === null && existsSync(validatedArchive)) {
+        rmSync(validatedArchive);
+      }
     }
   }, 120_000);
 });
