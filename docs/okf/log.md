@@ -97,3 +97,10 @@
 - M6R6 (#308): attestation procedure corrected to an executable order — benchmarks → rehearsal (clean tree) → `LUGAS_PERF_RELEASE=1 bun run verify` (gate hashes the FINAL tarball) → builder last; the previously documented gate-before-rehearsal order could never succeed.
 - M6R6 (#308): builder now fails closed unless evidence `attestationCommit` equals assembly HEAD, executes `LUGAS_PERF_RELEASE=1 bun run verify` itself during assembly, marks only proven claims in the checklist (compat matrix + P0/P1 sweep are explicit owner items), and generates the checksum preflight as a subshell so owner cwd never changes.
 - Standing blocker made visible in the ledger: **M6R6-ATT (#309)** — quiet-host final attestation and artifact assembly; the only open issue. Verdict: **source GO, publication HOLD** until #309 completes.
+
+## 2026-08-29 — M6R6.1 release-evidence integrity
+
+- #311: client bundle archive now carries `lugas-client-benchmark-v2` binding (commit/Bun/platform/arch/cpuModel); the runner fails nonzero on any error, and the release gate rejects legacy/unbound/foreign-commit/cross-platform client evidence — stale bundle bytes can no longer be wrapped into current-candidate evidence.
+- All three benchmark runners record platform/arch/cpuModel (plain/validated also load average before/after); the gate enforces the platform/arch binding it always claimed and records the archive environment into `release-evidence.json`.
+- Owner publication block is fail-closed (`set -euo pipefail` + explicit namespace-claimed assertion); the builder rewrites the DO-NOT-PUBLISH sentinel into an attested-set banner before checksumming the artifact set.
+- #309 re-scoped: technical attestation only; publication stays an explicit owner action.

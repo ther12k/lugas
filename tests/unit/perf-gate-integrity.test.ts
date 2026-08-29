@@ -18,13 +18,33 @@ const CHECKER = resolve(ROOT, "scripts/check-performance-budget.ts");
 
 type Row = { scenario: string; framework: string; samples: Array<{ rps: number; p50us: number; p95us: number; p99us: number }> };
 
-function writePlainArchive(resultsDir: string, rows: Row[], envCommit?: string): void {
+function writePlainArchive(
+  resultsDir: string,
+  rows: Row[],
+  envCommit?: string,
+  envExtra?: Record<string, unknown>,
+): void {
   mkdirSync(join(resultsDir, "m5-plain"), { recursive: true });
-  const env = { bunVersion: process.versions.bun, ...(envCommit !== undefined ? { commit: envCommit } : {}) };
+  const env = {
+    bunVersion: process.versions.bun,
+    ...(envCommit !== undefined ? { commit: envCommit } : {}),
+    ...envExtra,
+  };
   writeFileSync(
     join(resultsDir, "m5-plain", "results.json"),
     JSON.stringify({ env, results: rows }),
   );
+}
+
+type ClientArchive = {
+  format?: string;
+  env?: { commit?: string; bunVersion?: string; platform?: string; arch?: string };
+  bundle?: { rawBytes?: number };
+};
+
+function writeClientArchive(resultsDir: string, archive: ClientArchive): void {
+  mkdirSync(join(resultsDir, "m5-client-types"), { recursive: true });
+  writeFileSync(join(resultsDir, "m5-client-types", "smoke.json"), JSON.stringify(archive));
 }
 
 function writeValidatedArchive(
@@ -217,6 +237,129 @@ describe("perf gate integrity (M6R2)", () => {
       expect(staticLine).toBeDefined();
       expect(staticLine!).toContain("BELOW target");
       expect(staticLine!).not.toContain("≥ target");
+    } finally {
+      sb.cleanup();
+    }
+  });
+
+  // ----- M6R6.1 #311: client archive binding + platform/arch enforcement -----
+
+  /** Healthy archives bound to this host with an explicit commit. */
+  function writeBoundArchives(rd: string, commit: string): void {
+    const hostEnv = {
+      platform: process.platform,
+      arch: process.arch,
+      cpuModel: "test-cpu",
+      loadAverageBefore: [1, 2, 3],
+      loadAverageAfter: [1, 2, 3],
+    };
+    writePlainArchive(rd, [
+      { scenario: "plain-static", framework: "lugas", samples: Array(5).fill(HEALTHY_LUGAS) },
+      { scenario: "plain-json", framework: "lugas", samples: Array(5).fill(HEALTHY_LUGAS) },
+    ], commit, hostEnv);
+    writeValidatedArchive(rd, 35000);
+    // writeValidatedArchive writes {bunVersion, commit} only — rewrite with host fields
+    const validated = JSON.parse(readFileSync(join(rd, "m5-validated", "results.json"), "utf8")) as { env: Record<string, unknown> };
+    writeFileSync(join(rd, "m5-validated", "results.json"), JSON.stringify({ ...validated, env: { ...validated.env, ...hostEnv } }));
+  }
+
+  test("release mode rejects a legacy unbound client archive (M6R6.1 #311)", () => {
+    const sb = buildSandbox();
+    try {
+      const rd = join(sb.root, "benchmarks", "results");
+      writeBoundArchives(rd, "candidate-sha");
+      // Legacy archive: real bytes shape from before #311 — no format, no env.
+      writeClientArchive(rd, { bundle: { rawBytes: 14000 } });
+      const proc = Bun.spawnSync(["bun", "run", sb.checkerPath, "--release"], {
+        cwd: sb.root, stdout: "pipe", stderr: "pipe",
+        env: { ...process.env, LUGAS_PACKAGE_SOURCE_SHA: "candidate-sha" },
+      });
+      const out = new TextDecoder().decode(proc.stdout) + new TextDecoder().decode(proc.stderr);
+      expect(proc.exitCode).toBe(1);
+      expect(out).toContain("no candidate binding");
+    } finally {
+      sb.cleanup();
+    }
+  });
+
+  test("release mode rejects a client archive bound to a foreign commit (M6R6.1 #311)", () => {
+    const sb = buildSandbox();
+    try {
+      const rd = join(sb.root, "benchmarks", "results");
+      writeBoundArchives(rd, "candidate-sha");
+      writeClientArchive(rd, {
+        format: "lugas-client-benchmark-v2",
+        env: { commit: "deadbeef-stale", bunVersion: process.versions.bun, platform: process.platform, arch: process.arch },
+        bundle: { rawBytes: 14000 },
+      });
+      const proc = Bun.spawnSync(["bun", "run", sb.checkerPath, "--release"], {
+        cwd: sb.root, stdout: "pipe", stderr: "pipe",
+        env: { ...process.env, LUGAS_PACKAGE_SOURCE_SHA: "candidate-sha" },
+      });
+      const out = new TextDecoder().decode(proc.stdout) + new TextDecoder().decode(proc.stderr);
+      expect(proc.exitCode).toBe(1);
+      expect(out).toContain("client bundle: archive commit");
+    } finally {
+      sb.cleanup();
+    }
+  });
+
+  test("release mode rejects cross-platform client and plain archives (M6R6.1 #311)", () => {
+    const sb = buildSandbox();
+    try {
+      const rd = join(sb.root, "benchmarks", "results");
+      // Plain archive measured on another OS but bound to the right commit.
+      writeBoundArchives(rd, "candidate-sha");
+      writePlainArchive(rd, [
+        { scenario: "plain-static", framework: "lugas", samples: Array(5).fill(HEALTHY_LUGAS) },
+        { scenario: "plain-json", framework: "lugas", samples: Array(5).fill(HEALTHY_LUGAS) },
+      ], "candidate-sha", { platform: "darwin", arch: process.arch });
+      writeClientArchive(rd, {
+        format: "lugas-client-benchmark-v2",
+        env: { commit: "candidate-sha", bunVersion: process.versions.bun, platform: process.platform, arch: process.arch },
+        bundle: { rawBytes: 14000 },
+      });
+      const proc = Bun.spawnSync(["bun", "run", sb.checkerPath, "--release"], {
+        cwd: sb.root, stdout: "pipe", stderr: "pipe",
+        env: { ...process.env, LUGAS_PACKAGE_SOURCE_SHA: "candidate-sha" },
+      });
+      const out = new TextDecoder().decode(proc.stdout) + new TextDecoder().decode(proc.stderr);
+      expect(proc.exitCode).toBe(1);
+      expect(out).toContain("cross-machine evidence");
+
+      // Same but cross-machine CLIENT archive (plain archives healthy).
+      writeBoundArchives(rd, "candidate-sha");
+      writeClientArchive(rd, {
+        format: "lugas-client-benchmark-v2",
+        env: { commit: "candidate-sha", bunVersion: process.versions.bun, platform: "win32", arch: process.arch },
+        bundle: { rawBytes: 14000 },
+      });
+      const proc2 = Bun.spawnSync(["bun", "run", sb.checkerPath, "--release"], {
+        cwd: sb.root, stdout: "pipe", stderr: "pipe",
+        env: { ...process.env, LUGAS_PACKAGE_SOURCE_SHA: "candidate-sha" },
+      });
+      const out2 = new TextDecoder().decode(proc2.stdout) + new TextDecoder().decode(proc2.stderr);
+      expect(proc2.exitCode).toBe(1);
+      expect(out2).toContain("client bundle: archive environment");
+    } finally {
+      sb.cleanup();
+    }
+  });
+
+  test("dev mode ignores a legacy client archive without failing (M6R6.1 #311)", () => {
+    const sb = buildSandbox();
+    try {
+      const rd = join(sb.root, "benchmarks", "results");
+      writeBoundArchives(rd, "anything");
+      writeClientArchive(rd, { bundle: { rawBytes: 999999 } });
+      const proc = Bun.spawnSync(["bun", "run", sb.checkerPath], {
+        cwd: sb.root, stdout: "pipe", stderr: "pipe",
+      });
+      const out = new TextDecoder().decode(proc.stdout) + new TextDecoder().decode(proc.stderr);
+      // Legacy bytes must not be consumed even in dev mode; run is alert-only.
+      expect(proc.exitCode).toBe(0);
+      expect(out).toContain("legacy unbound archive ignored");
+      expect(out).not.toContain("999999");
     } finally {
       sb.cleanup();
     }

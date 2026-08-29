@@ -8,6 +8,7 @@
  */
 import { execSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { loadavg } from "node:os";
 import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -142,10 +143,19 @@ function pct(v: number[], p: number): number {
 
 async function main() {
   mkdirSync(RESULTS_DIR, { recursive: true });
+  // M6R6.1 #311: the archive records the machine it measured on (platform,
+  // arch, CPU, load before/after) so the release gate can enforce the
+  // platform/arch binding its contract claims and auditors can see host
+  // conditions instead of trusting a narrative "quiet host" statement.
+  const loadAverageBefore = loadavg();
   const env = {
     bunVersion: Bun.version,
     cpuModel: (() => { try { return execSync("lscpu | grep 'Model name' | head -1", { encoding: "utf8" }).split(":").pop()?.trim() ?? ""; } catch { return ""; } })(),
     commit: execSync("git rev-parse HEAD", { encoding: "utf8" }).trim(),
+    platform: process.platform,
+    arch: process.arch,
+    loadAverageBefore: [...loadAverageBefore],
+    loadAverageAfter: [] as number[],
     timestamp: new Date().toISOString(),
   };
 
@@ -216,6 +226,7 @@ async function main() {
     console.log(`\n(archive skipped: LUGAS_BENCH_NO_ARCHIVE=1)`);
     return;
   }
+  env.loadAverageAfter = [...loadavg()];
   writeFileSync(resolve(RESULTS_DIR, "results.json"), JSON.stringify({ env, results }, null, 2));
   console.log(`\nRaw data archived to ${RESULTS_DIR}/results.json`);
 }

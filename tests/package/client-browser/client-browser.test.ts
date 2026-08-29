@@ -21,6 +21,10 @@ async function bundleBrowser(
   if (!result.success) {
     throw new Error(`bundle failed: ${result.logs.map(String).join("\n")}`);
   }
+  // Mark the bundle dir as ESM: Node >= 22.7 otherwise emits a
+  // MODULE_TYPELESS_PACKAGE_JSON loader warning on stderr, which the
+  // execution smoke (correctly) treats as an unclean run.
+  writeFileSync(join(outDir, "package.json"), JSON.stringify({ type: "module" }));
   return {
     outDir,
     entryPoint: result.outputs.find((o) => o.kind === "entry-point")?.path,

@@ -12,8 +12,11 @@
  * - Plain archives that exist but lack a required scenario FAIL even in
  *   development mode. Total archive absence is SKIP in dev mode only.
  * - `--release` mode: every archive must exist and bind to the current
- *   candidate (archive env.commit === git HEAD) and the baseline environment
- *   platform/arch; anything missing or stale FAILs.
+ *   candidate (archive env.commit === package source / HEAD) and this
+ *   machine's platform/arch — recorded by every runner (M6R6.1 #311) and
+ *   enforced here. Client bundle archives carry their own
+ *   `lugas-client-benchmark-v2` binding (commit + platform/arch); legacy
+ *   unbound client archives are never used. Anything missing or stale FAILs.
  * - PASS is printed only when every scenario was actually compared (release
  *   mode) or compared with zero failures otherwise.
  */
@@ -72,6 +75,11 @@ interface Baselines {
 interface ArchiveEnv {
   bunVersion?: string;
   commit?: string;
+  platform?: string;
+  arch?: string;
+  cpuModel?: string;
+  loadAverageBefore?: number[];
+  loadAverageAfter?: number[];
 }
 
 type Sample = { rps: number; p50us: number; p95us: number; p99us: number };
@@ -164,6 +172,8 @@ function main() {
   const lastRawMedians: Record<string, number> = {};
   let lastTypecheckMs: number | null = null;
   let lastBundleBytes: number | null = null;
+  /** Plain-archive environment, recorded into release evidence for audit (M6R6.1). */
+  let lastPlainEnv: ArchiveEnv | null = null;
 
   // Release runs are evidence runs: the smoke-only archive-suppression flag
   // must never leak into a release execution (#M6R3).
@@ -237,6 +247,17 @@ function main() {
         console.warn(`⚠ ${scenario}: archive bun ${env.bunVersion} ≠ running ${process.versions.bun}`);
         alerts++;
       }
+      // M6R6.1 #311: enforce the platform/arch binding the header contract
+      // claims. Archives that do not record (or disagree with) this machine's
+      // platform/arch are cross-machine or pre-binding evidence.
+      if (env.platform !== process.platform || env.arch !== process.arch) {
+        console.error(
+          `✗ ${scenario}: archive environment ${env.platform ?? "?"}/${env.arch ?? "?"} ≠ this host ${process.platform}/${process.arch} — cross-machine evidence`,
+        );
+        failures++;
+        continue;
+      }
+      if (scenario === "plain-static") lastPlainEnv = env;
     }
 
     const medianRps = median(samples.map((s) => s.rps));
@@ -259,22 +280,56 @@ function main() {
   }
 
   // Client bundle size check — mandatory in release mode (#282).
+  // M6R6.1 #311: the client archive must carry the `lugas-client-benchmark-v2`
+  // binding. Legacy/unbound archives are NEVER used (their bytes could be
+  // leftovers from an older candidate); in release mode their presence FAILs.
   const bundleResultsPath = existsSync(resolve(RESULTS_DIR, "m5-client-types", "smoke.json"))
     ? resolve(RESULTS_DIR, "m5-client-types", "smoke.json")
     : resolve(RESULTS_DIR, "m5-client-types", "results.json");
   if (existsSync(bundleResultsPath)) {
-    const bundle = JSON.parse(readFileSync(bundleResultsPath, "utf8")) as {
-      bundle?: { rawBytes: number };
+    const client = JSON.parse(readFileSync(bundleResultsPath, "utf8")) as {
+      format?: string;
+      env?: ArchiveEnv;
+      bundle?: { rawBytes?: number };
     };
-    if (bundle.bundle && bundle.bundle.rawBytes > baselines.clientBundleMaxBytes) {
-      console.error(`✗ client bundle: ${bundle.bundle.rawBytes}B > max ${baselines.clientBundleMaxBytes}B`);
-      failures++;
-    } else if (bundle.bundle) {
-      lastBundleBytes = bundle.bundle.rawBytes;
-      console.log(`✓ client bundle: ${bundle.bundle.rawBytes}B ≤ ${baselines.clientBundleMaxBytes}B`);
-    } else if (RELEASE_MODE) {
-      console.error("✗ client bundle evidence missing 'bundle' payload");
-      failures++;
+    if (client.format !== "lugas-client-benchmark-v2") {
+      if (RELEASE_MODE) {
+        console.error(
+          "✗ client bundle evidence has no candidate binding (legacy format) — re-run scripts/benchmark-client-types.ts",
+        );
+        failures++;
+      } else {
+        console.log("→ client bundle: legacy unbound archive ignored (dev mode) — re-run scripts/benchmark-client-types.ts for evidence");
+      }
+    } else {
+      const rawBytes = client.bundle?.rawBytes;
+      if (typeof rawBytes !== "number" || !Number.isFinite(rawBytes) || rawBytes <= 0) {
+        console.error(`✗ client bundle: invalid rawBytes ${String(rawBytes)}`);
+        failures++;
+      } else if (RELEASE_MODE) {
+        const requiredCommit = PACKAGE_SOURCE_SHA ?? head;
+        if (!client.env?.commit || !requiredCommit || client.env.commit !== requiredCommit) {
+          console.error(`✗ client bundle: archive commit ${client.env?.commit ?? "(none)"} ≠ package source ${requiredCommit || "(unknown)"} — stale evidence`);
+          failures++;
+        } else if (client.env.platform !== process.platform || client.env.arch !== process.arch) {
+          console.error(`✗ client bundle: archive environment ${client.env.platform ?? "?"}/${client.env.arch ?? "?"} ≠ this host ${process.platform}/${process.arch} — cross-machine evidence`);
+          failures++;
+        } else if (rawBytes > baselines.clientBundleMaxBytes) {
+          console.error(`✗ client bundle: ${rawBytes}B > max ${baselines.clientBundleMaxBytes}B`);
+          failures++;
+        } else {
+          lastBundleBytes = rawBytes;
+          console.log(`✓ client bundle: ${rawBytes}B ≤ ${baselines.clientBundleMaxBytes}B (bound to package source)`);
+        }
+      } else {
+        if (rawBytes > baselines.clientBundleMaxBytes) {
+          console.error(`✗ client bundle: ${rawBytes}B > max ${baselines.clientBundleMaxBytes}B`);
+          failures++;
+        } else {
+          lastBundleBytes = rawBytes;
+          console.log(`✓ client bundle: ${rawBytes}B ≤ ${baselines.clientBundleMaxBytes}B`);
+        }
+      }
     }
   } else if (RELEASE_MODE) {
     console.error("✗ client bundle evidence missing (benchmarks/results/m5-client-types/smoke.json or results.json)");
@@ -350,6 +405,18 @@ function main() {
       tarballSha256: tarballHash,
       rawBunPlainStaticRps: lastRawMedians["plain-static"] ?? null,
       rawBunValidatedPostRps: lastRawMedians["validated-post"] ?? null,
+      // M6R6.1 #311: machine conditions of the measured run, recorded for
+      // audit instead of a narrative "quiet host" claim.
+      environment: lastPlainEnv === null ? null : {
+        platform: lastPlainEnv.platform ?? null,
+        arch: lastPlainEnv.arch ?? null,
+        cpuModel: lastPlainEnv.cpuModel ?? null,
+        bunVersion: lastPlainEnv.bunVersion ?? null,
+      },
+      loadAverage: lastPlainEnv?.loadAverageBefore && lastPlainEnv?.loadAverageAfter ? {
+        before: lastPlainEnv.loadAverageBefore,
+        after: lastPlainEnv.loadAverageAfter,
+      } : null,
       blockingFailures: failures,
       alerts,
     };

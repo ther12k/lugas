@@ -17,6 +17,15 @@ const ROOT = resolve(import.meta.dir, "..");
 const RESULTS_DIR = resolve(ROOT, "benchmarks", "results", "m5-client-types");
 const smoke = process.argv.includes("--smoke");
 
+function cpuModel(): string {
+  try {
+    return execSync("lscpu | grep 'Model name' | head -1", { encoding: "utf8" })
+      .split(":").pop()?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
 // --- Bundle size ---
 function bundleSize() {
   const entry = resolve(ROOT, "tests/package/client-browser/browser-fixture.ts");
@@ -74,6 +83,17 @@ async function main() {
   expectNoServerCode(bundleText);
 
   const results = {
+    // M6R6.1 #311: the archive binds to the candidate and its machine so the
+    // release gate can reject stale/foreign client evidence instead of
+    // wrapping leftover bytes into the current candidate's attestation.
+    format: "lugas-client-benchmark-v2",
+    env: {
+      bunVersion: Bun.version,
+      commit: execSync("git rev-parse HEAD", { cwd: ROOT, encoding: "utf8" }).trim(),
+      platform: process.platform,
+      arch: process.arch,
+      cpuModel: cpuModel(),
+    },
     bundle: { rawBytes: bundle.rawBytes, gzipBytes: bundle.gzipBytes },
     typecheckMs: tscMs,
     m3Baseline: { "500-route-cold-ms": 166, "1000-route-cold-ms": 287 },
@@ -91,4 +111,9 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+if (import.meta.main) {
+  main().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

@@ -294,6 +294,27 @@ function main() {
   if (freshEvidence.tarballSha256 !== sha256(readFileSync(tarballPath))) {
     fail("regenerated evidence tarball hash ≠ actual tarball bytes");
   }
+  // M6R6.1 #311: the evidence must record the measured machine. Missing
+  // environment = pre-binding evidence; a differing cpuModel on the same
+  // platform/arch is a warning (legitimate two-worktree attestation), while a
+  // differing platform/arch would already have failed inside the gate.
+  const evidenceEnvironment = (freshEvidence as {
+    environment?: { platform?: string | null; arch?: string | null; cpuModel?: string | null } | null;
+  }).environment;
+  if (evidenceEnvironment === undefined || evidenceEnvironment === null) {
+    console.error("✗ regenerated evidence missing environment binding — re-run the release gate with M6R6.1 tooling");
+    process.exit(1);
+  }
+  const evidencePlatform = evidenceEnvironment.platform;
+  const evidenceArch = evidenceEnvironment.arch;
+  if (!evidencePlatform || !evidenceArch) {
+    fail("regenerated evidence environment incomplete (platform/arch) — re-run the release gate with M6R6.1 tooling");
+  }
+  if (evidencePlatform !== process.platform || evidenceArch !== process.arch) {
+    console.warn(
+      `⚠ evidence environment ${evidencePlatform}/${evidenceArch} ≠ assembly host ${process.platform}/${process.arch} (audit note)`,
+    );
+  }
   evidence = freshEvidence;
   const attestationSha = evidence.attestationCommit ?? commit;
 
@@ -478,10 +499,15 @@ npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag
 ## Post-Approval Execution (Owner Only — follow this exact order)
 
 \`\`\`bash
-# 0. Preflight (from the commit containing these attested artifacts; subshell keeps your cwd)
+# 0. Preflight — FAIL-CLOSED (M6R6.1): any failed command, including the
+#    namespace assertion, aborts before the tag or publish runs.
+set -euo pipefail
 ( cd docs/releases/beta && sha256sum --check SHA256SUMS )
-npm whoami                                   # must be authenticated as the owner
-npm view lugas version 2>/dev/null           # MUST fail (404) — package still unclaimed
+npm whoami >/dev/null                            # must be authenticated as the owner
+if npm view lugas version >/dev/null 2>&1; then  # the name MUST still be unclaimed
+  echo "ERROR: npm package 'lugas' is no longer unclaimed — do not publish; contact the owner" >&2
+  exit 1
+fi
 
 # 1. Pin the reviewed source BEFORE the irreversible registry action
 git tag -a "v${BETA_VERSION}" "${PACKAGE_SOURCE_SHA}" -m "LugasJS v${BETA_VERSION} release candidate"
@@ -511,7 +537,28 @@ gh release create "v${BETA_VERSION}" \
   writeFileSync(resolve(OUT_DIR, "CHECKLIST.md"), checklist);
   console.log(`✓ CHECKLIST.md generated (${checklist.length} bytes)`);
 
-  // 3. Compute SHA256SUMS over ALL release artifacts INCLUDING the exact
+  // 3. Rewrite the DO-NOT-PUBLISH sentinel (M6R6.1 #311): the attested set
+  // must not checksum a README claiming the path is intentionally empty.
+  // Written BEFORE the manifest so the banner itself is covered.
+  writeFileSync(
+    resolve(OUT_DIR, "README.md"),
+    `# Attested beta artifact set — owner publication pending
+
+| Field | Value |
+|---|---|
+| Package source | \`${PACKAGE_SOURCE_SHA}\` |
+| Attestation commit | \`${attestationSha}\` |
+| Tarball SHA-256 | \`${actualTarballHash}\` |
+
+**Status: DO NOT PUBLISH** without completing \`CHECKLIST.md\` — publication
+requires explicit owner approval (M6-010 / M6-GATE). These artifacts were
+produced and cross-validated by the M6R6.1 attestation pipeline; superseded
+historical artifacts live in \`docs/releases/history/\`.
+`,
+  );
+  console.log("✓ README.md rewritten as attested-set banner");
+
+  // 4. Compute SHA256SUMS over ALL release artifacts INCLUDING the exact
   // tarball and the machine-readable evidence + rehearsal results (M6R5).
   const manifestEntries = readdirSync(OUT_DIR)
     .filter((f) => f !== "SHA256SUMS" && !f.startsWith("."))

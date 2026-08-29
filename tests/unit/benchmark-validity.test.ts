@@ -6,6 +6,7 @@
  * and runner failures produce nonzero exits.
  */
 import { describe, expect, test } from "bun:test";
+import { execSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -34,16 +35,74 @@ describe("benchmark response contracts (M6R2 #281)", () => {
   });
 });
 
-describe("runner failure semantics (M6R2 #281)", () => {
-  test("both runners install a nonzero-exit catch handler", () => {
+describe("runner failure semantics (M6R2 #281, M6R6.1 #311)", () => {
+  test("all three runners install a nonzero-exit catch handler", () => {
     const plain = readFileSync(resolve(ROOT, "scripts/benchmark-plain.ts"), "utf8");
     const validated = readFileSync(resolve(ROOT, "scripts/benchmark-validated.ts"), "utf8");
-    for (const [name, src] of [["plain", plain], ["validated", validated]] as const) {
+    const client = readFileSync(resolve(ROOT, "scripts/benchmark-client-types.ts"), "utf8");
+    for (const [name, src] of [["plain", plain], ["validated", validated], ["client", client]] as const) {
       expect(src.includes("process.exitCode = 1"), `${name} nonzero exit`).toBe(true);
       // import-guard keeps tests importable without triggering a full run
       expect(src.includes("if (import.meta.main)"), `${name} import guard`).toBe(true);
     }
   });
+
+  test("client runner fails with nonzero exit when the bundle build breaks (M6R6.1 #311)", () => {
+    // Sabotage via sandbox: point the bundle entry at a missing file. Before
+    // #311 the catch printed the error but exited 0, letting `set -e` flows
+    // continue toward the release gate with stale archives.
+    const dir = mkdtempSync(join(tmpdir(), "lugas-client-sabotage-"));
+    try {
+      const srcPath = resolve(ROOT, "scripts/benchmark-client-types.ts");
+      const src = readFileSync(srcPath, "utf8").replace(
+        "tests/package/client-browser/browser-fixture.ts",
+        "tests/package/client-browser/does-not-exist.ts",
+      );
+      expect(src).not.toContain("browser-fixture.ts");
+      writeFileSync(join(dir, "sabotaged-client.ts"), src);
+      const proc = Bun.spawnSync(["bun", "run", join(dir, "sabotaged-client.ts")], {
+        cwd: ROOT,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      expect(proc.exitCode, "sabotaged client runner must exit nonzero").not.toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  test("client runner archives the v2 candidate binding and is self-restoring (M6R6.1 #311)", () => {
+    const archive = resolve(ROOT, "benchmarks/results/m5-client-types/smoke.json");
+    const resultsArchive = resolve(ROOT, "benchmarks/results/m5-client-types/results.json");
+    const snapshot = existsSync(archive) ? readFileSync(archive) : null;
+    const resultsSnapshot = existsSync(resultsArchive) ? readFileSync(resultsArchive) : null;
+    try {
+      const proc = Bun.spawnSync(["bun", "run", resolve(ROOT, "scripts/benchmark-client-types.ts"), "--smoke"], {
+        cwd: ROOT,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      expect(proc.exitCode, "client runner exit").toBe(0);
+      const written = JSON.parse(readFileSync(archive, "utf8")) as {
+        format?: string;
+        env?: { commit?: string; bunVersion?: string; platform?: string; arch?: string; cpuModel?: string };
+        bundle?: { rawBytes?: number };
+      };
+      expect(written.format).toBe("lugas-client-benchmark-v2");
+      expect(written.env?.commit).toBe(execSync("git rev-parse HEAD", { encoding: "utf8" }).trim());
+      expect(written.env?.bunVersion).toBe(process.versions.bun);
+      expect(written.env?.platform).toBe(process.platform);
+      expect(written.env?.arch).toBe(process.arch);
+      expect(typeof written.env?.cpuModel).toBe("string");
+      expect(typeof written.bundle?.rawBytes).toBe("number");
+      expect(written.bundle!.rawBytes!).toBeGreaterThan(0);
+    } finally {
+      if (snapshot === null) rmSync(archive, { force: true });
+      else if (existsSync(archive)) writeFileSync(archive, snapshot);
+      if (resultsSnapshot === null) rmSync(resultsArchive, { force: true });
+      else if (existsSync(resultsArchive)) writeFileSync(resultsArchive, resultsSnapshot);
+    }
+  }, 180_000);
 
   test("plain runner fails with nonzero exit when a scenario violates its contract", () => {
     // Sabotage via sandbox: patch expectation inside a temp copy of the runner.

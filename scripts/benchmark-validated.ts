@@ -6,6 +6,7 @@
  */
 import { execSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { loadavg } from "node:os";
 import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -62,6 +63,7 @@ function median(v: number[]): number {
 
 async function main() {
   mkdirSync(RESULTS_DIR, { recursive: true });
+  const loadStart = loadavg();
 
   // Raw Bun
   const { createRawValidated } = await import(resolve(ROOT, "benchmarks/raw-bun/validated/scenarios.ts"));
@@ -100,7 +102,18 @@ async function main() {
   console.log(`| lugas | ${lgRps} | ${median(lugasSamples.map(s => s.p99us))} | — overhead: ${overheadPct}% |`);
 
   // M6R2 #280: archive binds to candidate commit so the release gate can reject stale evidence.
-  const env = { bunVersion: Bun.version, commit: execSync("git rev-parse HEAD", { encoding: "utf8" }).trim(), timestamp: new Date().toISOString() };
+  // M6R6.1 #311: platform/arch/cpu/load binding — the gate enforces what its
+  // contract claims, and auditors get real host conditions.
+  const env = {
+    bunVersion: Bun.version,
+    commit: execSync("git rev-parse HEAD", { encoding: "utf8" }).trim(),
+    platform: process.platform,
+    arch: process.arch,
+    cpuModel: (() => { try { return execSync("lscpu | grep 'Model name' | head -1", { encoding: "utf8" }).split(":").pop()?.trim() ?? ""; } catch { return ""; } })(),
+    loadAverageBefore: [...loadStart],
+    loadAverageAfter: [...loadavg()],
+    timestamp: new Date().toISOString(),
+  };
   // Archive — skipped under LUGAS_BENCH_NO_ARCHIVE (short smoke runs).
   if (process.env.LUGAS_BENCH_NO_ARCHIVE === "1") {
     console.log(`\n(archive skipped: LUGAS_BENCH_NO_ARCHIVE=1)`);
