@@ -89,3 +89,11 @@
 - Exact tarball committed and attested: `SHA256SUMS` now includes `lugas-0.1.0-beta.1.tgz` (sha256 `347f11c2…`); `build-beta-packet.ts` fails closed without it.
 - All release metadata (packet, checklist, provenance, inventory) regenerated and bound to `d2a07b2`; tag command pins the explicit SHA.
 - Standing verdict: **GO — reaffirmed** for `d2a07b2`; publication remains an owner action per `docs/releases/beta/CHECKLIST.md`.
+
+## 2026-08-29 — M6R5/M6R6 post-GATE attestation-chain corrections
+
+- M6R5 (#307): two-identity attestation model (`packageSourceCommit` + `attestationCommit`, `lugas-release-evidence-v2`); rehearsal emits `package-rehearsal.json`; builder cross-validates all artifacts fail-closed; four contaminated benchmark attempts discarded (environment-locked attestation).
+- M6R6 (#308): stale M6R3-era artifact set quarantined from the active publication path to `docs/releases/history/m6r3/` (frozen record, checksums still verify in place); `docs/releases/beta/` carries a DO-NOT-PUBLISH README until M6R6-ATT completes.
+- M6R6 (#308): attestation procedure corrected to an executable order — benchmarks → rehearsal (clean tree) → `LUGAS_PERF_RELEASE=1 bun run verify` (gate hashes the FINAL tarball) → builder last; the previously documented gate-before-rehearsal order could never succeed.
+- M6R6 (#308): builder now fails closed unless evidence `attestationCommit` equals assembly HEAD, executes `LUGAS_PERF_RELEASE=1 bun run verify` itself during assembly, marks only proven claims in the checklist (compat matrix + P0/P1 sweep are explicit owner items), and generates the checksum preflight as a subshell so owner cwd never changes.
+- Standing blocker made visible in the ledger: **M6R6-ATT (#309)** — quiet-host final attestation and artifact assembly; the only open issue. Verdict: **source GO, publication HOLD** until #309 completes.
