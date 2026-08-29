@@ -9,8 +9,9 @@
  * Usage: bun run scripts/benchmark-client-types.ts [--smoke]
  */
 import { execSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -29,10 +30,11 @@ function cpuModel(): string {
 // --- Bundle size ---
 function bundleSize() {
   const entry = resolve(ROOT, "tests/package/client-browser/browser-fixture.ts");
-  const outDir = "/tmp/m5-005-bundle";
-  mkdirSync(outDir, { recursive: true });
+  // M6R6.1: per-run temp dir instead of the hardcoded /tmp path — the runner
+  // must execute on every supported platform (CI runs it on Windows/macOS).
+  const outDir = mkdtempSync(join(tmpdir(), "m5-005-bundle-"));
 
-  execSync(`bun build ${entry} --target=browser --outdir=${outDir}`, {
+  execSync(`bun build ${JSON.stringify(entry)} --target=browser --outdir=${JSON.stringify(outDir)}`, {
     cwd: ROOT,
     stdio: "pipe",
   });
@@ -46,7 +48,7 @@ function bundleSize() {
   // Gzip estimate
   const gzipped = gzipSync(Buffer.from(readFileSync(join(outDir, files[0]!), "utf8"))).length;
 
-  return { rawBytes: raw, gzipBytes: gzipped, files };
+  return { rawBytes: raw, gzipBytes: gzipped, files, outDir };
 }
 
 // --- Type cost (from M3-017 committed data + fresh check) ---
@@ -78,7 +80,7 @@ async function main() {
 
   // Verify no server code in client bundle
   const bundleText = bundle.files.map((f: string) =>
-    readFileSync(join("/tmp/m5-005-bundle", f), "utf8"),
+    readFileSync(join(bundle.outDir, f), "utf8"),
   ).join("\n");
   expectNoServerCode(bundleText);
 
@@ -103,6 +105,7 @@ async function main() {
   writeFileSync(resolve(RESULTS_DIR, "results.json"), JSON.stringify(results, null, 2));
   writeFileSync(resolve(RESULTS_DIR, "smoke.json"), JSON.stringify(results, null, 2));
   console.log(`\nResults written to ${RESULTS_DIR}/`);
+  rmSync(bundle.outDir, { recursive: true, force: true });
 
   function expectNoServerCode(text: string): void {
     if (text.includes("src/core/app") || text.includes("defineApp(") || text.includes("Bun.serve")) {

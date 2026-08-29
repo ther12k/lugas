@@ -257,7 +257,7 @@ describe("perf gate integrity (M6R2)", () => {
       { scenario: "plain-static", framework: "lugas", samples: Array(5).fill(HEALTHY_LUGAS) },
       { scenario: "plain-json", framework: "lugas", samples: Array(5).fill(HEALTHY_LUGAS) },
     ], commit, hostEnv);
-    writeValidatedArchive(rd, 35000);
+    writeValidatedArchive(rd, 35000, commit);
     // writeValidatedArchive writes {bunVersion, commit} only — rewrite with host fields
     const validated = JSON.parse(readFileSync(join(rd, "m5-validated", "results.json"), "utf8")) as { env: Record<string, unknown> };
     writeFileSync(join(rd, "m5-validated", "results.json"), JSON.stringify({ ...validated, env: { ...validated.env, ...hostEnv } }));
@@ -309,11 +309,13 @@ describe("perf gate integrity (M6R2)", () => {
     try {
       const rd = join(sb.root, "benchmarks", "results");
       // Plain archive measured on another OS but bound to the right commit.
+      // The foreign value must genuinely differ from the runner's host.
+      const foreignPlatform = process.platform === "darwin" ? "linux" : "darwin";
       writeBoundArchives(rd, "candidate-sha");
       writePlainArchive(rd, [
         { scenario: "plain-static", framework: "lugas", samples: Array(5).fill(HEALTHY_LUGAS) },
         { scenario: "plain-json", framework: "lugas", samples: Array(5).fill(HEALTHY_LUGAS) },
-      ], "candidate-sha", { platform: "darwin", arch: process.arch });
+      ], "candidate-sha", { platform: foreignPlatform, arch: process.arch });
       writeClientArchive(rd, {
         format: "lugas-client-benchmark-v2",
         env: { commit: "candidate-sha", bunVersion: process.versions.bun, platform: process.platform, arch: process.arch },
@@ -328,10 +330,11 @@ describe("perf gate integrity (M6R2)", () => {
       expect(out).toContain("cross-machine evidence");
 
       // Same but cross-machine CLIENT archive (plain archives healthy).
+      const otherPlatform = process.platform === "win32" ? "linux" : "win32";
       writeBoundArchives(rd, "candidate-sha");
       writeClientArchive(rd, {
         format: "lugas-client-benchmark-v2",
-        env: { commit: "candidate-sha", bunVersion: process.versions.bun, platform: "win32", arch: process.arch },
+        env: { commit: "candidate-sha", bunVersion: process.versions.bun, platform: otherPlatform, arch: process.arch },
         bundle: { rawBytes: 14000 },
       });
       const proc2 = Bun.spawnSync(["bun", "run", sb.checkerPath, "--release"], {
