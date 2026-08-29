@@ -8,7 +8,16 @@
  *
  * Separates build & assembly from actual publication (M6-GATE sign-off required).
  *
- * Usage: bun run scripts/release/build-beta-packet.ts
+ * Usage (FINAL assembly step — M6R6 order):
+ *   bun run scripts/release/build-beta-packet.ts --package-source-sha <sha>
+ *
+ * Required preceding order (see docs/reports/gates/M6.md, M6R6 addendum):
+ *   1. benchmarks (plain, validated, client-types) — ignored archives
+ *   2. bun run release:package:rehearse   — requires a CLEAN tree; produces
+ *      the final tarball + package-rehearsal.json
+ *   3. LUGAS_PERF_RELEASE=1 bun run verify — release gate hashes the FINAL
+ *      tarball and writes release-evidence.json
+ *   4. THIS builder — re-executes verification itself, then writes the packet
  */
 import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
@@ -74,7 +83,8 @@ function main() {
   if (!existsSync(evidencePath)) {
     fail(
       `release evidence missing: ${evidencePath}\n` +
-      `  run the release gate (--release) on the package source checkout`,
+      `  required order: benchmarks → 'bun run release:package:rehearse' (clean tree) → ` +
+      `'LUGAS_PERF_RELEASE=1 bun run verify' (writes this file) → this builder`,
     );
   }
   let evidence: {
@@ -104,6 +114,15 @@ function main() {
   }
   if (evidence.packageSourceCommit !== PACKAGE_SOURCE_SHA) {
     fail(`release evidence bound to package source ${evidence.packageSourceCommit ?? "?"} ≠ required ${PACKAGE_SOURCE_SHA}`);
+  }
+  // M6R6 #308: the attestation identity is BINDING, not just recorded.
+  // Evidence produced by a gate running on a different commit must not be
+  // reusable here, and the packet must not print an unproven HEAD.
+  if (evidence.attestationCommit !== commit) {
+    fail(
+      `release evidence attestationCommit ${evidence.attestationCommit ?? "?"} ≠ this checkout ${commit} — ` +
+      `re-run 'LUGAS_PERF_RELEASE=1 bun run verify' on this exact HEAD before assembling the packet`,
+    );
   }
   const required: Array<[string, unknown]> = [
     ["plainStaticRps", evidence.plainStaticRps],
@@ -225,6 +244,71 @@ function main() {
     fail("sbom records nonzero production dependencies");
   }
 
+  // -- builder-executed repository verification (M6R6 #308) -----------------
+  // The checklist may only claim what this process proved. The full gate is
+  // executed HERE in release mode BEFORE any checklist text is written, so a
+  // PASS mark is machine-proven rather than aspirational.
+  const archivePaths = [
+    resolve(ROOT, "benchmarks", "results", "m5-plain", "results.json"),
+    resolve(ROOT, "benchmarks", "results", "m5-validated", "results.json"),
+  ];
+  for (const archive of archivePaths) {
+    if (!existsSync(archive)) {
+      fail(`benchmark archive missing: ${archive} — run the benchmarks before packet assembly`);
+    }
+  }
+  console.log("== verify (builder-executed, LUGAS_PERF_RELEASE=1) ==");
+  const verifyProc = Bun.spawnSync(["bun", "run", "verify"], {
+    cwd: ROOT,
+    env: { ...process.env, LUGAS_PERF_RELEASE: "1", LUGAS_PACKAGE_SOURCE_SHA: PACKAGE_SOURCE_SHA },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const verifyOutput = `${verifyProc.stdout.toString()}${verifyProc.stderr.toString()}`.trim();
+  console.log(verifyOutput.split("\n").slice(-14).join("\n"));
+  if (!verifyProc.success) {
+    fail("builder-executed 'bun run verify' FAILED — no checklist or packet written");
+  }
+  // The verify run re-executed the release gate, which regenerated
+  // release-evidence.json. Re-read it and re-prove every binding before the
+  // packet is written from it; the manifest must cover validated bytes only.
+  let freshEvidence: typeof evidence | undefined;
+  try {
+    freshEvidence = JSON.parse(readFileSync(evidencePath, "utf8")) as typeof evidence;
+  } catch (error) {
+    fail(`release evidence malformed after verification: ${(error as Error).message}`);
+  }
+  if (freshEvidence === undefined) process.exit(1);
+  if (freshEvidence.format !== "lugas-release-evidence-v2") {
+    fail(`regenerated release evidence format mismatch: ${freshEvidence.format}`);
+  }
+  if (freshEvidence.packageSourceCommit !== PACKAGE_SOURCE_SHA) {
+    fail(`regenerated evidence packageSourceCommit ${freshEvidence.packageSourceCommit ?? "?"} ≠ ${PACKAGE_SOURCE_SHA}`);
+  }
+  if (freshEvidence.attestationCommit !== commit) {
+    fail(`regenerated evidence attestationCommit ${freshEvidence.attestationCommit ?? "?"} ≠ ${commit}`);
+  }
+  if (freshEvidence.blockingFailures !== 0 || freshEvidence.alerts !== 0) {
+    fail(`regenerated evidence records ${freshEvidence.blockingFailures} failure(s) / ${freshEvidence.alerts} alert(s)`);
+  }
+  if (freshEvidence.tarballSha256 !== sha256(readFileSync(tarballPath))) {
+    fail("regenerated evidence tarball hash ≠ actual tarball bytes");
+  }
+  evidence = freshEvidence;
+  const attestationSha = evidence.attestationCommit ?? commit;
+
+  // -- governance artifacts (checked, not assumed) ----------------------------
+  for (const gov of [
+    "docs/owner-decisions/naming-assets.md",
+    "docs/owner-decisions/license-governance.md",
+    "LICENSE",
+    "NOTICE",
+    "SECURITY.md",
+    "GOVERNANCE.md",
+  ]) {
+    if (!existsSync(resolve(ROOT, gov))) fail(`required governance file missing: ${gov}`);
+  }
+
   // -- derived figures (all from evidence; zero literals) -----------------------
   const overheadValidatedPct = (
     ((evidence.rawBunValidatedPostRps! - evidence.validatedPostRps!) / evidence.rawBunValidatedPostRps!) * 100
@@ -246,7 +330,8 @@ function main() {
 
 **Candidate Version:** \`${BETA_VERSION}\`  
 **Package Source Commit:** \`${PACKAGE_SOURCE_SHA}\`  
-**Attestation Commit:** \`${commit}\` (\`${shortCommit}\`)  
+**Attestation Commit:** \`${attestationSha}\` (\`${attestationSha.slice(0, 7)}\`)
+
 **Generated:** ${timestamp}  
 **Runtime:** Bun ${bunVersion} · TypeScript 7.0.2 · Linux x86-64 / macOS arm64 / Windows x64  
 **Package:** \`lugas\` (unscoped) · License: Apache-2.0 · Repo: \`ther12k/lugas\`
@@ -255,7 +340,7 @@ function main() {
 
 ## 1. Executive Summary
 
-This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.1** release candidate. All milestones (M0–M6) are complete with zero waivers, zero P0/P1 defects, and all performance, security, and compatibility requirements verified.
+This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.1** release candidate. All milestones (M0–M6) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
 
 Publication remains strictly gated on owner approval in **M6-GATE**.
 
@@ -280,14 +365,19 @@ Publication remains strictly gated on owner approval in **M6-GATE**.
 ### Gate Reports
 ${gateFiles.map((f) => `- [\`docs/reports/gates/${f}\`](../../reports/gates/${f})`).join("\n")}
 
-### M6 Candidate Review Reports
+### Candidate Evidence (canonical for THIS candidate)
+- [\`docs/releases/beta/release-evidence.json\`](release-evidence.json) — \`lugas-release-evidence-v2\`; two-identity bindings (\`packageSourceCommit\` + \`attestationCommit\`), measured medians, tarball hash
+- [\`docs/releases/beta/package-rehearsal.json\`](package-rehearsal.json) — \`lugas-package-rehearsal-v1\`; rehearsal checks and dry-run publication result
+- [\`docs/reports/gates/M6.md\`](../../reports/gates/M6.md) — M6 GO verdict + M6R1–M6R6 post-GATE addenda (attestation procedure)
+
+### M6 Candidate Review Reports (history)
 - [\`docs/reports/m6-api-freeze.md\`](../../reports/m6-api-freeze.md) — Public API candidate freeze
 - [\`docs/reports/m6-compatibility.md\`](../../reports/m6-compatibility.md) — 6-cell CI matrix verification
 - [\`docs/reports/m6-naming-availability.md\`](../../reports/m6-naming-availability.md) — npm namespace and collision review
-- [\`docs/reports/m6-package-rehearsal.md\`](../../reports/m6-package-rehearsal.md) — Publication rehearsal history (SUPERSEDED for the current candidate by m6r4-final-evidence)
-- [\`docs/reports/m6r4-final-evidence.md\`](../../reports/m6r4-final-evidence.md) — **CANONICAL final evidence for this candidate** (perf gate, rehearsal, provenance, checksums)
+- [\`docs/reports/m6-package-rehearsal.md\`](../../reports/m6-package-rehearsal.md) — Publication rehearsal history (superseded for this candidate by \`package-rehearsal.json\`)
+- [\`docs/reports/m6r4-final-evidence.md\`](../../reports/m6r4-final-evidence.md) — Prior-candidate evidence bundle (superseded for this candidate by \`release-evidence.json\`)
 - [\`docs/reports/m6-clean-room-agent.md\`](../../reports/m6-clean-room-agent.md) — Independent clean-room agent proof
-- [\`docs/reports/m6-final-verification.md\`](../../reports/m6-final-verification.md) — Prior-candidate verification history (SUPERSEDED by m6r4-final-evidence)
+- [\`docs/reports/m6-final-verification.md\`](../../reports/m6-final-verification.md) — Prior-candidate verification history (superseded)
 
 ---
 
@@ -356,38 +446,40 @@ npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag
   // 2. Assemble CHECKLIST.md
   const checklist = `# LugasJS v${BETA_VERSION} Pre-Publication Checklist
 
-**Candidate:** \`${commit}\`  
-**Target Package:** \`lugas@${BETA_VERSION}\`  
-**Registry Target:** \`https://registry.npmjs.org/\` with tag \`beta\`
+| Field | Value |
+|---|---|
+| Package Source Commit | \`${PACKAGE_SOURCE_SHA}\` (tag must point here) |
+| Attestation Commit | \`${attestationSha}\` (checkout that ran the gate + builder) |
+| Target Package | \`lugas@${BETA_VERSION}\` |
+| Registry Target | \`https://registry.npmjs.org/\` with tag \`beta\` |
 
 ---
 
-## Pre-Release Verification Steps
+## Verified at Packet Assembly (executed by the builder — not aspirational)
 
-- [x] **Repository Verification:** Full gate \`bun run verify\` passes cleanly on release candidate commit.
-- [x] **Typecheck Integrity:** \`bun run typecheck\` clean with zero errors across strict compiler options.
-- [x] **Performance Gate:** \`bun run scripts/check-performance-budget.ts --release\` reports zero blocking failures and zero alerts.
-- [x] **Compatibility Matrix:** CI workflow \`.github/workflows/compatibility.yml\` green across all 6 OS/Bun cells.
-- [x] **Package Rehearsal:** \`bun run release:package:rehearse\` passes ${rehearsal.checksPassed}/${rehearsal.checksTotal} checks with dry-run publication validated.
-- [x] **Clean-Room Proof:** Independent agent implementation (\`tests/clean-room/billing-service.test.ts\`) passes 8/8 tests.
-- [x] **Owner Decisions Recorded:**
-  - [x] Naming & Package Identity: \`docs/owner-decisions/naming-assets.md\` (ODR-0001)
-  - [x] License & Governance: \`docs/owner-decisions/license-governance.md\` (ODR-0002)
-- [x] **Legal & Attribution:** \`LICENSE\` (full Apache-2.0), \`NOTICE\`, \`SECURITY.md\`, \`GOVERNANCE.md\` in place.
-- [x] **Release Packet Built:** \`docs/releases/beta/RELEASE_PACKET.md\` assembled and indexed.
-- [x] **Exact Tarball Preserved:** \`lugas-${BETA_VERSION}.tgz\` committed (un-ignored for release) and covered by \`SHA256SUMS\` — publication bytes are byte-identical to rehearsal bytes (M6R3).
-- [x] **Post-GATE Re-attestation:** M6 addendum records evidence bound to this exact SHA after the evidence-tooling fixes (M6R3).
-- [ ] **Owner Release Gate Sign-Off:** M6-GATE approval recorded in \`docs/reports/gates/M6.md\` (GO verdict + any post-GATE addendum).
+- [x] **Repository Verification:** \`bun run verify\` executed by this builder with \`LUGAS_PERF_RELEASE=1\` — exit 0 (typecheck, tests, docs, diff, release-mode perf gate).
+- [x] **Typecheck Integrity:** included in the builder-executed verify (\`tsc --noEmit\`, strict compiler options).
+- [x] **Performance Gate:** release-mode gate executed during assembly; \`release-evidence.json\` records 0 blocking failures, 0 alerts, bound to the commits above.
+- [x] **Package Rehearsal:** \`release:package:rehearse\` passed ${rehearsal.checksPassed}/${rehearsal.checksTotal} checks with dry-run publication validated (\`package-rehearsal.json\`).
+- [x] **Clean-Room Proof:** independent clean-room suite ran inside the builder-executed verify (\`bun test\`).
+- [x] **Owner Decisions Recorded:** \`docs/owner-decisions/naming-assets.md\` (ODR-0001), \`docs/owner-decisions/license-governance.md\` (ODR-0002) — presence checked by the builder.
+- [x] **Legal & Attribution:** \`LICENSE\` (full Apache-2.0), \`NOTICE\`, \`SECURITY.md\`, \`GOVERNANCE.md\` — presence checked by the builder.
+- [x] **Two-Identity Attestation:** \`release-evidence.json\` (\`lugas-release-evidence-v2\`) binds \`packageSourceCommit\` and \`attestationCommit\`; the builder re-proved both bindings and the tarball hash at assembly time.
+- [x] **Exact Tarball Preserved:** \`lugas-${BETA_VERSION}.tgz\` hash triple-checked (gate evidence = rehearsal result = actual bytes) and covered by \`SHA256SUMS\`.
+
+## Owner Checks (not provable offline by the builder — verify before publishing)
+
+- [ ] **Compatibility Matrix:** CI \`.github/workflows/compatibility.yml\` green across all 6 OS/Bun cells on the artifact commit.
+- [ ] **No Open P0/P1:** issue tracker free of open P0/P1 defects at publication time.
+- [ ] **Owner Release Gate Sign-Off:** M6-GATE approval recorded in \`docs/reports/gates/M6.md\` (GO verdict + post-GATE addenda).
 
 ---
 
 ## Post-Approval Execution (Owner Only — follow this exact order)
 
 \`\`\`bash
-# 0. Preflight (from the commit containing these attested artifacts)
-cd docs/releases/beta
-sha256sum --check SHA256SUMS
-cd ../..
+# 0. Preflight (from the commit containing these attested artifacts; subshell keeps your cwd)
+( cd docs/releases/beta && sha256sum --check SHA256SUMS )
 npm whoami                                   # must be authenticated as the owner
 npm view lugas version 2>/dev/null           # MUST fail (404) — package still unclaimed
 
