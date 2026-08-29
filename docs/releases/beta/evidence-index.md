@@ -1,8 +1,9 @@
 # LugasJS v0.1.0-beta.1 Evidence Index
 
 **Candidate Version:** `0.1.0-beta.1`  
-**Candidate Commit:** `73337b3`  
-**Generated:** 2026-08-27  
+**Candidate Commit:** `d2a07b2` (post-GATE re-attestation; see [m6r4-final-evidence.md](../../reports/m6r4-final-evidence.md))  
+**Tarball:** `lugas-0.1.0-beta.1.tgz` · sha256 `347f11c2c00b9790811cefa7b36462da80aaabdd543b4beb79617d1d3326205d` (committed, in SHA256SUMS)  
+**Generated:** 2026-08-28  
 **Bun:** 1.4.0 · TypeScript: 7.0.2 · OS: linux-x64 / macOS arm64 / Windows x64
 
 ---
@@ -31,7 +32,9 @@
 | Naming & Assets | [`docs/reports/m6-naming-availability.md`](../../reports/m6-naming-availability.md) | npm `lugas` available (404); low collision risk |
 | Package Rehearsal | [`docs/reports/m6-package-rehearsal.md`](../../reports/m6-package-rehearsal.md) | 15/15 checks green; dry-run publish validated |
 | Clean-Room Agent | [`docs/reports/m6-clean-room-agent.md`](../../reports/m6-clean-room-agent.md) | Multi-tenant billing app built from docs (8/8 pass) |
-| Final Verification | [`docs/reports/m6-final-verification.md`](../../reports/m6-final-verification.md) | Performance budgets met; 0 open P0/P1 defects |
+| Final Verification (canonical, current candidate) | [`docs/reports/m6r4-final-evidence.md`](../../reports/m6r4-final-evidence.md) | Release-mode gate PASS; rehearsal 15/16; provenance bound to `d2a07b2` |
+| Final Verification (prior candidate `73337b3` — SUPERSEDED) | [`docs/reports/m6-final-verification.md`](../../reports/m6-final-verification.md) | Retained for audit history |
+| Package Rehearsal (current candidate) | [`docs/reports/m6-package-rehearsal.md`](../../reports/m6-package-rehearsal.md) | 15/16 checks (original 15/15 + NOTICE assertion) |
 
 ---
 

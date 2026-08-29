@@ -18,7 +18,7 @@
  *   mode) or compared with zero failures otherwise.
  */
 import { execSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -134,6 +134,10 @@ function main() {
   let failures = 0;
   let alerts = 0;
   let skippedScenarios = 0;
+  /** Measured medians per scenario, recorded for machine-readable evidence (M6R4). */
+  const lastMedians: Record<string, number> = {};
+  let lastTypecheckMs: number | null = null;
+  let lastBundleBytes: number | null = null;
 
   // Release runs are evidence runs: the smoke-only archive-suppression flag
   // must never leak into a release execution (#M6R3).
@@ -205,6 +209,7 @@ function main() {
     }
 
     const medianRps = median(samples.map((s) => s.rps));
+    lastMedians[scenario] = medianRps;
 
     // Four-branch classification (#282): a result above alert but below
     // target is explicitly reported as missed, never as ≥ target.
@@ -234,6 +239,7 @@ function main() {
       console.error(`✗ client bundle: ${bundle.bundle.rawBytes}B > max ${baselines.clientBundleMaxBytes}B`);
       failures++;
     } else if (bundle.bundle) {
+      lastBundleBytes = bundle.bundle.rawBytes;
       console.log(`✓ client bundle: ${bundle.bundle.rawBytes}B ≤ ${baselines.clientBundleMaxBytes}B`);
     } else if (RELEASE_MODE) {
       console.error("✗ client bundle evidence missing 'bundle' payload");
@@ -270,6 +276,7 @@ function main() {
       console.error(`✗ typecheck ${elapsedMs}ms > budget ${baselines.typecheckBudgetMs}ms`);
       failures++;
     } else {
+      lastTypecheckMs = elapsedMs;
       console.log(`✓ typecheck ${elapsedMs}ms ≤ budget ${baselines.typecheckBudgetMs}ms`);
     }
     }
@@ -286,6 +293,39 @@ function main() {
     return;
   }
   console.log(`\nPASS: ${failures} blocking failure(s), ${alerts} alert(s)`);
+
+  // Machine-readable release evidence (M6R4): the packet builder consumes
+  // this file instead of narrative defaults. Written only in release mode on
+  // success — the packet builder fails closed without it.
+  if (RELEASE_MODE) {
+    let tarballHash: string | null = null;
+    const tgz = resolve(ROOT, "docs", "releases", "beta", "lugas-0.1.0-beta.1.tgz");
+    if (existsSync(tgz)) {
+      const { createHash } = require("node:crypto") as typeof import("node:crypto");
+      tarballHash = createHash("sha256").update(readFileSync(tgz)).digest("hex");
+    }
+
+    const evidence = {
+      format: "lugas-release-evidence-v1",
+      candidateCommit: head || null,
+      measuredAt: new Date().toISOString(),
+      bunVersion: process.versions.bun,
+      plainStaticRps: lastMedians["plain-static"] ?? null,
+      plainJsonRps: lastMedians["plain-json"] ?? null,
+      validatedPostRps: lastMedians["validated-post"] ?? null,
+      typecheckMs: lastTypecheckMs,
+      clientBundleBytes: lastBundleBytes,
+      tarballSha256: tarballHash,
+      blockingFailures: failures,
+      alerts,
+    };
+    mkdirSync(resolve(ROOT, "docs", "releases", "beta"), { recursive: true });
+    writeFileSync(
+      resolve(ROOT, "docs", "releases", "beta", "release-evidence.json"),
+      JSON.stringify(evidence, null, 2) + "\n",
+    );
+    console.log(`Release evidence written to docs/releases/beta/release-evidence.json`);
+  }
 }
 
 main();

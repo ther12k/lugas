@@ -1,3 +1,8 @@
+> **SUPERSEDED (M6R4, 2026-08-28):** this report documents candidate *44805a0* with
+> tarball sha256 *9c1f0411…*. It is retained for audit history. The **canonical final
+> evidence for the current candidate `d2a07b2`** (tarball `lugas-0.1.0-beta.1.tgz`,
+> sha256 `347f11c2…`) is [`docs/reports/m6r4-final-evidence.md`](m6r4-final-evidence.md).
+
 # M6 Package Publication Rehearsal — Beta Candidate
 
 Milestone: M6 — Beta Stabilization and Release

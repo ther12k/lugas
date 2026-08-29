@@ -21,6 +21,7 @@
   "files": [
     "src",
     "README.md",
+    "NOTICE",
     "AGENTS.md",
     "docs/okf/architecture"
   ],

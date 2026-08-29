@@ -304,6 +304,8 @@ export default defineApp({ routes: { "/x": { GET: route({ handler: () => text(20
   check("no forbidden paths inside beta tarball", violations.length === 0, violations.length === 0 ? "clean" : violations.join(", "));
   const hasLicense = inventory.files.some((f) => f === "LICENSE");
   check("license file ships in tarball", hasLicense, hasLicense ? "LICENSE present (Apache-2.0)" : "MISSING");
+  const hasNotice = inventory.files.some((f) => f === "NOTICE");
+  check("NOTICE file ships in tarball", hasNotice, hasNotice ? "NOTICE present (ODR-0002 attribution)" : "MISSING");
 
   // Summary
   const failed = results.filter((r) => !r.ok);
