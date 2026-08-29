@@ -1,0 +1,14 @@
+{
+  "format": "lugas-release-evidence-v1",
+  "candidateCommit": "3fb6556e30c6ea7b20617c06469d658c46633a59",
+  "measuredAt": "2026-08-29T03:48:43.329Z",
+  "bunVersion": "1.4.0",
+  "plainStaticRps": 100439,
+  "plainJsonRps": 68436,
+  "validatedPostRps": 41815,
+  "typecheckMs": 1445,
+  "clientBundleBytes": 14900,
+  "tarballSha256": "347f11c2c00b9790811cefa7b36462da80aaabdd543b4beb79617d1d3326205d",
+  "blockingFailures": 0,
+  "alerts": 0
+}
