@@ -1,8 +1,8 @@
 # LugasJS v0.1.0-beta.1 Release Packet
 
 **Candidate Version:** `0.1.0-beta.1`  
-**Candidate Commit:** `d2a07b213bc719097c88340a177e68737aa10301` (`d2a07b2`)  
-**Generated:** 2026-08-28T17:38:21.040Z  
+**Candidate Commit:** `34439dce1e50dc03d751df1a7260980e88719777` (`34439dc`)  
+**Generated:** 2026-08-29T03:54:43.953Z  
 **Runtime:** Bun 1.4.0 · TypeScript 7.0.2 · Linux x86-64 / macOS arm64 / Windows x64  
 **Package:** `lugas` (unscoped) · License: Apache-2.0 · Repo: `ther12k/lugas`
 
@@ -47,9 +47,10 @@ Publication remains strictly gated on owner approval in **M6-GATE**.
 - [`docs/reports/m6-api-freeze.md`](../../reports/m6-api-freeze.md) — Public API candidate freeze
 - [`docs/reports/m6-compatibility.md`](../../reports/m6-compatibility.md) — 6-cell CI matrix verification
 - [`docs/reports/m6-naming-availability.md`](../../reports/m6-naming-availability.md) — npm namespace and collision review
-- [`docs/reports/m6-package-rehearsal.md`](../../reports/m6-package-rehearsal.md) — Publication rehearsal (15/15 checks)
+- [`docs/reports/m6-package-rehearsal.md`](../../reports/m6-package-rehearsal.md) — Publication rehearsal history (SUPERSEDED for the current candidate by m6r4-final-evidence)
+- [`docs/reports/m6r4-final-evidence.md`](../../reports/m6r4-final-evidence.md) — **CANONICAL final evidence for this candidate** (perf gate, rehearsal, provenance, checksums)
 - [`docs/reports/m6-clean-room-agent.md`](../../reports/m6-clean-room-agent.md) — Independent clean-room agent proof
-- [`docs/reports/m6-final-verification.md`](../../reports/m6-final-verification.md) — Final candidate evidence aggregation
+- [`docs/reports/m6-final-verification.md`](../../reports/m6-final-verification.md) — Prior-candidate verification history (SUPERSEDED by m6r4-final-evidence)
 
 ---
 
@@ -57,11 +58,11 @@ Publication remains strictly gated on owner approval in **M6-GATE**.
 
 | Scenario / Metric | Release Floor | Alert Floor | Target | Candidate Measured | Result |
 |---|---|---|---|---|---|
-| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **126,109 rps** | ✅ Exceeded |
-| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **94,588 rps** | ✅ Exceeded |
-| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **58,975 rps** | ✅ Exceeded (11.4% overhead) |
-| Typecheck Duration | — | — | < 2,000ms | **833ms** | ✅ Target Met |
-| Client Bundle Size | — | — | < 25,000 B | **14,900 B** (~4.1 kB gzip) | ✅ Target Met |
+| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **81,167 rps** | ✅ Exceeded |
+| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **72,002 rps** | ✅ Exceeded |
+| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **47,089 rps** | ✅ Exceeded (-0.9% overhead) |
+| Typecheck Duration | — | — | < 2,000ms | **1157ms** | ✅ Measured on candidate |
+| Client Bundle Size | — | — | < 25,000 B | **14900 B** | ✅ Measured on candidate |
 
 ---
 

@@ -1,14 +1,14 @@
 {
   "format": "lugas-release-evidence-v1",
-  "candidateCommit": "58923f86f4e22bed334fb9cad180fba88f754cac",
-  "measuredAt": "2026-08-29T03:50:29.445Z",
+  "candidateCommit": "34439dce1e50dc03d751df1a7260980e88719777",
+  "measuredAt": "2026-08-29T03:54:32.863Z",
   "bunVersion": "1.4.0",
-  "plainStaticRps": 80873,
-  "plainJsonRps": 68337,
-  "validatedPostRps": 46375,
-  "typecheckMs": 1365,
+  "plainStaticRps": 81167,
+  "plainJsonRps": 72002,
+  "validatedPostRps": 47089,
+  "typecheckMs": 1157,
   "clientBundleBytes": 14900,
-  "tarballSha256": "8733ea5459892406130bf9b2ba923a203fac9803ce1e3763128de06c6801399f",
+  "tarballSha256": "347f11c2c00b9790811cefa7b36462da80aaabdd543b4beb79617d1d3326205d",
   "blockingFailures": 0,
   "alerts": 0
 }
