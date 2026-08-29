@@ -41,38 +41,100 @@ function main() {
     ? readdirSync(gateDir).filter((f) => f.endsWith(".md")).sort()
     : [];
 
-  // Read performance metrics if available
-  let plainRps = "137,238";
-  let jsonRps = "107,644";
-  let validatedRps = "66,827";
-  let overhead = "11.4%";
-
+  // ------------------------------------------------------------------
+  // Machine-readable release evidence is MANDATORY (M6R4). The packet
+  // builder has NO metric defaults and NO silent catches: it fails closed
+  // when gate evidence is missing, malformed, stale, or inconsistent with
+  // the candidate commit.
+  // ------------------------------------------------------------------
+  const evidencePath = resolve(OUT_DIR, "release-evidence.json");
+  if (!existsSync(evidencePath)) {
+    console.error(
+      `✗ release evidence missing: ${evidencePath}\n` +
+      `  run: bun run scripts/benchmark-{plain,validated,client-types}.ts && bun run scripts/check-performance-budget.ts --release`,
+    );
+    process.exit(1);
+  }
+  let evidence: {
+    format?: string;
+    candidateCommit?: string | null;
+    plainStaticRps?: number | null;
+    plainJsonRps?: number | null;
+    validatedPostRps?: number | null;
+    typecheckMs?: number | null;
+    clientBundleBytes?: number | null;
+    tarballSha256?: string | null;
+    blockingFailures?: number | null;
+  };
   try {
-    const plainPath = resolve(ROOT, "benchmarks/results/m5-plain/results.json");
-    if (existsSync(plainPath)) {
-      const data = JSON.parse(readFileSync(plainPath, "utf8"));
-      const staticSamples = (data.results ?? [])
-        .find((r: any) => r.scenario === "plain-static" && r.framework === "lugas")?.samples ?? [];
-      const jsonSamples = (data.results ?? [])
-        .find((r: any) => r.scenario === "plain-json" && r.framework === "lugas")?.samples ?? [];
-      if (staticSamples.length > 0) {
-        const sorted = staticSamples.map((s: any) => s.rps).sort((a: number, b: number) => a - b);
-        plainRps = sorted[Math.floor(sorted.length / 2)].toLocaleString();
-      }
-      if (jsonSamples.length > 0) {
-        const sorted = jsonSamples.map((s: any) => s.rps).sort((a: number, b: number) => a - b);
-        jsonRps = sorted[Math.floor(sorted.length / 2)].toLocaleString();
-      }
-    }
-    const valPath = resolve(ROOT, "benchmarks/results/m5-validated/results.json");
-    if (existsSync(valPath)) {
-      const data = JSON.parse(readFileSync(valPath, "utf8"));
-      const lugasSamples = (data.lugas ?? []).map((s: any) => s.rps).sort((a: number, b: number) => a - b);
-      if (lugasSamples.length > 0) {
-        validatedRps = lugasSamples[Math.floor(lugasSamples.length / 2)].toLocaleString();
-      }
-    }
-  } catch { /* use baseline recorded numbers */ }
+    evidence = JSON.parse(readFileSync(evidencePath, "utf8"));
+  } catch (error) {
+    console.error(`✗ release evidence malformed: ${(error as Error).message}`);
+    process.exit(1);
+  }
+  const required: Array<[string, unknown]> = [
+    ["format", evidence.format],
+    ["candidateCommit", evidence.candidateCommit],
+    ["plainStaticRps", evidence.plainStaticRps],
+    ["plainJsonRps", evidence.plainJsonRps],
+    ["validatedPostRps", evidence.validatedPostRps],
+    ["typecheckMs", evidence.typecheckMs],
+    ["clientBundleBytes", evidence.clientBundleBytes],
+    ["blockingFailures", evidence.blockingFailures],
+  ];
+  const missing = required.filter(([, v]) => v === null || v === undefined).map(([k]) => k);
+  if (missing.length > 0) {
+    console.error(`✗ release evidence incomplete — missing: ${missing.join(", ")}`);
+    process.exit(1);
+  }
+  if (evidence.format !== "lugas-release-evidence-v1") {
+    console.error(`✗ release evidence format mismatch: ${evidence.format}`);
+    process.exit(1);
+  }
+  if (evidence.candidateCommit !== commit) {
+    console.error(
+      `✗ release evidence bound to ${evidence.candidateCommit} but packet candidate is ${commit} — re-run the release gate on the exact candidate`,
+    );
+    process.exit(1);
+  }
+  if ((evidence.blockingFailures ?? 1) !== 0) {
+    console.error(`✗ release evidence records ${evidence.blockingFailures} blocking failure(s) — not releasable`);
+    process.exit(1);
+  }
+
+  // Raw-Bun comparator for the overhead figure comes from the plain archive
+  // of the SAME run; fail closed if unusable.
+  const plainPath = resolve(ROOT, "benchmarks/results/m5-plain/results.json");
+  if (!existsSync(plainPath)) {
+    console.error(`✗ plain benchmark archive missing: ${plainPath}`);
+    process.exit(1);
+  }
+  let plainRaw: { env?: { commit?: string }; results?: Array<{ scenario: string; framework: string; samples: Array<{ rps: number }> }> };
+  try {
+    plainRaw = JSON.parse(readFileSync(plainPath, "utf8"));
+  } catch (error) {
+    console.error(`✗ plain benchmark archive malformed: ${(error as Error).message}`);
+    process.exit(1);
+  }
+  if (plainRaw.env?.commit !== commit) {
+    console.error(`✗ plain archive bound to ${plainRaw.env?.commit ?? "?"} ≠ candidate ${commit}`);
+    process.exit(1);
+  }
+  const rawStatic = (plainRaw.results ?? []).find((r) => r.scenario === "plain-static" && r.framework === "raw-bun")?.samples ?? [];
+  if (rawStatic.length === 0) {
+    console.error("✗ plain archive has no raw-bun plain-static samples (overhead comparator unavailable)");
+    process.exit(1);
+  }
+  const rawStaticMedian = rawStatic.map((x) => x.rps).sort((a, b) => a - b)[Math.floor(rawStatic.length / 2)]!;
+  const overheadPct = (((rawStaticMedian - evidence.plainStaticRps!) / rawStaticMedian) * 100).toFixed(1);
+
+  const fmt = (n: number) => n.toLocaleString("en-US");
+  const plainRps = fmt(evidence.plainStaticRps!);
+  const jsonRps = fmt(evidence.plainJsonRps!);
+  const validatedRps = fmt(evidence.validatedPostRps!);
+  const overhead = `${overheadPct}%`;
+  const typecheckMs = String(evidence.typecheckMs);
+  const bundleBytes = String(evidence.clientBundleBytes);
 
   // 1. Assemble RELEASE_PACKET.md
   const releasePacket = `# LugasJS v${BETA_VERSION} Release Packet
@@ -116,9 +178,10 @@ ${gateFiles.map((f) => `- [\`docs/reports/gates/${f}\`](../../reports/gates/${f}
 - [\`docs/reports/m6-api-freeze.md\`](../../reports/m6-api-freeze.md) — Public API candidate freeze
 - [\`docs/reports/m6-compatibility.md\`](../../reports/m6-compatibility.md) — 6-cell CI matrix verification
 - [\`docs/reports/m6-naming-availability.md\`](../../reports/m6-naming-availability.md) — npm namespace and collision review
-- [\`docs/reports/m6-package-rehearsal.md\`](../../reports/m6-package-rehearsal.md) — Publication rehearsal (15/15 checks)
+- [\`docs/reports/m6-package-rehearsal.md\`](../../reports/m6-package-rehearsal.md) — Publication rehearsal history (SUPERSEDED for the current candidate by m6r4-final-evidence)
+- [\`docs/reports/m6r4-final-evidence.md\`](../../reports/m6r4-final-evidence.md) — **CANONICAL final evidence for this candidate** (perf gate, rehearsal, provenance, checksums)
 - [\`docs/reports/m6-clean-room-agent.md\`](../../reports/m6-clean-room-agent.md) — Independent clean-room agent proof
-- [\`docs/reports/m6-final-verification.md\`](../../reports/m6-final-verification.md) — Final candidate evidence aggregation
+- [\`docs/reports/m6-final-verification.md\`](../../reports/m6-final-verification.md) — Prior-candidate verification history (SUPERSEDED by m6r4-final-evidence)
 
 ---
 
@@ -129,8 +192,8 @@ ${gateFiles.map((f) => `- [\`docs/reports/gates/${f}\`](../../reports/gates/${f}
 | \`plain-static\` | 30,000 rps | 40,000 rps | 60,000 rps | **${plainRps} rps** | ✅ Exceeded |
 | \`plain-json\` | 25,000 rps | 35,000 rps | 50,000 rps | **${jsonRps} rps** | ✅ Exceeded |
 | \`validated-post\` | 15,000 rps | 20,000 rps | 30,000 rps | **${validatedRps} rps** | ✅ Exceeded (${overhead} overhead) |
-| Typecheck Duration | — | — | < 2,000ms | **833ms** | ✅ Target Met |
-| Client Bundle Size | — | — | < 25,000 B | **14,900 B** (~4.1 kB gzip) | ✅ Target Met |
+| Typecheck Duration | — | — | < 2,000ms | **${typecheckMs}ms** | ✅ Measured on candidate |
+| Client Bundle Size | — | — | < 25,000 B | **${bundleBytes} B** | ✅ Measured on candidate |
 
 ---
 

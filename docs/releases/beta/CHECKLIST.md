@@ -1,6 +1,6 @@
 # LugasJS v0.1.0-beta.1 Pre-Publication Checklist
 
-**Candidate:** `d2a07b213bc719097c88340a177e68737aa10301`  
+**Candidate:** `34439dce1e50dc03d751df1a7260980e88719777`  
 **Target Package:** `lugas@0.1.0-beta.1`  
 **Registry Target:** `https://registry.npmjs.org/` with tag `beta`
 
@@ -32,7 +32,7 @@
 npm publish ./docs/releases/beta/lugas-0.1.0-beta.1.tgz --access public --tag beta
 
 # 2. Tag the APPROVED release SHA explicitly (never ambient HEAD)
-git tag -a "v0.1.0-beta.1" "d2a07b213bc719097c88340a177e68737aa10301" -m "LugasJS v0.1.0-beta.1 release candidate"
+git tag -a "v0.1.0-beta.1" "34439dce1e50dc03d751df1a7260980e88719777" -m "LugasJS v0.1.0-beta.1 release candidate"
 git push origin "v0.1.0-beta.1"
 
 # 3. Create GitHub Release with RELEASE_PACKET.md notes
