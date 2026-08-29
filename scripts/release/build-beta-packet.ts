@@ -23,6 +23,11 @@ function sha256(data: Buffer | string): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
+function argValue(name: string): string | undefined {
+  const i = process.argv.indexOf(name);
+  return i !== -1 ? process.argv[i + 1] : undefined;
+}
+
 function main() {
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
 
@@ -42,29 +47,50 @@ function main() {
     : [];
 
   // ------------------------------------------------------------------
-  // Machine-readable release evidence is MANDATORY (M6R4). The packet
-  // builder has NO metric defaults and NO silent catches: it fails closed
-  // when gate evidence is missing, malformed, stale, or inconsistent with
-  // the candidate commit.
+  // Cross-artifact fail-closed attestation (M6R5).
+  //
+  // Two-identity model:
+  //   PACKAGE_SOURCE_SHA : the tree the beta package was built from
+  //                        (--package-source-sha / LUGAS_PACKAGE_SOURCE_SHA).
+  //   commit (HEAD)      : the attestation checkout running this builder.
+  // The packet binds to the package source; HEAD is recorded as the
+  // attestation commit. Every artifact is cross-checked against both.
   // ------------------------------------------------------------------
-  const evidencePath = resolve(OUT_DIR, "release-evidence.json");
-  if (!existsSync(evidencePath)) {
+  const PACKAGE_SOURCE_SHA =
+    argValue("--package-source-sha") ?? process.env.LUGAS_PACKAGE_SOURCE_SHA ?? null;
+  if (!PACKAGE_SOURCE_SHA) {
     console.error(
-      `✗ release evidence missing: ${evidencePath}\n` +
-      `  run: bun run scripts/benchmark-{plain,validated,client-types}.ts && bun run scripts/check-performance-budget.ts --release`,
+      "✗ --package-source-sha (or LUGAS_PACKAGE_SOURCE_SHA) is required — the packet must bind to an explicit package source commit",
     );
     process.exit(1);
   }
+  const fail = (msg: string): never => {
+    console.error(`✗ ${msg}`);
+    process.exit(1);
+  };
+
+  // -- release evidence -------------------------------------------------
+  const evidencePath = resolve(OUT_DIR, "release-evidence.json");
+  if (!existsSync(evidencePath)) {
+    fail(
+      `release evidence missing: ${evidencePath}\n` +
+      `  run the release gate (--release) on the package source checkout`,
+    );
+  }
   let evidence: {
     format?: string;
-    candidateCommit?: string | null;
+    packageSourceCommit?: string | null;
+    attestationCommit?: string | null;
     plainStaticRps?: number | null;
     plainJsonRps?: number | null;
     validatedPostRps?: number | null;
+    rawBunPlainStaticRps?: number | null;
+    rawBunValidatedPostRps?: number | null;
     typecheckMs?: number | null;
     clientBundleBytes?: number | null;
     tarballSha256?: string | null;
     blockingFailures?: number | null;
+    alerts?: number | null;
   };
   try {
     evidence = JSON.parse(readFileSync(evidencePath, "utf8"));
@@ -72,75 +98,155 @@ function main() {
     console.error(`✗ release evidence malformed: ${(error as Error).message}`);
     process.exit(1);
   }
+  if (evidence === undefined) process.exit(1);
+  if (evidence.format !== "lugas-release-evidence-v2") {
+    fail(`release evidence format mismatch: ${evidence.format} (expected lugas-release-evidence-v2)`);
+  }
+  if (evidence.packageSourceCommit !== PACKAGE_SOURCE_SHA) {
+    fail(`release evidence bound to package source ${evidence.packageSourceCommit ?? "?"} ≠ required ${PACKAGE_SOURCE_SHA}`);
+  }
   const required: Array<[string, unknown]> = [
-    ["format", evidence.format],
-    ["candidateCommit", evidence.candidateCommit],
     ["plainStaticRps", evidence.plainStaticRps],
     ["plainJsonRps", evidence.plainJsonRps],
     ["validatedPostRps", evidence.validatedPostRps],
+    ["rawBunPlainStaticRps", evidence.rawBunPlainStaticRps],
+    ["rawBunValidatedPostRps", evidence.rawBunValidatedPostRps],
     ["typecheckMs", evidence.typecheckMs],
     ["clientBundleBytes", evidence.clientBundleBytes],
+    ["tarballSha256", evidence.tarballSha256],
     ["blockingFailures", evidence.blockingFailures],
+    ["alerts", evidence.alerts],
   ];
   const missing = required.filter(([, v]) => v === null || v === undefined).map(([k]) => k);
   if (missing.length > 0) {
-    console.error(`✗ release evidence incomplete — missing: ${missing.join(", ")}`);
-    process.exit(1);
+    fail(`release evidence incomplete — missing: ${missing.join(", ")}`);
   }
-  if (evidence.format !== "lugas-release-evidence-v1") {
-    console.error(`✗ release evidence format mismatch: ${evidence.format}`);
-    process.exit(1);
+  if (evidence.blockingFailures !== 0) {
+    fail(`release evidence records ${evidence.blockingFailures} blocking failure(s) — not releasable`);
   }
-  if (evidence.candidateCommit !== commit) {
-    console.error(
-      `✗ release evidence bound to ${evidence.candidateCommit} but packet candidate is ${commit} — re-run the release gate on the exact candidate`,
-    );
-    process.exit(1);
-  }
-  if ((evidence.blockingFailures ?? 1) !== 0) {
-    console.error(`✗ release evidence records ${evidence.blockingFailures} blocking failure(s) — not releasable`);
-    process.exit(1);
+  if (evidence.alerts !== 0) {
+    fail(`release evidence records ${evidence.alerts} alert(s) — release requires zero alerts`);
   }
 
-  // Raw-Bun comparator for the overhead figure comes from the plain archive
-  // of the SAME run; fail closed if unusable.
-  const plainPath = resolve(ROOT, "benchmarks/results/m5-plain/results.json");
-  if (!existsSync(plainPath)) {
-    console.error(`✗ plain benchmark archive missing: ${plainPath}`);
-    process.exit(1);
+  // -- rehearsal result ---------------------------------------------------
+  const rehearsalPath = resolve(OUT_DIR, "package-rehearsal.json");
+  if (!existsSync(rehearsalPath)) {
+    fail(`rehearsal result missing: ${rehearsalPath} — run 'bun run release:package:rehearse'`);
   }
-  let plainRaw: { env?: { commit?: string }; results?: Array<{ scenario: string; framework: string; samples: Array<{ rps: number }> }> };
+  let rehearsal: {
+    format?: string;
+    packageSourceCommit?: string;
+    tarballSha256?: string;
+    checksPassed?: number;
+    checksTotal?: number;
+    entryCount?: number;
+    noticePresent?: boolean;
+    licensePresent?: boolean;
+    dryRunPublishPassed?: boolean;
+  };
   try {
-    plainRaw = JSON.parse(readFileSync(plainPath, "utf8"));
+    rehearsal = JSON.parse(readFileSync(rehearsalPath, "utf8"));
   } catch (error) {
-    console.error(`✗ plain benchmark archive malformed: ${(error as Error).message}`);
+    console.error(`✗ rehearsal result malformed: ${(error as Error).message}`);
     process.exit(1);
   }
-  if (plainRaw.env?.commit !== commit) {
-    console.error(`✗ plain archive bound to ${plainRaw.env?.commit ?? "?"} ≠ candidate ${commit}`);
-    process.exit(1);
+  if (rehearsal === undefined) process.exit(1);
+  if (rehearsal.format !== "lugas-package-rehearsal-v1") {
+    fail(`rehearsal result format mismatch: ${rehearsal.format}`);
   }
-  const rawStatic = (plainRaw.results ?? []).find((r) => r.scenario === "plain-static" && r.framework === "raw-bun")?.samples ?? [];
-  if (rawStatic.length === 0) {
-    console.error("✗ plain archive has no raw-bun plain-static samples (overhead comparator unavailable)");
-    process.exit(1);
+  if (rehearsal.packageSourceCommit !== PACKAGE_SOURCE_SHA) {
+    fail(`rehearsal bound to source ${rehearsal.packageSourceCommit ?? "?"} ≠ required ${PACKAGE_SOURCE_SHA}`);
   }
-  const rawStaticMedian = rawStatic.map((x) => x.rps).sort((a, b) => a - b)[Math.floor(rawStatic.length / 2)]!;
-  const overheadPct = (((rawStaticMedian - evidence.plainStaticRps!) / rawStaticMedian) * 100).toFixed(1);
+  if (rehearsal.checksPassed !== rehearsal.checksTotal) {
+    fail(`rehearsal incomplete: ${rehearsal.checksPassed}/${rehearsal.checksTotal} checks`);
+  }
+  if (!rehearsal.dryRunPublishPassed) fail("rehearsal did not pass dry-run publication");
+  if (!rehearsal.licensePresent) fail("rehearsal reports LICENSE missing from tarball");
+  if (!rehearsal.noticePresent) fail("rehearsal reports NOTICE missing from tarball");
 
+  // -- exact tarball vs BOTH attestations ---------------------------------
+  const tarballName = `lugas-${BETA_VERSION}.tgz`;
+  const tarballPath = resolve(OUT_DIR, tarballName);
+  if (!existsSync(tarballPath)) {
+    fail(`exact tarball missing: ${tarballPath} — run 'bun run release:package:rehearse'`);
+  }
+  const actualTarballHash = sha256(readFileSync(tarballPath));
+  if (actualTarballHash !== evidence.tarballSha256) {
+    fail(`tarball hash ${actualTarballHash.slice(0, 12)}… ≠ release-evidence hash ${(evidence.tarballSha256 ?? "?").slice(0, 12)}… — re-run the release gate AFTER the final rehearsal`);
+  }
+  if (actualTarballHash !== rehearsal.tarballSha256) {
+    fail(`tarball hash ${actualTarballHash.slice(0, 12)}… ≠ rehearsal hash ${(rehearsal.tarballSha256 ?? "?").slice(0, 12)}…`);
+  }
+
+  // -- provenance -----------------------------------------------------------
+  const provenancePath = resolve(OUT_DIR, "provenance.json");
+  if (!existsSync(provenancePath)) fail("provenance.json missing");
+  const provenance = JSON.parse(readFileSync(provenancePath, "utf8")) as {
+    sourceCommit?: string;
+    gitTreeHash?: string;
+    publishedToRegistry?: boolean;
+  };
+  if (provenance.sourceCommit !== PACKAGE_SOURCE_SHA) {
+    fail(`provenance sourceCommit ${provenance.sourceCommit ?? "?"} ≠ package source ${PACKAGE_SOURCE_SHA}`);
+  }
+  if (provenance.publishedToRegistry !== false) {
+    fail("provenance must record publishedToRegistry:false at packet build time");
+  }
+
+  // -- inventory -------------------------------------------------------------
+  const inventoryPath = resolve(OUT_DIR, "inventory.json");
+  if (!existsSync(inventoryPath)) fail("inventory.json missing");
+  const inventory = JSON.parse(readFileSync(inventoryPath, "utf8")) as {
+    tarballEntries?: number;
+    files?: string[];
+  };
+  if (inventory.tarballEntries !== rehearsal.entryCount) {
+    fail(`inventory entries ${inventory.tarballEntries} ≠ rehearsal entryCount ${rehearsal.entryCount}`);
+  }
+  for (const requiredFile of ["LICENSE", "NOTICE", "README.md"]) {
+    if (!inventory.files?.includes(requiredFile)) {
+      fail(`inventory is missing required package file: ${requiredFile}`);
+    }
+  }
+
+  // -- sbom ---------------------------------------------------------------------
+  const sbomPath = resolve(OUT_DIR, "sbom.json");
+  if (!existsSync(sbomPath)) fail("sbom.json missing");
+  const sbom = JSON.parse(readFileSync(sbomPath, "utf8")) as {
+    packageVersion?: string;
+    packageName?: string;
+    productionDependencies?: string[];
+    zeroProductionRuntimeDependency?: boolean;
+  };
+  if (sbom.packageVersion !== BETA_VERSION || sbom.packageName !== "lugas") {
+    fail(`sbom identity mismatch: ${sbom.packageName}@${sbom.packageVersion}`);
+  }
+  if (sbom.zeroProductionRuntimeDependency !== true) {
+    fail("sbom records nonzero production dependencies");
+  }
+
+  // -- derived figures (all from evidence; zero literals) -----------------------
+  const overheadValidatedPct = (
+    ((evidence.rawBunValidatedPostRps! - evidence.validatedPostRps!) / evidence.rawBunValidatedPostRps!) * 100
+  ).toFixed(1);
+  const overheadPlainPct = (
+    ((evidence.rawBunPlainStaticRps! - evidence.plainStaticRps!) / evidence.rawBunPlainStaticRps!) * 100
+  ).toFixed(1);
   const fmt = (n: number) => n.toLocaleString("en-US");
   const plainRps = fmt(evidence.plainStaticRps!);
   const jsonRps = fmt(evidence.plainJsonRps!);
   const validatedRps = fmt(evidence.validatedPostRps!);
-  const overhead = `${overheadPct}%`;
+  const overhead = `${overheadValidatedPct}%`;
   const typecheckMs = String(evidence.typecheckMs);
   const bundleBytes = String(evidence.clientBundleBytes);
+
 
   // 1. Assemble RELEASE_PACKET.md
   const releasePacket = `# LugasJS v${BETA_VERSION} Release Packet
 
 **Candidate Version:** \`${BETA_VERSION}\`  
-**Candidate Commit:** \`${commit}\` (\`${shortCommit}\`)  
+**Package Source Commit:** \`${PACKAGE_SOURCE_SHA}\`  
+**Attestation Commit:** \`${commit}\` (\`${shortCommit}\`)  
 **Generated:** ${timestamp}  
 **Runtime:** Bun ${bunVersion} · TypeScript 7.0.2 · Linux x86-64 / macOS arm64 / Windows x64  
 **Package:** \`lugas\` (unscoped) · License: Apache-2.0 · Repo: \`ther12k/lugas\`
@@ -189,9 +295,9 @@ ${gateFiles.map((f) => `- [\`docs/reports/gates/${f}\`](../../reports/gates/${f}
 
 | Scenario / Metric | Release Floor | Alert Floor | Target | Candidate Measured | Result |
 |---|---|---|---|---|---|
-| \`plain-static\` | 30,000 rps | 40,000 rps | 60,000 rps | **${plainRps} rps** | ✅ Exceeded |
+| \`plain-static\` | 30,000 rps | 40,000 rps | 60,000 rps | **${plainRps} rps** (${overheadPlainPct}% vs raw Bun) | ✅ Exceeded |
 | \`plain-json\` | 25,000 rps | 35,000 rps | 50,000 rps | **${jsonRps} rps** | ✅ Exceeded |
-| \`validated-post\` | 15,000 rps | 20,000 rps | 30,000 rps | **${validatedRps} rps** | ✅ Exceeded (${overhead} overhead) |
+| \`validated-post\` | 15,000 rps | 20,000 rps | 30,000 rps | **${validatedRps} rps** | ✅ Exceeded (${overhead} validated overhead vs raw Bun) |
 | Typecheck Duration | — | — | < 2,000ms | **${typecheckMs}ms** | ✅ Measured on candidate |
 | Client Bundle Size | — | — | < 25,000 B | **${bundleBytes} B** | ✅ Measured on candidate |
 
@@ -219,7 +325,7 @@ ${gateFiles.map((f) => `- [\`docs/reports/gates/${f}\`](../../reports/gates/${f}
 ## 7. Supply Chain & Package Verification
 
 - **Production Dependencies:** **0** (zero runtime dependencies).
-- **Tarball File Count:** 69 files (strict whitelist; no tests/benchmarks/worktrees).
+- **Tarball Entry Count:** **${rehearsal.entryCount}** files (strict whitelist; no tests/benchmarks/worktrees).
 - **Publication Dry-Run:** Validated via \`npm publish --dry-run --access public --tag beta\`.
 - **Artifact Manifest:** Checksums and provenance recorded in \`docs/releases/beta/SHA256SUMS\`.
 
@@ -262,7 +368,7 @@ npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag
 - [x] **Typecheck Integrity:** \`bun run typecheck\` clean with zero errors across strict compiler options.
 - [x] **Performance Gate:** \`bun run scripts/check-performance-budget.ts --release\` reports zero blocking failures and zero alerts.
 - [x] **Compatibility Matrix:** CI workflow \`.github/workflows/compatibility.yml\` green across all 6 OS/Bun cells.
-- [x] **Package Rehearsal:** \`bun run release:package:rehearse\` passes 15/15 checks with dry-run publication validated.
+- [x] **Package Rehearsal:** \`bun run release:package:rehearse\` passes ${rehearsal.checksPassed}/${rehearsal.checksTotal} checks with dry-run publication validated.
 - [x] **Clean-Room Proof:** Independent agent implementation (\`tests/clean-room/billing-service.test.ts\`) passes 8/8 tests.
 - [x] **Owner Decisions Recorded:**
   - [x] Naming & Package Identity: \`docs/owner-decisions/naming-assets.md\` (ODR-0001)
@@ -275,40 +381,58 @@ npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag
 
 ---
 
-## Post-Approval Execution (Owner Only)
+## Post-Approval Execution (Owner Only — follow this exact order)
 
 \`\`\`bash
-# 1. Publish to npm registry (owner execution only)
-npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag beta
+# 0. Preflight (from the commit containing these attested artifacts)
+cd docs/releases/beta
+sha256sum --check SHA256SUMS
+cd ../..
+npm whoami                                   # must be authenticated as the owner
+npm view lugas version 2>/dev/null           # MUST fail (404) — package still unclaimed
 
-# 2. Tag the APPROVED release SHA explicitly (never ambient HEAD)
-git tag -a "v${BETA_VERSION}" "${commit}" -m "LugasJS v${BETA_VERSION} release candidate"
+# 1. Pin the reviewed source BEFORE the irreversible registry action
+git tag -a "v${BETA_VERSION}" "${PACKAGE_SOURCE_SHA}" -m "LugasJS v${BETA_VERSION} release candidate"
 git push origin "v${BETA_VERSION}"
 
-# 3. Create GitHub Release with RELEASE_PACKET.md notes
-gh release create "v${BETA_VERSION}" ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --title "v${BETA_VERSION}" --notes-file ./docs/releases/beta/RELEASE_PACKET.md --prerelease
+# 2. Publish the exact attested tarball
+npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag beta
+
+# 3. Post-publication verification
+npm view lugas@${BETA_VERSION} version dist.integrity dist.tarball
+npm dist-tag ls lugas                        # beta -> ${BETA_VERSION} (NOT latest)
+
+# 4. GitHub release with the attested artifacts
+gh release create "v${BETA_VERSION}" \
+  ./docs/releases/beta/lugas-${BETA_VERSION}.tgz \
+  ./docs/releases/beta/SHA256SUMS \
+  ./docs/releases/beta/provenance.json \
+  ./docs/releases/beta/sbom.json \
+  --title "v${BETA_VERSION}" \
+  --notes-file ./docs/releases/beta/RELEASE_PACKET.md \
+  --prerelease
 \`\`\`
-`;
+
+*Note: The namespace check in step 0 is not a reservation — re-verify immediately before step 2.*
+`
 
   writeFileSync(resolve(OUT_DIR, "CHECKLIST.md"), checklist);
   console.log(`✓ CHECKLIST.md generated (${checklist.length} bytes)`);
 
   // 3. Compute SHA256SUMS over ALL release artifacts INCLUDING the exact
-  // tarball (M6R3): publication bytes must be checksum-attested in-repo.
-  const tarballName = `lugas-${BETA_VERSION}.tgz`;
-  const tarballPath = resolve(OUT_DIR, tarballName);
-  if (!existsSync(tarballPath)) {
-    console.error(
-      `✗ exact tarball missing: ${tarballPath} — run 'bun run release:package:rehearse' first (M6R3 requires the publication bytes to be attested)`,
-    );
-    process.exit(1);
-  }
-  const betaFiles = readdirSync(OUT_DIR)
+  // tarball and the machine-readable evidence + rehearsal results (M6R5).
+  const manifestEntries = readdirSync(OUT_DIR)
     .filter((f) => f !== "SHA256SUMS" && !f.startsWith("."))
     .sort();
-  if (!betaFiles.includes(tarballName)) betaFiles.unshift(tarballName);
-
-  const sums = betaFiles.map((name) => {
+  if (!manifestEntries.includes(tarballName)) {
+    fail("SHA256SUMS must cover the exact tarball");
+  }
+  for (const requiredManifest of ["release-evidence.json", "package-rehearsal.json"]) {
+    if (!manifestEntries.includes(requiredManifest)) {
+      fail(`SHA256SUMS must cover ${requiredManifest}`);
+    }
+  }
+  const sums = manifestEntries.map((name) => {
     const data = readFileSync(resolve(OUT_DIR, name));
     return `${sha256(data)}  ${name}`;
   });

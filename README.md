@@ -2,7 +2,7 @@
 
 **Lugas** is a small, explicit, Bun-native TypeScript framework: raw `Bun.serve` performance with typed routes, Standard Schema validation, ordered guards with typed context enrichment, RFC 9457 Problem Details errors, an end-to-end typed client, and test helpers — with **zero production runtime dependencies**.
 
-> **Status:** public beta **v0.1.0-beta.1** · Runtime: **Bun 1.4.x** · License: Apache-2.0
+> **Status:** publication-ready beta candidate **v0.1.0-beta.1** (registry publication pending owner sign-off) · Runtime: **Bun 1.4.x** · License: Apache-2.0
 
 ## Install
 
@@ -36,13 +36,6 @@ Run it:
 // server.ts
 import app from "./app"; // the defineApp instance above
 
-const server = Bun.serve(app.serve({ port: 3000 }).options ?? {});
-console.log(`listening on ${server.url}`);
-```
-
-Or start it directly from the app instance:
-
-```ts
 const server = app.serve({ port: 3000 });
 console.log(`listening on ${server.url}`);
 ```
@@ -113,8 +106,8 @@ await server.stop();
 ## CLI
 
 ```bash
-bun run src/cli/main.ts routes ./app.ts    # human-readable route table
-bun run src/cli/main.ts inspect ./app.ts   # full manifest JSON (lugas-manifest-v1)
+bunx lugas routes ./app.ts    # human-readable route table
+bunx lugas inspect ./app.ts   # full manifest JSON (lugas-manifest-v1)
 ```
 
 ## Error handling

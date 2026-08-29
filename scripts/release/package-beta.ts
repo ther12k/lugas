@@ -19,6 +19,7 @@
  * Usage: bun run release:package:rehearse
  */
 import { createHash } from "node:crypto";
+// (createHash used for the machine-readable rehearsal result, M6R5)
 import { execSync } from "node:child_process";
 import {
   cpSync,
@@ -39,6 +40,8 @@ const BETA_VERSION = "0.1.0-beta.1";
 
 type CheckResult = { name: string; ok: boolean; detail: string };
 const results: CheckResult[] = [];
+// M6R5: rehearsal result is machine-readable and consumed by the packet builder.
+const REHEARSAL_RESULT_PATH = resolve(ROOT, "docs", "releases", "beta", "package-rehearsal.json");
 
 function check(name: string, ok: boolean, detail: string): void {
   results.push({ name, ok, detail });
@@ -307,9 +310,25 @@ export default defineApp({ routes: { "/x": { GET: route({ handler: () => text(20
   const hasNotice = inventory.files.some((f) => f === "NOTICE");
   check("NOTICE file ships in tarball", hasNotice, hasNotice ? "NOTICE present (ODR-0002 attribution)" : "MISSING");
 
-  // Summary
+  // Summary + machine-readable result (M6R5)
   const failed = results.filter((r) => !r.ok);
+  const summary = {
+    format: "lugas-package-rehearsal-v1",
+    packageSourceCommit: execSync("git rev-parse HEAD", { cwd: ROOT, encoding: "utf8" }).trim(),
+    tarballSha256: createHash("sha256").update(readFileSync(tgzOut)).digest("hex"),
+    checksPassed: results.length - failed.length,
+    checksTotal: results.length,
+    entryCount,
+    noticePresent: results.some((r) => r.name.startsWith("NOTICE") && r.ok),
+    licensePresent: results.some((r) => r.name.startsWith("license") && r.ok),
+    dryRunPublishPassed: results.some((r) => r.name.includes("dry-run") && r.ok),
+    generatedAt: new Date().toISOString(),
+  };
+  mkdirSync(resolve(ROOT, "docs", "releases", "beta"), { recursive: true });
+  writeFileSync(REHEARSAL_RESULT_PATH, JSON.stringify(summary, null, 2) + "\n");
+
   console.log(`\n=== Rehearsal summary: ${results.length - failed.length}/${results.length} checks passed ===`);
+  console.log(`Rehearsal result written to docs/releases/beta/package-rehearsal.json`);
 
   console.log(`
 Publication command (DOCUMENTED, NOT EXECUTED):
