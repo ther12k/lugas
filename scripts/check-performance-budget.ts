@@ -26,6 +26,20 @@ const BASELINES_PATH = resolve(ROOT, "benchmarks", "baselines", "m5-accepted.jso
 const RESULTS_DIR = resolve(ROOT, "benchmarks", "results");
 
 const RELEASE_MODE = process.argv.includes("--release");
+/**
+ * M6R5 two-identity model:
+ *  - attestationCommit: HEAD where the gate runs (this checkout).
+ *  - packageSourceCommit: the tree the beta package was built from, pinned
+ *    explicitly via --package-source-sha (or LUGAS_PACKAGE_SOURCE_SHA).
+ * Evidence records BOTH; equality is not required (a release pipeline
+ * attests a source commit from a later attestation checkout).
+ */
+function argValue(name: string): string | undefined {
+  const i = process.argv.indexOf(name);
+  return i !== -1 ? process.argv[i + 1] : undefined;
+}
+const PACKAGE_SOURCE_SHA =
+  argValue("--package-source-sha") ?? process.env.LUGAS_PACKAGE_SOURCE_SHA ?? null;
 /** Expected independent runs per archived sample set, matching the runners. */
 const EXPECTED_RUNS = 5;
 
@@ -85,7 +99,7 @@ function headCommit(): string {
  */
 function findResults(
   scenario: string,
-): { status: "no-archive" } | { status: "no-scenario" } | { status: "ok"; samples: Sample[]; env: ArchiveEnv } {
+): { status: "no-archive" } | { status: "no-scenario" } | { status: "ok"; samples: Sample[]; rawComparatorSamples: Sample[]; env: ArchiveEnv } {
   const source = SCENARIO_SOURCE[scenario];
   if (source === undefined || !existsSync(source.file)) return { status: "no-archive" };
   const data = JSON.parse(readFileSync(source.file, "utf8")) as {
@@ -103,15 +117,25 @@ function findResults(
     if (matching.length === 0 || matching.every((m) => !Array.isArray(m.samples))) {
       return { status: "no-scenario" };
     }
+    // Keep the raw-Bun comparator of the SAME scenario for overhead reporting.
+    const rawComparator = data.results.find(
+      (r) => r.scenario === source.scenarioField && r.framework === "raw-bun",
+    );
     return {
       status: "ok",
       samples: matching.flatMap((m) => m.samples),
+      rawComparatorSamples: Array.isArray(rawComparator?.samples) ? rawComparator!.samples : [],
       env: data.env ?? {},
     };
   }
   // Validated format: separate top-level arrays per framework.
   if (!Array.isArray(data.lugas)) return { status: "no-scenario" };
-  return { status: "ok", samples: data.lugas, env: data.env ?? {} };
+  return {
+    status: "ok",
+    samples: data.lugas,
+    rawComparatorSamples: Array.isArray(data.raw) ? data.raw : [],
+    env: data.env ?? {},
+  };
 }
 
 function median(values: number[]): number {
@@ -136,6 +160,8 @@ function main() {
   let skippedScenarios = 0;
   /** Measured medians per scenario, recorded for machine-readable evidence (M6R4). */
   const lastMedians: Record<string, number> = {};
+  /** Raw-Bun comparator medians (per-scenario overhead denominators, M6R5). */
+  const lastRawMedians: Record<string, number> = {};
   let lastTypecheckMs: number | null = null;
   let lastBundleBytes: number | null = null;
 
@@ -176,7 +202,10 @@ function main() {
       continue;
     }
 
-    const { samples, env } = found;
+    const { samples, env, rawComparatorSamples } = found;
+    if (rawComparatorSamples.length > 0) {
+      lastRawMedians[scenario] = median(rawComparatorSamples.map((x) => x.rps));
+    }
 
     if (samples.length < EXPECTED_RUNS) {
       console.error(`✗ ${scenario}: ${samples.length} lugas sample(s) < expected ${EXPECTED_RUNS} runs`);
@@ -190,10 +219,12 @@ function main() {
       continue;
     }
 
-    // Candidate binding (M6R2 #280): release mode requires archive @ HEAD.
+    // Candidate binding (M6R2 #280; M6R5 two-identity): archives must be
+    // bound to the package source tree when pinned, else to attestation HEAD.
     if (RELEASE_MODE) {
-      if (!env.commit || !head || env.commit !== head) {
-        console.error(`✗ ${scenario}: archive commit ${env.commit ?? "(none)"} ≠ candidate ${head || "(unknown)"} — stale evidence`);
+      const requiredCommit = PACKAGE_SOURCE_SHA ?? head;
+      if (!env.commit || !requiredCommit || env.commit !== requiredCommit) {
+        console.error(`✗ ${scenario}: archive commit ${env.commit ?? "(none)"} ≠ package source ${requiredCommit || "(unknown)"} — stale evidence`);
         failures++;
         continue;
       }
@@ -306,8 +337,9 @@ function main() {
     }
 
     const evidence = {
-      format: "lugas-release-evidence-v1",
-      candidateCommit: head || null,
+      format: "lugas-release-evidence-v2",
+      packageSourceCommit: PACKAGE_SOURCE_SHA,
+      attestationCommit: head || null,
       measuredAt: new Date().toISOString(),
       bunVersion: process.versions.bun,
       plainStaticRps: lastMedians["plain-static"] ?? null,
@@ -316,6 +348,8 @@ function main() {
       typecheckMs: lastTypecheckMs,
       clientBundleBytes: lastBundleBytes,
       tarballSha256: tarballHash,
+      rawBunPlainStaticRps: lastRawMedians["plain-static"] ?? null,
+      rawBunValidatedPostRps: lastRawMedians["validated-post"] ?? null,
       blockingFailures: failures,
       alerts,
     };
