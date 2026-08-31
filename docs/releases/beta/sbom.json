@@ -1,0 +1,36 @@
+{
+  "format": "lugas-sbom-v0",
+  "generatedAt": "2026-08-31T02:30:32.702Z",
+  "packageName": "lugas",
+  "packageVersion": "0.1.0-beta.1",
+  "derivation": "staged package.json dependencies/optionalDependencies/peerDependencies",
+  "productionDependencies": [],
+  "devDependencies": [
+    {
+      "name": "@standard-schema/spec",
+      "scope": "dev"
+    },
+    {
+      "name": "@types/bun",
+      "scope": "dev"
+    },
+    {
+      "name": "elysia",
+      "scope": "dev"
+    },
+    {
+      "name": "typescript",
+      "scope": "dev"
+    },
+    {
+      "name": "valibot",
+      "scope": "dev"
+    },
+    {
+      "name": "zod",
+      "scope": "dev"
+    }
+  ],
+  "tarballEntryCount": 70,
+  "zeroProductionRuntimeDependency": true
+}
