@@ -87,7 +87,8 @@ type _t27 = Expect<Equal<Jsonify<{ value: void }>, {}>>;
 
 // 10. Non-JSON slots pass through honestly instead of lying.
 type _t16 = Expect<Equal<Jsonify<unknown>, unknown>>;
-type _t17 = Expect<Equal<Jsonify<{ any: any }>, { any: any }>>;
+// `any` may be undefined, so the key is possibly absent (M6R12 sentinel model).
+type _t17 = Expect<Equal<Jsonify<{ any: any }>, { any?: any }>>;
 
 // 11. The helper's brand reflects the wire shape end-to-end.
 const res = json(200, { at: new Date() });

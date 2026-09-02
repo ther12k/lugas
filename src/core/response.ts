@@ -33,17 +33,24 @@ export type TypedResponse<S extends number = number, B = unknown> = Response & {
  * conflated with a drop), and root bodies that serialize to no JSON text
  * are rejected by `json()` with `LUGAS_RESPONSE_005`.
  */
-export type Jsonify<T> = StripThrows<JsonifyRaw<T>>;
+export type Jsonify<T> = WireValue<JsonifyRaw<T>>;
 
 /** Hook application at one position: `toJSON` invoked at most once. ECMAScript checks callability only — any callable `toJSON` is a hook regardless of its parameter list (M6R11); a non-callable `toJSON` stays an ordinary member. */
 type HookOnce<T> = T extends { readonly toJSON: infer F } ? (F extends (...args: any[]) => infer J ? J : T) : T;
 
 /**
- * Internal sentinel for "serialization throws" (bigint at any position,
- * including hook results). Distinct from `never` (= "serializes to
- * `undefined`": dropped/null) so drop classification can never conflate the
- * two outcomes (M6R10).
+ * Internal outcome sentinels, kept as distinct union members through
+ * post-hook classification so neither can be erased by union reduction
+ * (`never` absorbs into unions; sentinels do not):
+ * - `JsonDrops` — the position serializes to `undefined` (undefined,
+ *   function, symbol, `void`, or a hook result that is one of those): key
+ *   omitted from objects, `null` substituted in array elements (M6R12).
+ * - `JsonThrows` — serialization throws (`bigint` at any position, including
+ *   hook results): no wire representation ever exists.
  */
+declare const jsonDropsSentinel: unique symbol;
+type JsonDrops = typeof jsonDropsSentinel;
+
 declare const jsonThrowsSentinel: unique symbol;
 type JsonThrows = typeof jsonThrowsSentinel;
 
@@ -57,7 +64,7 @@ type JsonifyAfterHook<T> =
   0 extends 1 & T
     ? T
     : T extends Function | symbol | undefined | void
-      ? never
+      ? JsonDrops
       : T extends bigint
         ? JsonThrows
         : T extends number
@@ -72,33 +79,36 @@ type JsonifyAfterHook<T> =
                   ? JsonifyObject<T>
                   : T;
 
-/** Raw post-hook wire type at one position (throw positions carry the sentinel). */
+/** Raw post-hook outcome at one position (drops and throws carry their sentinels). */
 type JsonifyRaw<T> = JsonifyAfterHook<HookOnce<T>>;
 
-/** Public value positions: a throw means no value ever exists — typed `never`, not a wire type. */
-type StripThrows<T> = T extends JsonThrows ? never : T;
+/** The serializable part of a raw outcome; sentinels are not wire values. */
+type WireValue<R> = Exclude<R, JsonDrops | JsonThrows>;
 
-/** Member value position: fresh `HookOnce`, throw stripped to `never` (M6R10). */
-type JsonifyProperty<V> = StripThrows<JsonifyRaw<V>>;
+/** True when the raw outcome includes a drop (member optional / element `null`). */
+type HasDrop<R> = [Extract<R, JsonDrops>] extends [never] ? false : true;
+
+/** Member value position: fresh `HookOnce`; sentinels stripped to `never` (throw) / key-omission (drop, via MemberDrops). */
+type JsonifyProperty<V> = WireValue<JsonifyRaw<V>>;
 
 /** General `number` may be `NaN`/`±Infinity`, which serialize as JSON `null`; finite numeric literals stay exact (M6R9). */
 type JsonifyNumber<N extends number> = number extends N ? N | null : N;
 
 /**
- * Per-member: does this value serialize to `undefined` (so the key is
- * omitted)? Classified from the raw post-hook result — `never` means drop;
- * the throw sentinel is explicitly NOT a drop (M6R10).
+ * Per-member outcome flags, read from the raw post-hook result (sentinels
+ * preserved): `may` — a drop outcome is possible (key optional); `has` — a
+ * serializable value is possible (key contributes a wire value). A
+ * union-returning hook (`toJSON(): string | undefined`) yields
+ * `string | JsonDrops`, so both flags hold and the key becomes optional
+ * (M6R12).
  */
-type MemberDrops<V> = V extends V
-  ? [JsonifyRaw<V>] extends [never]
-    ? true
-    : false
-  : never;
+type MemberMayDrop<V> = HasDrop<JsonifyRaw<V>>;
+type MemberHasValue<V> = [WireValue<JsonifyRaw<V>>] extends [never] ? false : true;
 
-type DropFlags<T> = { [K in keyof T]: MemberDrops<T[K]> };
+type DropFlags<T> = { [K in keyof T]: { readonly may: MemberMayDrop<T[K]>; readonly has: MemberHasValue<T[K]> } };
 
 /**
- * Object position (M6R9/M6R10): members that never drop stay required; members
+ * Object position (M6R9–M6R12): members that never drop stay required; members
  * that may drop become optional with the non-dropped value type; members
  * that always drop are removed entirely; members whose serialization throws
  * stay required with `never`. Key decisions come from the pre-evaluated flag
@@ -111,8 +121,8 @@ type JsonifyObject<T extends object> = Simplify<
   { [K in RequiredKeys<T>]: JsonifyProperty<T[K]> } & { [K in OptionalKeys<T>]?: JsonifyProperty<T[K]> }
 >;
 
-type RequiredKeys<T> = { [K in keyof DropFlags<T>]: DropFlags<T>[K] extends false ? K : never }[keyof T];
-type OptionalKeys<T> = { [K in keyof DropFlags<T>]: true extends DropFlags<T>[K] ? (false extends DropFlags<T>[K] ? K : never) : never }[keyof T];
+type RequiredKeys<T> = { [K in keyof DropFlags<T>]: DropFlags<T>[K]["may"] extends false ? K : never }[keyof T];
+type OptionalKeys<T> = { [K in keyof DropFlags<T>]: DropFlags<T>[K]["may"] extends true ? (DropFlags<T>[K]["has"] extends true ? K : never) : never }[keyof T];
 
 /** Single homomorphic pass that flattens intersections without losing modifiers or index signatures. */
 type Simplify<T> = { [K in keyof T]: T[K] };
@@ -120,17 +130,15 @@ type Simplify<T> = { [K in keyof T]: T[K] };
 /**
  * Element position for arrays: `JSON.stringify` substitutes `null` only for
  * elements that serialize to `undefined`; an element whose serialization
- * throws (bigint, hook→bigint) stays `never` — an abrupt throw completion is
- * never converted to `null` (M6R11: classify the raw outcome before
- * stripping the sentinel).
+ * throws (bigint, hook→bigint) contributes `never` — an abrupt throw
+ * completion is never converted to `null` (M6R11/M6R12: outcomes are read
+ * from the raw result, sentinels preserved until projection).
  */
 type JsonifyElement<V> = V extends V
   ? JsonifyRaw<V> extends infer R
-    ? [R] extends [never]
-      ? null
-      : [R] extends [JsonThrows]
-        ? never
-        : StripThrows<R>
+    ? HasDrop<R> extends true
+      ? WireValue<R> | null
+      : WireValue<R>
     : never
   : never;
 

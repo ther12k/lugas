@@ -141,3 +141,9 @@
 - #323: `JsonifyElement` classifies the raw post-hook outcome before stripping the throw sentinel — raw `never` → drop → `null`, raw throw sentinel → `never`, otherwise the value. `bigint`/hook-bigint array elements are throw-signaled again instead of `null` (an abrupt throw completion is never converted to `null` by `SerializeJSONArray`).
 - #323: hook detection is callability-only (`toJSON: infer F` + callable check) — any callable `toJSON` is a hook regardless of parameter list, matching runtime; non-callable `toJSON` stays an ordinary member.
 - #315 re-anchored to the post-M6R11 candidate; still the single mechanical transition before publication is reconsidered.
+
+## 2026-09-02 — M6R12 drop sentinel for union-returning hooks
+
+- #325: drops now carry a durable internal sentinel (`JsonDrops`) alongside `JsonThrows`; post-hook outcomes survive union reduction, so a single `toJSON(): string | undefined` hook keeps both branches — member keys become optional, array elements include `null`, drop+throw hooks collapse correctly to omission/`null`. Keyset flags read two dimensions (may-drop / has-value) from the raw outcome; a never-returning hook classifies as a throw-signal; `any` members honestly become optional.
+- Typed-wire boundary declared **settled for the beta scope**: prototype/enumerability approximation, cycles, and `problem()` Jsonification stand as explicit beta limitations.
+- #315 re-anchored to the post-M6R12 candidate; still the single mechanical transition before publication is reconsidered.
