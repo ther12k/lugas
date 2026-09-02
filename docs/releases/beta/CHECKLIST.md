@@ -2,8 +2,8 @@
 
 | Field | Value |
 |---|---|
-| Package Source Commit | `0b79f09959263599dca16eb9128269cda9d6f285` (tag must point here) |
-| Attestation Commit | `0b79f09959263599dca16eb9128269cda9d6f285` (checkout that ran the gate + builder) |
+| Package Source Commit | `2ed954deb648cdb8e40d7b05e6c0cb0d116f050b` (tag must point here) |
+| Attestation Commit | `2ed954deb648cdb8e40d7b05e6c0cb0d116f050b` (checkout that ran the gate + builder) |
 | Target Package | `lugas@0.1.0-beta.1` |
 | Registry Target | `https://registry.npmjs.org/` with tag `beta` |
 
@@ -43,7 +43,7 @@ if npm view lugas version >/dev/null 2>&1; then  # the name MUST still be unclai
 fi
 
 # 1. Pin the reviewed source BEFORE the irreversible registry action
-git tag -a "v0.1.0-beta.1" "0b79f09959263599dca16eb9128269cda9d6f285" -m "LugasJS v0.1.0-beta.1 release candidate"
+git tag -a "v0.1.0-beta.1" "2ed954deb648cdb8e40d7b05e6c0cb0d116f050b" -m "LugasJS v0.1.0-beta.1 release candidate"
 git push origin "v0.1.0-beta.1"
 
 # 2. Publish the exact attested tarball
