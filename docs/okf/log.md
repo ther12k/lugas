@@ -135,3 +135,9 @@
 - Runtime ground truth locked with hook call-counters through a live json()/client round-trip (outer positions called, inner hook never entered) plus keyed-hook and hook-bigint probes.
 - Bookkeeping: M6R9's "zero runtime change" summary phrase corrected — the M6R9 LUGAS_RESPONSE_005 root-body check was an intentional runtime correction.
 - #315 re-anchored to the post-M6R10 candidate; still the single mechanical transition before publication is reconsidered.
+
+## 2026-09-02 — M6R11 array-throw preservation + callability-only hooks
+
+- #323: `JsonifyElement` classifies the raw post-hook outcome before stripping the throw sentinel — raw `never` → drop → `null`, raw throw sentinel → `never`, otherwise the value. `bigint`/hook-bigint array elements are throw-signaled again instead of `null` (an abrupt throw completion is never converted to `null` by `SerializeJSONArray`).
+- #323: hook detection is callability-only (`toJSON: infer F` + callable check) — any callable `toJSON` is a hook regardless of parameter list, matching runtime; non-callable `toJSON` stays an ordinary member.
+- #315 re-anchored to the post-M6R11 candidate; still the single mechanical transition before publication is reconsidered.

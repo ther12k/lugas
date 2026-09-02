@@ -157,4 +157,35 @@ describe("toJSON position semantics (M6R10)", () => {
     expect(() => JSON.stringify({ value: hookBig })).toThrow(TypeError);
     expect(() => json(200, { value: hookBig })).toThrow(TypeError);
   });
+
+  test("bigint and hook-bigint ARRAY elements throw, never become null (M6R11)", () => {
+    expect(() => JSON.stringify([1n])).toThrow(TypeError);
+    expect(() => json(200, [1n])).toThrow(TypeError);
+    const hookBig = { toJSON(): bigint { return 1n; } };
+    expect(() => json(200, [hookBig])).toThrow(TypeError);
+  });
+
+  test("any callable toJSON is a hook regardless of parameter signature (M6R11)", async () => {
+    const oddCallable = {
+      toJSON(_key: number): { ok: boolean } {
+        return { ok: true };
+      },
+    };
+    const appOdd = defineApp({
+      routes: {
+        "/odd-hook": {
+          GET: route({ handler: () => json(200, { value: oddCallable }) }),
+        },
+      },
+    });
+    const server = createTestServer(appOdd, { port: 0 });
+    const client = createClient<AppContract<typeof appOdd>>({ baseUrl: server.url });
+    const result = await client.get("/odd-hook");
+    await server.stop();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const data: { value: { ok: boolean } } = result.data;
+      expect(data.value).toEqual({ ok: true });
+    }
+  });
 });
