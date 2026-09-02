@@ -127,3 +127,11 @@
 - Implementation note: drop analysis reads off a pre-evaluated flag object (`DropFlags`) because recursive conditionals inside deferred keyset/`as`-clause evaluation misfire under tsc 7.0.2 (probed); the brand is flattened via one homomorphic pass so it stays identity-comparable with plain object literals.
 - Bookkeeping: the M6R8 close-out's "8/8 checks" is corrected to the actual 7 named checks (6 compatibility cells + verify).
 - #315 remains the single mechanical transition, now anchored to the post-M6R9 candidate; publication stays an owner-authorized action after it.
+
+## 2026-09-02 — M6R10 toJSON position semantics
+
+- #321: `Jsonify` now models ECMA-262 exactly — `toJSON` is invoked at most once per serialization position (with the property key; key-bearing signatures accepted), and a `toJSON` found on the hook's replacement value is not re-entered at that position; only member/element positions restart the hook. The previous recursive chain mis-typed chained hooks as `never`/drops where JS produces objects.
+- #321: throw and drop are distinct outcomes — an internal sentinel carries "serializes by throwing" (bigint at any position, including hook results) through drop classification; throw positions brand `never` and stay required, never collapsed to omitted keys.
+- Runtime ground truth locked with hook call-counters through a live json()/client round-trip (outer positions called, inner hook never entered) plus keyed-hook and hook-bigint probes.
+- Bookkeeping: M6R9's "zero runtime change" summary phrase corrected — the M6R9 LUGAS_RESPONSE_005 root-body check was an intentional runtime correction.
+- #315 re-anchored to the post-M6R10 candidate; still the single mechanical transition before publication is reconsidered.

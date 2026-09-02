@@ -16,26 +16,50 @@ export type TypedResponse<S extends number = number, B = unknown> = Response & {
 
 /**
  * Compile-time mirror of what `JSON.stringify` actually puts on the wire
- * (M6R7–M6R9). `toJSON` results are unwrapped recursively (`Date` arrives as
- * `string`); values that serialize to `undefined` — functions, symbols,
- * `undefined`, `void`, or a `toJSON` chain ending in one — are dropped from
- * objects and substituted as `null` in array elements; members that only
- * *may* drop become optional properties; general `number` widens to
- * `number | null` because `NaN` and `±Infinity` serialize as `null` (finite
- * numeric literals stay exact); `Map`/`Set` serialize to an empty object.
- * Two exceptions are explicit: a `bigint` anywhere makes `JSON.stringify`
- * throw a `TypeError` before a wire representation exists (typed `never` — a
- * throw-signal, not a wire type), and root bodies that serialize to no JSON
- * text are rejected by `json()` with `LUGAS_RESPONSE_005`.
+ * (M6R7–M6R10). Modeled per ECMA-262 `SerializeJSONProperty`: at each
+ * serialization position the value's `toJSON` is invoked **at most once**
+ * (with the property key), the result replaces the value, and serialization
+ * proceeds — a `toJSON` found on the replacement is *not* re-entered at the
+ * same position; only member/element positions start fresh hook
+ * opportunities. A general `number` widens to `number | null`
+ * (`NaN`/`±Infinity` serialize as `null`; finite literals stay exact).
+ * Values that serialize to `undefined` (functions, symbols, `undefined`,
+ * `void`, or a hook result that is one of those) are dropped from objects
+ * and substituted as `null` in array elements; members that only *may* drop
+ * become optional properties. `Map`/`Set` serialize to an empty object.
+ * Two exceptions are explicit and distinct: a `bigint` at any position —
+ * including as a hook result — makes `JSON.stringify` throw a `TypeError`
+ * before a wire representation exists (a throw-signal typed `never`, never
+ * conflated with a drop), and root bodies that serialize to no JSON text
+ * are rejected by `json()` with `LUGAS_RESPONSE_005`.
  */
-export type Jsonify<T> = 0 extends 1 & T
-  ? T
-  : T extends { readonly toJSON: () => infer J }
-    ? Jsonify<J>
+export type Jsonify<T> = StripThrows<JsonifyRaw<T>>;
+
+/** Hook application at one position: `toJSON` invoked at most once, key-bearing signatures accepted (M6R10). */
+type HookOnce<T> = T extends { readonly toJSON: (key: string) => infer J } ? J : T;
+
+/**
+ * Internal sentinel for "serialization throws" (bigint at any position,
+ * including hook results). Distinct from `never` (= "serializes to
+ * `undefined`": dropped/null) so drop classification can never conflate the
+ * two outcomes (M6R10).
+ */
+declare const jsonThrowsSentinel: unique symbol;
+type JsonThrows = typeof jsonThrowsSentinel;
+
+/**
+ * Post-hook serialization at one position: no further `toJSON` is consulted
+ * here. Member and element positions restart from `JsonifyProperty` /
+ * `JsonifyElement`, which each apply `HookOnce` once more — matching the
+ * specification's per-position hook.
+ */
+type JsonifyAfterHook<T> =
+  0 extends 1 & T
+    ? T
     : T extends Function | symbol | undefined | void
       ? never
       : T extends bigint
-        ? never
+        ? JsonThrows
         : T extends number
           ? JsonifyNumber<T>
           : T extends string | boolean | null
@@ -48,38 +72,43 @@ export type Jsonify<T> = 0 extends 1 & T
                   ? JsonifyObject<T>
                   : T;
 
+/** Raw post-hook wire type at one position (throw positions carry the sentinel). */
+type JsonifyRaw<T> = JsonifyAfterHook<HookOnce<T>>;
+
+/** Public value positions: a throw means no value ever exists — typed `never`, not a wire type. */
+type StripThrows<T> = T extends JsonThrows ? never : T;
+
+/** Member value position: fresh `HookOnce`, throw stripped to `never` (M6R10). */
+type JsonifyProperty<V> = StripThrows<JsonifyRaw<V>>;
+
 /** General `number` may be `NaN`/`±Infinity`, which serialize as JSON `null`; finite numeric literals stay exact (M6R9). */
 type JsonifyNumber<N extends number> = number extends N ? N | null : N;
 
 /**
  * Per-member: does this value serialize to `undefined` (so the key is
- * omitted)? Every `undefined`-serializing member of `T[K]` makes `Jsonify<V>`
- * `never`, so the drop test piggybacks on `Jsonify` itself — which evaluates
- * reliably per key — instead of running a separate recursion inside keyset
- * computation. `bigint` members throw instead of dropping and are never
- * classified as dropped (M6R9).
+ * omitted)? Classified from the raw post-hook result — `never` means drop;
+ * the throw sentinel is explicitly NOT a drop (M6R10).
  */
 type MemberDrops<V> = V extends V
-  ? [V] extends [bigint]
-    ? false
-    : [Jsonify<V>] extends [never]
-      ? true
-      : false
+  ? [JsonifyRaw<V>] extends [never]
+    ? true
+    : false
   : never;
 
 type DropFlags<T> = { [K in keyof T]: MemberDrops<T[K]> };
 
 /**
- * Object position (M6R9): members that never drop stay required; members
+ * Object position (M6R9/M6R10): members that never drop stay required; members
  * that may drop become optional with the non-dropped value type; members
- * that always drop are removed entirely. Key decisions come from the
- * pre-evaluated flag object; the two complementary keysets are flattened
- * into one object type so the brand stays identity-comparable with plain
- * object literals. (Non-homomorphic mapping: `readonly` modifiers on bodies
- * are not carried into the brand — wire payloads are freshly decoded.)
+ * that always drop are removed entirely; members whose serialization throws
+ * stay required with `never`. Key decisions come from the pre-evaluated flag
+ * object; the two complementary keysets are flattened into one object type
+ * so the brand stays identity-comparable with plain object literals.
+ * (Non-homomorphic mapping: `readonly` modifiers on bodies are not carried
+ * into the brand — wire payloads are freshly decoded.)
  */
 type JsonifyObject<T extends object> = Simplify<
-  { [K in RequiredKeys<T>]: Jsonify<T[K]> } & { [K in OptionalKeys<T>]?: Jsonify<T[K]> }
+  { [K in RequiredKeys<T>]: JsonifyProperty<T[K]> } & { [K in OptionalKeys<T>]?: JsonifyProperty<T[K]> }
 >;
 
 type RequiredKeys<T> = { [K in keyof DropFlags<T>]: DropFlags<T>[K] extends false ? K : never }[keyof T];
@@ -88,13 +117,17 @@ type OptionalKeys<T> = { [K in keyof DropFlags<T>]: true extends DropFlags<T>[K]
 /** Single homomorphic pass that flattens intersections without losing modifiers or index signatures. */
 type Simplify<T> = { [K in keyof T]: T[K] };
 
-/** Element position for arrays: `JSON.stringify` substitutes `null` for elements that serialize to `undefined` (M6R8/M6R9). */
+/**
+ * Element position for arrays: `JSON.stringify` substitutes `null` for
+ * elements that serialize to `undefined`; an element whose serialization
+ * throws stays `never` (M6R10).
+ */
 type JsonifyElement<V> = V extends V
-  ? V extends { readonly toJSON: () => infer J }
-    ? JsonifyElement<J>
-    : V extends Function | symbol | undefined | void
+  ? StripThrows<JsonifyRaw<V>> extends infer E
+    ? [E] extends [never]
       ? null
-      : Jsonify<V>
+      : E
+    : never
   : never;
 
 /**
