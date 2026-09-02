@@ -14,7 +14,7 @@
  * Data-only diagnostic results (non-throwing, e.g. path analysis) reuse the
  * same code registry through the `LugasDiagnostic` shape.
  */
-export type DiagnosticFamily = "APP" | "MODULE" | "ROUTE" | "GUARD" | "ROUTES" | "TEST";
+export type DiagnosticFamily = "APP" | "MODULE" | "ROUTE" | "GUARD" | "ROUTES" | "RESPONSE" | "TEST";
 
 export type DiagnosticCode =
   | "LUGAS_APP_001" | "LUGAS_APP_002" | "LUGAS_APP_003" | "LUGAS_APP_004" | "LUGAS_APP_005" | "LUGAS_APP_006"
@@ -23,6 +23,7 @@ export type DiagnosticCode =
   | "LUGAS_GUARD_001" | "LUGAS_GUARD_002" | "LUGAS_GUARD_003" | "LUGAS_GUARD_004"
   | "LUGAS_GUARD_005" | "LUGAS_GUARD_006" | "LUGAS_GUARD_007"
   | "LUGAS_ROUTES_001" | "LUGAS_ROUTES_002" | "LUGAS_ROUTES_003" | "LUGAS_ROUTES_004"
+  | "LUGAS_RESPONSE_001" | "LUGAS_RESPONSE_002" | "LUGAS_RESPONSE_003" | "LUGAS_RESPONSE_004"
   | "LUGAS_TEST_001"
   | "LUGAS_CLI_001";
 
@@ -78,6 +79,10 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_ROUTES_002", thrownBy: "defineApp()", meaning: "unsupported route entry under a method key", hint: "use route() descriptors, native Response values, functions, or {dir}" },
   { code: "LUGAS_ROUTES_003", thrownBy: "defineApp()", meaning: "unsupported route entry shape", hint: "same allowed shapes as LUGAS_ROUTES_002" },
   { code: "LUGAS_ROUTES_004", thrownBy: "path analysis", meaning: "invalid route path", hint: "paths must start with '/' and follow Bun route syntax" },
+  { code: "LUGAS_RESPONSE_001", thrownBy: "json()", meaning: "content-type override is not a JSON media type", hint: "json() owns application/json and application/*+json; omit the override or use text()" },
+  { code: "LUGAS_RESPONSE_002", thrownBy: "text()", meaning: "content-type override is not a text media type", hint: "text() owns text/*; omit the override or use json()" },
+  { code: "LUGAS_RESPONSE_003", thrownBy: "problem()", meaning: "content-type override is not application/problem+json", hint: "problem() owns application/problem+json (RFC 9457); omit the override or use json()" },
+  { code: "LUGAS_RESPONSE_004", thrownBy: "empty()", meaning: "content-type override on a bodyless response", hint: "empty() owns no body; a response without a body cannot declare a content type" },
   { code: "LUGAS_CLI_001", thrownBy: "lugas CLI", meaning: "invalid CLI option value", hint: "--timeout must be a positive integer in milliseconds" },
   { code: "LUGAS_TEST_001", thrownBy: "createTestServer()", meaning: "forbidden server override option", hint: "the test server inherits routes/errors from the app; configure them via defineApp/route/guard" },
 ];

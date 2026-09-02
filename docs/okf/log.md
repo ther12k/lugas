@@ -112,3 +112,10 @@
 - #314: `json()` brands `Jsonify<B>`, so client-visible payload facts reflect `JSON.stringify` truth (Date→string, dropped undefined/function keys, Map/Set→{}, bigint→never, undefined array elements→null). Runtime serialization untouched; body-type restriction was considered and rejected (index-signature false positives on prebuilt bodies).
 - #314 (finding 4, discovered by the new boundary test): `AppContract` no longer lets the module-route `Readonly<Record<string, unknown>>` fallback leak a string index signature — module-only apps keep literal path contracts and unknown client paths are compile errors again.
 - Consequence: the attested beta artifact set (candidate `0b79f09`) is superseded; **M6R7-ATT** tracks re-attestation before publication is reconsidered (owner action thereafter).
+
+## 2026-09-02 — M6R8 Jsonify completion + media-type ownership
+
+- #317: `Jsonify` now models array substitution (`undefined`-serializing elements — including functions and symbols — arrive as `null`), possibly-dropped union members (read type carries `undefined`), and `void`-only member dropping; the `bigint` case is documented as a throw-signal, not a wire type.
+- #317: typed response helpers own their media types — `json()` application/json + application/*+json, `text()` text/*, `problem()` application/problem+json, `empty()` no body. Contradictory explicit overrides throw `LUGAS_RESPONSE_001`–`004` at construction; compatible overrides keep caller precedence. The typed client's decode can no longer disagree with the response brand.
+- New end-to-end media-type contract test (json/text/problem round-trips incl. compatible overrides) proving typed body == parsed body; diagnostics catalog + goldens updated (RESPONSE family).
+- #315 re-anchored: the re-attestation candidate is now post-M6R8 main; publication stays HOLD pending that single mechanical gate.
