@@ -74,3 +74,20 @@ const reportApp = defineApp({
 type ReportOutcomes = ClientOutcomes<AppContract<typeof reportApp>["/report"]["GET"]>;
 type ReportBody = Extract<ReportOutcomes, { status: 200 }>["body"];
 type _t19 = Expect<Equal<ReportBody, { at: string; name: string; note: string | undefined }>>;
+
+// 8. Array elements that serialize to undefined are substituted as null (M6R8):
+//    functions and symbols serialize to undefined, and array serialization
+//    substitutes null for them.
+type _t20 = Expect<Equal<Jsonify<[() => void]>, [null]>>;
+type _t21 = Expect<Equal<Jsonify<[symbol]>, [null]>>;
+type _t22 = Expect<Equal<Jsonify<[string, () => void]>, [string, null]>>;
+type _t23 = Expect<Equal<Jsonify<readonly (string | (() => void))[]>, readonly (string | null)[]>>;
+
+// 9. Union members that may serialize to undefined can be absent on the wire
+//    (M6R8): the key stays but the read type carries undefined.
+type _t24 = Expect<Equal<Jsonify<{ value: string | (() => void) }>, { value: string | undefined }>>;
+type _t25 = Expect<Equal<Jsonify<{ value: string | symbol }>, { value: string | undefined }>>;
+type _t26 = Expect<Equal<Jsonify<{ value: { id: string } | undefined | (() => void) }>, { value: { id: string } | undefined }>>;
+
+// 10. void-only members are always dropped by serialization (M6R8).
+type _t27 = Expect<Equal<Jsonify<{ value: void }>, {}>>;

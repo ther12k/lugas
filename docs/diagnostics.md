@@ -47,6 +47,10 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_ROUTES_002 | defineApp() | unsupported entry under method key | use route(), native Response, functions, or {dir} |
 | LUGAS_ROUTES_003 | defineApp() | unsupported route entry shape | same shapes as LUGAS_ROUTES_002 |
 | LUGAS_ROUTES_004 | path analysis | invalid route path | paths start with '/' and follow Bun syntax |
+| LUGAS_RESPONSE_001 | json() | content-type override is not a JSON media type | json() owns application/json and application/*+json; omit the override or use text() |
+| LUGAS_RESPONSE_002 | text() | content-type override is not a text media type | text() owns text/*; omit the override or use json() |
+| LUGAS_RESPONSE_003 | problem() | content-type override is not application/problem+json | problem() owns application/problem+json (RFC 9457); omit the override or use json() |
+| LUGAS_RESPONSE_004 | empty() | content-type override on a bodyless response | empty() owns no body; a response without a body cannot declare a content type |
 
 ## Compatibility
 
