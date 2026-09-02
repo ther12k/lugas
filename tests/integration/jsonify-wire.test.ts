@@ -72,8 +72,19 @@ const app = defineApp({
     "/keyed-hook": {
       GET: route({ handler: () => json(200, { value: keyed }) }),
     },
+    "/union-hook": {
+      GET: route({ handler: () => json(200, { value: maybeDropHook, list: [maybeDropHook] }) }),
+    },
   },
 });
+
+// A hook DECLARED with a union return type, deterministically returning
+// undefined at runtime (M6R12): the brand must still carry the drop outcome.
+const maybeDropHook: { toJSON(): string | undefined } = {
+  toJSON(): string | undefined {
+    return undefined;
+  },
+};
 
 type API = AppContract<typeof app>;
 
@@ -186,6 +197,21 @@ describe("toJSON position semantics (M6R10)", () => {
     if (result.ok) {
       const data: { value: { ok: boolean } } = result.data;
       expect(data.value).toEqual({ ok: true });
+    }
+  });
+});
+
+describe("union-returning hooks keep their drop outcome (M6R12)", () => {
+  test("hook returning undefined under a union return type omits the member and nulls the element", async () => {
+    const server = createTestServer(app, { port: 0 });
+    const client = createClient<API>({ baseUrl: server.url });
+    const result = await client.get("/union-hook");
+    await server.stop();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const data: { value?: string; list: (string | null)[] } = result.data;
+      expect(data.value).toBeUndefined();
+      expect(data).toEqual({ list: [null] });
     }
   });
 });

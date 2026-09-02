@@ -23,6 +23,19 @@ interface Outer {
 
 type Keyed = { toJSON(key: string): { key: string } };
 type OddHook = { toJSON(_key: number): { ok: boolean } };
+
+interface MaybeDropHook {
+  toJSON(): string | undefined;
+}
+interface DropOrThrowHook {
+  toJSON(): undefined | bigint;
+}
+interface ValueOrThrowHook {
+  toJSON(): string | bigint;
+}
+interface AlwaysThrows {
+  toJSON(): never;
+}
 type HookBig = { toJSON(): bigint };
 
 // 1. The hook runs once; the replacement's own toJSON is NOT re-entered at
@@ -56,6 +69,15 @@ type _t17 = Expect<Equal<Jsonify<[undefined | string]>, [null | string]>>;
 //     not exist at runtime, so any callable toJSON is a hook.
 type _t18 = Expect<Equal<Jsonify<{ toJSON(_key: number): { ok: boolean } }>, { ok: boolean }>>;
 type _t19 = Expect<Equal<Jsonify<{ value: OddHook }>, { value: { ok: boolean } }>>;
+
+// 4d. Union-returning hooks keep every outcome (M6R12): the drop branch of
+//     a single hook's return type survives post-hook classification.
+type _t20 = Expect<Equal<Jsonify<{ value: MaybeDropHook }>, { value?: string }>>;
+type _t21 = Expect<Equal<Jsonify<[MaybeDropHook]>, [string | null]>>;
+type _t22 = Expect<Equal<Jsonify<{ value: DropOrThrowHook }>, {}>>;
+type _t23 = Expect<Equal<Jsonify<[DropOrThrowHook]>, [null]>>;
+type _t24 = Expect<Equal<Jsonify<{ value: ValueOrThrowHook }>, { value: string }>>;
+type _t25 = Expect<Equal<Jsonify<[AlwaysThrows]>, [never]>>;
 
 // 5. Unrelated positions are unaffected (M6R7–M6R9 regression).
 type _t11 = Expect<Equal<Jsonify<Date>, string>>;
