@@ -147,3 +147,10 @@
 - #325: drops now carry a durable internal sentinel (`JsonDrops`) alongside `JsonThrows`; post-hook outcomes survive union reduction, so a single `toJSON(): string | undefined` hook keeps both branches — member keys become optional, array elements include `null`, drop+throw hooks collapse correctly to omission/`null`. Keyset flags read two dimensions (may-drop / has-value) from the raw outcome; a never-returning hook classifies as a throw-signal; `any` members honestly become optional.
 - Typed-wire boundary declared **settled for the beta scope**: prototype/enumerability approximation, cycles, and `problem()` Jsonification stand as explicit beta limitations.
 - #315 re-anchored to the post-M6R12 candidate; still the single mechanical transition before publication is reconsidered.
+
+## 2026-09-03 — M6R7-ATT final attestation of the M6R12 candidate
+
+- #315: quiet-host attestation of `2ed954d` completed — the second (and per the settled typed-wire boundary, final pre-publication) artifact set. Window: 20 min sustained load < 4 (last 1.58) + no fresh compilers + 3-min hold (last 1.31); earlier contaminated windows (hold broken at 4.07; compiler bursts) were rejected whole — no partial phases retained.
+- Evidence (lugas-release-evidence-v2): both identities bound to `2ed954d…`; plain-static 134,393 rps; plain-json 108,041 rps; validated-post 66,512 rps; typecheck 1,041 ms; client bundle 14,900 B; linux/x64/i5-13420H/Bun 1.4.0; run load 1.19→1.91; `blockingFailures: 0`, `alerts: 0`. Transparency note: plainStatic exceeded the raw-Bun baseline (115,762) — scheduler-warmup artifact of the runner's measurement order, budget-checked against the frozen 60k floor.
+- 10-point mechanical review: 12/12 PASS before PR. Artifact-only PR #327 merged (7/7 checks); post-merge clean-checkout SHA256SUMS verified (9/9 OK) on main@04a5a63.
+- #315 closed with all acceptance boxes ticked. Repository state: 0 open issues, 0 open PRs. Publication (tag + npm publish) remains the explicit owner action per docs/releases/beta/CHECKLIST.md.
