@@ -19,6 +19,31 @@ const dropper = {
   },
 };
 
+// M6R10: the hook is invoked once per serialization position; the
+// replacement's own toJSON is NOT re-entered at the same position.
+let innerHookCalls = 0;
+const inner = {
+  keep: "x",
+  toJSON(): undefined {
+    innerHookCalls += 1;
+    return undefined;
+  },
+};
+let outerHookCalls = 0;
+const outer = {
+  toJSON(): typeof inner {
+    outerHookCalls += 1;
+    return inner;
+  },
+};
+
+// M6R10: ECMAScript passes the property key to toJSON.
+const keyed = {
+  toJSON(key: string): { key: string } {
+    return { key };
+  },
+};
+
 const app = defineApp({
   routes: {
     "/non-finite": {
@@ -40,6 +65,12 @@ const app = defineApp({
     },
     "/tojson-drop-element": {
       GET: route({ handler: () => json(200, [dropper, "x"]) }),
+    },
+    "/hook-once": {
+      GET: route({ handler: () => json(200, { value: outer, outer, key: "k" }) }),
+    },
+    "/keyed-hook": {
+      GET: route({ handler: () => json(200, { value: keyed }) }),
     },
   },
 });
@@ -85,5 +116,45 @@ describe("Jsonify wire probes", () => {
       const data: (string | null)[] = result.data;
       expect(data).toEqual([null, "x"]);
     }
+  });
+});
+
+describe("toJSON position semantics (M6R10)", () => {
+  test("the hook runs once per position; the replacement's hook is not re-entered", async () => {
+    outerHookCalls = 0;
+    innerHookCalls = 0;
+    const server = createTestServer(app, { port: 0 });
+    const client = createClient<API>({ baseUrl: server.url });
+    const result = await client.get("/hook-once");
+    await server.stop();
+    // One body, one stringify: the outer hook ran once at each of its three
+    // positions (member "value", member "outer", root? no — root is the
+    // wrapper object), and the inner hook never ran.
+    expect(outerHookCalls).toBe(2);
+    expect(innerHookCalls).toBe(0);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const data: { value: { keep: string }; outer: { keep: string }; key: string } = result.data;
+      expect(data.value).toEqual({ keep: "x" });
+      expect(data.outer).toEqual({ keep: "x" });
+    }
+  });
+
+  test("keyed hooks receive the property key", async () => {
+    const server = createTestServer(app, { port: 0 });
+    const client = createClient<API>({ baseUrl: server.url });
+    const result = await client.get("/keyed-hook");
+    await server.stop();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const data: { value: { key: string } } = result.data;
+      expect(data.value).toEqual({ key: "value" });
+    }
+  });
+
+  test("a hook returning bigint throws instead of serializing", () => {
+    const hookBig = { toJSON(): bigint { return 1n; } };
+    expect(() => JSON.stringify({ value: hookBig })).toThrow(TypeError);
+    expect(() => json(200, { value: hookBig })).toThrow(TypeError);
   });
 });
