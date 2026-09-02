@@ -119,8 +119,8 @@ export type MethodParamsInput<TPath extends string> =
 
 /**
  * Query input slot for a method call (M3-009): required exactly when the
- * route entry declares a `query` schema; values mirror the schema's output
- * type and are serialized as repeated scalar keys.
+ * route entry declares a `query` schema; values mirror the schema's wire
+ * input type (M6R7) and are serialized as repeated scalar keys.
  */
 export type MethodQueryInput<TContract, TPath extends string, TMethod extends HttpMethod> =
   ClientInput<RouteEntryForMethod<TContract, TPath, TMethod>>["query"] extends infer Q
@@ -131,7 +131,8 @@ export type MethodQueryInput<TContract, TPath extends string, TMethod extends Ht
 
 /**
  * Headers slot for a method call (M3-010): required exactly when the route
- * entry declares a `headers` schema; values mirror the schema output type.
+ * entry declares a `headers` schema; values mirror the schema's wire input
+ * type (M6R7).
  */
 export type MethodHeadersInput<TContract, TPath extends string, TMethod extends HttpMethod> =
   ClientInput<RouteEntryForMethod<TContract, TPath, TMethod>>["headers"] extends infer H
@@ -142,8 +143,8 @@ export type MethodHeadersInput<TContract, TPath extends string, TMethod extends 
 
 /**
  * Body slot for a method call (M3-010): required exactly when the route entry
- * declares a `body` schema; values mirror the schema output type and are
- * serialized as JSON.
+ * declares a `body` schema; values mirror the schema's wire input type
+ * (M6R7) and are serialized as JSON.
  */
 export type MethodBodyInput<TContract, TPath extends string, TMethod extends HttpMethod> =
   ClientInput<RouteEntryForMethod<TContract, TPath, TMethod>>["body"] extends infer B

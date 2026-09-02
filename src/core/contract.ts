@@ -10,7 +10,7 @@ import type {
   RouteResponseUnion,
   TypedResponse,
 } from "./types";
-import type { StandardSchemaOutput } from "../internal/standard-schema";
+import type { StandardSchemaInput } from "../internal/standard-schema";
 
 export type RouteInputContract<TDescriptor> = TDescriptor extends {
   readonly params?: infer P;
@@ -19,10 +19,10 @@ export type RouteInputContract<TDescriptor> = TDescriptor extends {
   readonly body?: infer B;
 }
   ? {
-      readonly params: P extends { readonly "~standard": unknown } ? StandardSchemaOutput<P> : undefined;
-      readonly query: Q extends { readonly "~standard": unknown } ? StandardSchemaOutput<Q> : undefined;
-      readonly headers: H extends { readonly "~standard": unknown } ? StandardSchemaOutput<H> : undefined;
-      readonly body: B extends { readonly "~standard": unknown } ? StandardSchemaOutput<B> : undefined;
+      readonly params: P extends { readonly "~standard": unknown } ? StandardSchemaInput<P> : undefined;
+      readonly query: Q extends { readonly "~standard": unknown } ? StandardSchemaInput<Q> : undefined;
+      readonly headers: H extends { readonly "~standard": unknown } ? StandardSchemaInput<H> : undefined;
+      readonly body: B extends { readonly "~standard": unknown } ? StandardSchemaInput<B> : undefined;
     }
   : {
       readonly params: undefined;
@@ -72,8 +72,16 @@ export type FlattenPathMethods<TPathEntry> = TPathEntry extends RouteDescriptor<
     }
   : { readonly ALL: RouteContract<TPathEntry> };
 
-export type AppContract<TApp> = TApp extends LugasApp<any, infer TRoutes>
-  ? {
-      readonly [Path in keyof TRoutes as string & Path]: FlattenPathMethods<TRoutes[Path]>;
-    }
+export type AppContract<TApp> = TApp extends LugasApp<any, any>
+  ? TApp extends { readonly routes?: infer TRoutes }
+    ? {
+        // Extract paths from the `routes` property directly: inference through
+        // the branded `LugasApp<any, infer TRoutes>` slot collapses module
+        // paths into a bare `Readonly<Record<string, unknown>>` index
+        // signature. Index-signature keys carry no literal path fact, so they
+        // are filtered — mapping them would collapse the client's path
+        // restriction to `string` (M6R7).
+        readonly [Path in keyof TRoutes as string extends Path ? never : string & Path]: FlattenPathMethods<TRoutes[Path]>;
+      }
+    : {}
   : {};

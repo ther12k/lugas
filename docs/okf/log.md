@@ -104,3 +104,11 @@
 - All three benchmark runners record platform/arch/cpuModel (plain/validated also load average before/after); the gate enforces the platform/arch binding it always claimed and records the archive environment into `release-evidence.json`.
 - Owner publication block is fail-closed (`set -euo pipefail` + explicit namespace-claimed assertion); the builder rewrites the DO-NOT-PUBLISH sentinel into an attested-set banner before checksumming the artifact set.
 - #309 re-scoped: technical attestation only; publication stays an explicit owner action.
+
+## 2026-09-02 — M6R7 contract-boundary honesty
+
+- #314: `AppContract`/`FlattenPathMethods`/`RouteContract`/`RouteInputContract` (and `Jsonify`) are public exports of the `lugas` root; the README typed-client example now compiles against the installed package, proven by a new installed-tarball consumer test (positive + failing negative control).
+- #314: client request slots are typed from the schema's wire input (`StandardSchemaInput`); the server handler context keeps the validated output — transforming schemas now split correctly across the boundary.
+- #314: `json()` brands `Jsonify<B>`, so client-visible payload facts reflect `JSON.stringify` truth (Date→string, dropped undefined/function keys, Map/Set→{}, bigint→never, undefined array elements→null). Runtime serialization untouched; body-type restriction was considered and rejected (index-signature false positives on prebuilt bodies).
+- #314 (finding 4, discovered by the new boundary test): `AppContract` no longer lets the module-route `Readonly<Record<string, unknown>>` fallback leak a string index signature — module-only apps keep literal path contracts and unknown client paths are compile errors again.
+- Consequence: the attested beta artifact set (candidate `0b79f09`) is superseded; **M6R7-ATT** tracks re-attestation before publication is reconsidered (owner action thereafter).

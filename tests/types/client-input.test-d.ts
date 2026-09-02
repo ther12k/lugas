@@ -67,7 +67,9 @@ type _t4 = Expect<Equal<NoParams, {}>>;
 // 3. ClientCallInput merges path params with structured inputs
 type GetUserInput = ClientCallInput<Contract, "/users/:id", "GET">;
 type _t5 = Expect<Equal<GetUserInput["pathParams"], { readonly id: string }>>;
-type _t6 = Expect<Equal<NonNullable<GetUserInput["params"]>, { id: number }>>;
+// z.coerce.number() has input `unknown` (M6R7): the client sends the raw wire
+// value; only the server handler context observes the coerced output.
+type _t6 = Expect<Equal<NonNullable<GetUserInput["params"]>, { id: unknown }>>;
 type _t7 = Expect<Equal<NonNullable<GetUserInput["query"]>, { include?: string | undefined }>>;
 
 // 4. POST body is required structured input
