@@ -22,6 +22,7 @@ interface Outer {
 }
 
 type Keyed = { toJSON(key: string): { key: string } };
+type OddHook = { toJSON(_key: number): { ok: boolean } };
 type HookBig = { toJSON(): bigint };
 
 // 1. The hook runs once; the replacement's own toJSON is NOT re-entered at
@@ -43,6 +44,18 @@ type _t7 = Expect<Equal<Jsonify<{ value: HookBig }>, { value: never }>>;
 type _t8 = Expect<Equal<Jsonify<{ value: Dropping }>, {}>>;
 type _t9 = Expect<Equal<Jsonify<[Dropping]>, [null]>>;
 type _t10 = Expect<Equal<Jsonify<{ value: Dropping | string }>, { value?: string }>>;
+
+// 4b. Array elements: throw is never converted to null (M6R11) — the raw
+//     outcome is classified before the sentinel is stripped.
+type _t14 = Expect<Equal<Jsonify<[bigint]>, [never]>>;
+type _t15 = Expect<Equal<Jsonify<[{ toJSON(): bigint }]>, [never]>>;
+type _t16 = Expect<Equal<Jsonify<[bigint | string]>, [string]>>;
+type _t17 = Expect<Equal<Jsonify<[undefined | string]>, [null | string]>>;
+
+// 4c. Hook detection is callability-only (M6R11): parameter annotations do
+//     not exist at runtime, so any callable toJSON is a hook.
+type _t18 = Expect<Equal<Jsonify<{ toJSON(_key: number): { ok: boolean } }>, { ok: boolean }>>;
+type _t19 = Expect<Equal<Jsonify<{ value: OddHook }>, { value: { ok: boolean } }>>;
 
 // 5. Unrelated positions are unaffected (M6R7–M6R9 regression).
 type _t11 = Expect<Equal<Jsonify<Date>, string>>;

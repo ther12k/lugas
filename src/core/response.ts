@@ -35,8 +35,8 @@ export type TypedResponse<S extends number = number, B = unknown> = Response & {
  */
 export type Jsonify<T> = StripThrows<JsonifyRaw<T>>;
 
-/** Hook application at one position: `toJSON` invoked at most once, key-bearing signatures accepted (M6R10). */
-type HookOnce<T> = T extends { readonly toJSON: (key: string) => infer J } ? J : T;
+/** Hook application at one position: `toJSON` invoked at most once. ECMAScript checks callability only — any callable `toJSON` is a hook regardless of its parameter list (M6R11); a non-callable `toJSON` stays an ordinary member. */
+type HookOnce<T> = T extends { readonly toJSON: infer F } ? (F extends (...args: any[]) => infer J ? J : T) : T;
 
 /**
  * Internal sentinel for "serialization throws" (bigint at any position,
@@ -118,15 +118,19 @@ type OptionalKeys<T> = { [K in keyof DropFlags<T>]: true extends DropFlags<T>[K]
 type Simplify<T> = { [K in keyof T]: T[K] };
 
 /**
- * Element position for arrays: `JSON.stringify` substitutes `null` for
+ * Element position for arrays: `JSON.stringify` substitutes `null` only for
  * elements that serialize to `undefined`; an element whose serialization
- * throws stays `never` (M6R10).
+ * throws (bigint, hook→bigint) stays `never` — an abrupt throw completion is
+ * never converted to `null` (M6R11: classify the raw outcome before
+ * stripping the sentinel).
  */
 type JsonifyElement<V> = V extends V
-  ? StripThrows<JsonifyRaw<V>> extends infer E
-    ? [E] extends [never]
+  ? JsonifyRaw<V> extends infer R
+    ? [R] extends [never]
       ? null
-      : E
+      : [R] extends [JsonThrows]
+        ? never
+        : StripThrows<R>
     : never
   : never;
 
