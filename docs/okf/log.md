@@ -119,3 +119,11 @@
 - #317: typed response helpers own their media types — `json()` application/json + application/*+json, `text()` text/*, `problem()` application/problem+json, `empty()` no body. Contradictory explicit overrides throw `LUGAS_RESPONSE_001`–`004` at construction; compatible overrides keep caller precedence. The typed client's decode can no longer disagree with the response brand.
 - New end-to-end media-type contract test (json/text/problem round-trips incl. compatible overrides) proving typed body == parsed body; diagnostics catalog + goldens updated (RESPONSE family).
 - #315 re-anchored: the re-attestation candidate is now post-M6R8 main; publication stays HOLD pending that single mechanical gate.
+
+## 2026-09-02 — M6R9 strong typed-wire contract
+
+- #319: `Jsonify` completes the strong contract — general `number` widens to `number | null` (NaN/±Infinity serialize as null; finite literals stay exact), `toJSON` chains ending in `undefined` propagate the drop (removed members / optional members / null elements), and possibly-dropped members become true optional properties instead of required keys padded with `undefined`.
+- #319: `json()` rejects root bodies that serialize to no JSON text (`LUGAS_RESPONSE_005`) instead of constructing a null body with a JSON content type; root `bigint` keeps its native throw as the documented exception.
+- Implementation note: drop analysis reads off a pre-evaluated flag object (`DropFlags`) because recursive conditionals inside deferred keyset/`as`-clause evaluation misfire under tsc 7.0.2 (probed); the brand is flattened via one homomorphic pass so it stays identity-comparable with plain object literals.
+- Bookkeeping: the M6R8 close-out's "8/8 checks" is corrected to the actual 7 named checks (6 compatibility cells + verify).
+- #315 remains the single mechanical transition, now anchored to the post-M6R9 candidate; publication stays an owner-authorized action after it.

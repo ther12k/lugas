@@ -61,6 +61,16 @@ describe("typed-response media-type ownership", () => {
     expect(res.headers.get("content-type")).toBeNull();
   });
 
+  test("json() rejects root bodies that serialize to no JSON text as LUGAS_RESPONSE_005", () => {
+    expect(() => json(200, undefined)).toThrow(expect.objectContaining({ code: "LUGAS_RESPONSE_005" }));
+    expect(() => json(200, () => "fn")).toThrow(expect.objectContaining({ code: "LUGAS_RESPONSE_005" }));
+    expect(() => json(200, { toJSON: () => undefined })).toThrow(
+      expect.objectContaining({ code: "LUGAS_RESPONSE_005" }),
+    );
+    // Root null is valid JSON text and stays allowed.
+    expect(json(200, null).status).toBe(200);
+  });
+
   test("Headers instances and tuple forms are normalized before the check", () => {
     expect(() => json(200, { ok: true }, { headers: new Headers({ "content-type": "text/plain" }) })).toThrow(
       expect.objectContaining({ code: "LUGAS_RESPONSE_001" }),

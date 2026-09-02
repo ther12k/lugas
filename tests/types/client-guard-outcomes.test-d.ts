@@ -50,7 +50,7 @@ type AdminStatuses = AdminOutcomes["status"];
 type _t1 = Expect<Equal<AdminStatuses, 200 | 401 | 403 | 404>>;
 
 type Body200 = Extract<AdminOutcomes, { status: 200 }>["body"];
-type _t2 = Expect<Equal<Body200, { id: number }>>;
+type _t2 = Expect<Equal<Body200, { id: number | null }>>;
 
 // 2. Exact problem extension fields preserved (title + code extension)
 type Body403 = Extract<AdminOutcomes, { status: 403 }>["body"];

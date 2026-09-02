@@ -23,7 +23,7 @@ export type DiagnosticCode =
   | "LUGAS_GUARD_001" | "LUGAS_GUARD_002" | "LUGAS_GUARD_003" | "LUGAS_GUARD_004"
   | "LUGAS_GUARD_005" | "LUGAS_GUARD_006" | "LUGAS_GUARD_007"
   | "LUGAS_ROUTES_001" | "LUGAS_ROUTES_002" | "LUGAS_ROUTES_003" | "LUGAS_ROUTES_004"
-  | "LUGAS_RESPONSE_001" | "LUGAS_RESPONSE_002" | "LUGAS_RESPONSE_003" | "LUGAS_RESPONSE_004"
+  | "LUGAS_RESPONSE_001" | "LUGAS_RESPONSE_002" | "LUGAS_RESPONSE_003" | "LUGAS_RESPONSE_004" | "LUGAS_RESPONSE_005"
   | "LUGAS_TEST_001"
   | "LUGAS_CLI_001";
 
@@ -83,6 +83,7 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_RESPONSE_002", thrownBy: "text()", meaning: "content-type override is not a text media type", hint: "text() owns text/*; omit the override or use json()" },
   { code: "LUGAS_RESPONSE_003", thrownBy: "problem()", meaning: "content-type override is not application/problem+json", hint: "problem() owns application/problem+json (RFC 9457); omit the override or use json()" },
   { code: "LUGAS_RESPONSE_004", thrownBy: "empty()", meaning: "content-type override on a bodyless response", hint: "empty() owns no body; a response without a body cannot declare a content type" },
+  { code: "LUGAS_RESPONSE_005", thrownBy: "json()", meaning: "body serializes to no JSON text", hint: "the body (or its toJSON result) is undefined; use empty() for a bodyless response" },
   { code: "LUGAS_CLI_001", thrownBy: "lugas CLI", meaning: "invalid CLI option value", hint: "--timeout must be a positive integer in milliseconds" },
   { code: "LUGAS_TEST_001", thrownBy: "createTestServer()", meaning: "forbidden server override option", hint: "the test server inherits routes/errors from the app; configure them via defineApp/route/guard" },
 ];
