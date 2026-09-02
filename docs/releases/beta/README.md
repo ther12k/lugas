@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Package source | `0b79f09959263599dca16eb9128269cda9d6f285` |
-| Attestation commit | `0b79f09959263599dca16eb9128269cda9d6f285` |
-| Tarball SHA-256 | `024a25f283d0d07411620056897bd65988443da828f75ff92cad76af15511373` |
+| Package source | `2ed954deb648cdb8e40d7b05e6c0cb0d116f050b` |
+| Attestation commit | `2ed954deb648cdb8e40d7b05e6c0cb0d116f050b` |
+| Tarball SHA-256 | `83813db9011b738f95ff181edcc8ef483f4509449dfbfe6e8a9c4412de1bab23` |
 
 **Status: DO NOT PUBLISH** without completing `CHECKLIST.md` — publication
 requires explicit owner approval (M6-010 / M6-GATE). These artifacts were

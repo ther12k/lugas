@@ -1,10 +1,10 @@
 # LugasJS v0.1.0-beta.1 Release Packet
 
 **Candidate Version:** `0.1.0-beta.1`  
-**Package Source Commit:** `0b79f09959263599dca16eb9128269cda9d6f285`  
-**Attestation Commit:** `0b79f09959263599dca16eb9128269cda9d6f285` (`0b79f09`)
+**Package Source Commit:** `2ed954deb648cdb8e40d7b05e6c0cb0d116f050b`  
+**Attestation Commit:** `2ed954deb648cdb8e40d7b05e6c0cb0d116f050b` (`2ed954d`)
 
-**Generated:** 2026-08-31T02:30:45.964Z  
+**Generated:** 2026-09-02T20:09:59.058Z  
 **Runtime:** Bun 1.4.0 · TypeScript 7.0.2 · Linux x86-64 / macOS arm64 / Windows x64  
 **Package:** `lugas` (unscoped) · License: Apache-2.0 · Repo: `ther12k/lugas`
 
@@ -65,10 +65,10 @@ Publication remains strictly gated on owner approval in **M6-GATE**.
 
 | Scenario / Metric | Release Floor | Alert Floor | Target | Candidate Measured | Result |
 |---|---|---|---|---|---|
-| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **140,817 rps** (-14.2% vs raw Bun) | ✅ Exceeded |
-| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **104,928 rps** | ✅ Exceeded |
-| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **69,390 rps** | ✅ Exceeded (13.1% validated overhead vs raw Bun) |
-| Typecheck Duration | — | — | < 2,000ms | **975ms** | ✅ Measured on candidate |
+| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **134,393 rps** (-16.1% vs raw Bun) | ✅ Exceeded |
+| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **108,041 rps** | ✅ Exceeded |
+| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **66,512 rps** | ✅ Exceeded (13.6% validated overhead vs raw Bun) |
+| Typecheck Duration | — | — | < 2,000ms | **1041ms** | ✅ Measured on candidate |
 | Client Bundle Size | — | — | < 25,000 B | **14900 B** | ✅ Measured on candidate |
 
 ---
