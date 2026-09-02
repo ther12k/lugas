@@ -47,7 +47,7 @@ describe("typed body matches the decode under the actual content type", () => {
     await server.stop();
     expect(result.ok).toBe(true);
     if (result.ok) {
-      const data: { ok: boolean; n: number } = result.data;
+      const data: { ok: boolean; n: number | null } = result.data;
       expect(data).toEqual({ ok: true, n: 1 });
     }
   });

@@ -186,6 +186,12 @@
     "hint": "empty() owns no body; a response without a body cannot declare a content type"
   },
   {
+    "code": "LUGAS_RESPONSE_005",
+    "thrownBy": "json()",
+    "meaning": "body serializes to no JSON text",
+    "hint": "the body (or its toJSON result) is undefined; use empty() for a bodyless response"
+  },
+  {
     "code": "LUGAS_CLI_001",
     "thrownBy": "lugas CLI",
     "meaning": "invalid CLI option value",

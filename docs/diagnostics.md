@@ -51,6 +51,7 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_RESPONSE_002 | text() | content-type override is not a text media type | text() owns text/*; omit the override or use json() |
 | LUGAS_RESPONSE_003 | problem() | content-type override is not application/problem+json | problem() owns application/problem+json (RFC 9457); omit the override or use json() |
 | LUGAS_RESPONSE_004 | empty() | content-type override on a bodyless response | empty() owns no body; a response without a body cannot declare a content type |
+| LUGAS_RESPONSE_005 | json() | body serializes to no JSON text | the body (or its toJSON result) is undefined; use empty() for a bodyless response |
 
 ## Compatibility
 

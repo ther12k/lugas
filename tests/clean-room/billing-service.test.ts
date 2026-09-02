@@ -20,6 +20,7 @@ import {
   route,
   json,
   problem,
+  type Jsonify,
   type TypedResponse,
 } from "../../src/index";
 import { createTestServer } from "../../src/testing/index";
@@ -189,7 +190,8 @@ const invoiceModule = defineModule({
         headers: AuthHeaders,
         params: OrgParams,
         body: CreateInvoiceBody,
-        handler: (ctx): TypedResponse<201, Invoice> => {
+        // The brand is Jsonify<Invoice>: `amount` may be NaN/±Infinity, which serialize as null (M6R9).
+          handler: (ctx): TypedResponse<201, Jsonify<Invoice>> => {
           const services = ctx.services as BillingServices;
           const body = ctx.body;
           const invoice: Invoice = {

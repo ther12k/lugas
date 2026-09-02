@@ -16,16 +16,17 @@ export type TypedResponse<S extends number = number, B = unknown> = Response & {
 
 /**
  * Compile-time mirror of what `JSON.stringify` actually puts on the wire
- * (M6R7, completed M6R8): `toJSON` results are unwrapped (`Date` arrives as
- * `string`); values that are always `undefined`/function/symbol/`void` are
- * dropped; members that only *may* serialize to `undefined` (a union with a
- * dropped branch) can be absent, so their read type carries `undefined`;
- * array elements that serialize to `undefined` — including function and
- * symbol elements — are substituted as `null`. `Map`/`Set` serialize to an
- * empty object. A `bigint` anywhere in the body makes `JSON.stringify` throw
- * a `TypeError` before a wire representation exists: it is typed `never` so
- * no usable value is promised. That is a documented throw-signal, not a wire
- * type — nothing reaches the wire from `json()` for such a body.
+ * (M6R7–M6R9). `toJSON` results are unwrapped recursively (`Date` arrives as
+ * `string`); values that serialize to `undefined` — functions, symbols,
+ * `undefined`, `void`, or a `toJSON` chain ending in one — are dropped from
+ * objects and substituted as `null` in array elements; members that only
+ * *may* drop become optional properties; general `number` widens to
+ * `number | null` because `NaN` and `±Infinity` serialize as `null` (finite
+ * numeric literals stay exact); `Map`/`Set` serialize to an empty object.
+ * Two exceptions are explicit: a `bigint` anywhere makes `JSON.stringify`
+ * throw a `TypeError` before a wire representation exists (typed `never` — a
+ * throw-signal, not a wire type), and root bodies that serialize to no JSON
+ * text are rejected by `json()` with `LUGAS_RESPONSE_005`.
  */
 export type Jsonify<T> = 0 extends 1 & T
   ? T
@@ -35,29 +36,65 @@ export type Jsonify<T> = 0 extends 1 & T
       ? never
       : T extends bigint
         ? never
-        : T extends string | number | boolean | null
-          ? T
-          : T extends readonly unknown[]
-            ? { [K in keyof T]: JsonifyElement<T[K]> }
-            : T extends Map<unknown, unknown> | Set<unknown>
-              ? Record<string, never>
-              : T extends object
-                ? { [K in keyof T as T[K] extends Function | symbol | undefined | void ? never : K]: JsonifyMember<T[K]> }
-                : T;
+        : T extends number
+          ? JsonifyNumber<T>
+          : T extends string | boolean | null
+            ? T
+            : T extends readonly unknown[]
+              ? { [K in keyof T]: JsonifyElement<T[K]> }
+              : T extends Map<unknown, unknown> | Set<unknown>
+                ? Record<string, never>
+                : T extends object
+                  ? JsonifyObject<T>
+                  : T;
 
-/** True when any union member of `V` serializes to `undefined` (dropped member or substituted `null` element). */
-type MayBeDropped<V> = true extends (V extends V ? (V extends Function | symbol | undefined | void ? true : false) : never)
-  ? true
-  : false;
+/** General `number` may be `NaN`/`±Infinity`, which serialize as JSON `null`; finite numeric literals stay exact (M6R9). */
+type JsonifyNumber<N extends number> = number extends N ? N | null : N;
 
-/** Value position for object members: a member that may be dropped can be absent on the wire. */
-type JsonifyMember<V> = Jsonify<V> | (MayBeDropped<V> extends true ? undefined : never);
+/**
+ * Per-member: does this value serialize to `undefined` (so the key is
+ * omitted)? Every `undefined`-serializing member of `T[K]` makes `Jsonify<V>`
+ * `never`, so the drop test piggybacks on `Jsonify` itself — which evaluates
+ * reliably per key — instead of running a separate recursion inside keyset
+ * computation. `bigint` members throw instead of dropping and are never
+ * classified as dropped (M6R9).
+ */
+type MemberDrops<V> = V extends V
+  ? [V] extends [bigint]
+    ? false
+    : [Jsonify<V>] extends [never]
+      ? true
+      : false
+  : never;
 
-/** Element position for arrays: `JSON.stringify` substitutes `null` for elements that serialize to `undefined`. */
+type DropFlags<T> = { [K in keyof T]: MemberDrops<T[K]> };
+
+/**
+ * Object position (M6R9): members that never drop stay required; members
+ * that may drop become optional with the non-dropped value type; members
+ * that always drop are removed entirely. Key decisions come from the
+ * pre-evaluated flag object; the two complementary keysets are flattened
+ * into one object type so the brand stays identity-comparable with plain
+ * object literals. (Non-homomorphic mapping: `readonly` modifiers on bodies
+ * are not carried into the brand — wire payloads are freshly decoded.)
+ */
+type JsonifyObject<T extends object> = Simplify<
+  { [K in RequiredKeys<T>]: Jsonify<T[K]> } & { [K in OptionalKeys<T>]?: Jsonify<T[K]> }
+>;
+
+type RequiredKeys<T> = { [K in keyof DropFlags<T>]: DropFlags<T>[K] extends false ? K : never }[keyof T];
+type OptionalKeys<T> = { [K in keyof DropFlags<T>]: true extends DropFlags<T>[K] ? (false extends DropFlags<T>[K] ? K : never) : never }[keyof T];
+
+/** Single homomorphic pass that flattens intersections without losing modifiers or index signatures. */
+type Simplify<T> = { [K in keyof T]: T[K] };
+
+/** Element position for arrays: `JSON.stringify` substitutes `null` for elements that serialize to `undefined` (M6R8/M6R9). */
 type JsonifyElement<V> = V extends V
-  ? V extends Function | symbol | undefined | void
-    ? null
-    : Jsonify<V>
+  ? V extends { readonly toJSON: () => infer J }
+    ? JsonifyElement<J>
+    : V extends Function | symbol | undefined | void
+      ? null
+      : Jsonify<V>
   : never;
 
 /**
@@ -96,8 +133,14 @@ export function json<S extends number, B>(status: S, body: B, init?: ResponseIni
       context: { contentType: override },
     });
   }
+  const serialized = JSON.stringify(body);
+  if (serialized === undefined) {
+    throw diagnostic("LUGAS_RESPONSE_005", "json(): body serializes to no JSON text", {
+      hint: "the body (or its toJSON result) is undefined; use empty() for a bodyless response",
+    });
+  }
   if (override === undefined) headers.set("content-type", "application/json; charset=utf-8");
-  return new Response(JSON.stringify(body), { ...init, status, headers }) as TypedResponse<S, Jsonify<B>>;
+  return new Response(serialized, { ...init, status, headers }) as TypedResponse<S, Jsonify<B>>;
 }
 
 /**
