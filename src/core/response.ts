@@ -13,15 +13,51 @@ export type TypedResponse<S extends number = number, B = unknown> = Response & {
 };
 
 /**
+ * Compile-time mirror of what `JSON.stringify` actually puts on the wire
+ * (M6R7): `toJSON` results are unwrapped (`Date` arrives as `string`),
+ * values that are always `undefined`/function/symbol are dropped, `Map`/`Set`
+ * serialize to an empty object, and `bigint` makes `stringify` throw (typed
+ * `never` so no usable value is promised). Keys whose value is only
+ * *possibly* `undefined` stay, carrying `undefined`; array elements typed
+ * `undefined` arrive as `null`. Everything else round-trips unchanged.
+ */
+export type Jsonify<T> = 0 extends 1 & T
+  ? T
+  : T extends { readonly toJSON: () => infer J }
+    ? Jsonify<J>
+    : T extends Function | symbol | undefined | void
+      ? never
+      : T extends bigint
+        ? never
+        : T extends string | number | boolean | null
+          ? T
+          : T extends readonly unknown[]
+            ? { [K in keyof T]: JsonifyElement<T[K]> }
+            : T extends Map<unknown, unknown> | Set<unknown>
+              ? Record<string, never>
+              : T extends object
+                ? { [K in keyof T as T[K] extends Function | symbol | undefined ? never : K]: JsonifyMember<T[K]> }
+                : T;
+
+/** Value position for object members: a possibly-`undefined` value may be absent on the wire. */
+type JsonifyMember<V> = Jsonify<Exclude<V, undefined>> | (undefined extends V ? undefined : never);
+
+/** Element position for arrays: `JSON.stringify` serializes `undefined` elements as `null`. */
+type JsonifyElement<V> = Jsonify<Exclude<V, undefined>> | (undefined extends V ? null : never);
+
+/**
  * `json(status, body, init?)`
  *
  * Header precedence is deterministic: `init.headers` wins when it sets
  * `content-type`; otherwise `application/json; charset=utf-8` is applied.
+ *
+ * The response brand carries `Jsonify<B>` (M6R7), not raw `B`: the typed body
+ * facts clients observe reflect what `JSON.stringify` actually serializes.
  */
-export function json<S extends number, B>(status: S, body: B, init?: ResponseInit): TypedResponse<S, B> {
+export function json<S extends number, B>(status: S, body: B, init?: ResponseInit): TypedResponse<S, Jsonify<B>> {
   const headers = new Headers(init?.headers as Bun.HeadersInit | undefined);
   if (!headers.has("content-type")) headers.set("content-type", "application/json; charset=utf-8");
-  return new Response(JSON.stringify(body), { ...init, status, headers }) as TypedResponse<S, B>;
+  return new Response(JSON.stringify(body), { ...init, status, headers }) as TypedResponse<S, Jsonify<B>>;
 }
 
 /**

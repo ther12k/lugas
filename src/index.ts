@@ -8,7 +8,13 @@ export type { RouteConfig } from "./core/route";
 export { guard } from "./core/guard";
 export type { GuardConfig } from "./core/guard";
 export { empty, json, problem, redirect, text } from "./core/response";
-export type { ProblemFields, RedirectStatus, TypedResponse } from "./core/response";
+export type { Jsonify, ProblemFields, RedirectStatus, TypedResponse } from "./core/response";
+export type {
+  AppContract,
+  FlattenPathMethods,
+  RouteContract,
+  RouteInputContract,
+} from "./core/contract";
 export type {
   GuardDescriptor,
   GuardHandler,
