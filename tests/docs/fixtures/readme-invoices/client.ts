@@ -1,6 +1,6 @@
 import type { AppContract } from "lugas";
 import { createClient } from "lugas/client";
-import app from "./app";
+import type app from "./app";
 
 const api = createClient<AppContract<typeof app>>({ baseUrl: "https://api.example.com" });
 

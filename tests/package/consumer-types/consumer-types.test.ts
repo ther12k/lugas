@@ -56,7 +56,15 @@ const baseCompilerOptions = {
   noEmit: true,
 };
 
-/** Stages the package exactly like scripts/release/package-beta.ts, packs it, and installs the tarball into a throwaway consumer project. */
+/**
+ * Stages a workspace package-boundary fixture (src + package metadata,
+ * packed with `bun pm pack`) and installs that tarball into a throwaway
+ * consumer project. This is deliberately NOT the release staging path —
+ * scripts/release/package-beta.ts stages from a git archive, sets the beta
+ * version, and packs with `npm pack --json`; verifying the README fixtures
+ * against that exact checksummed release tarball is a separate M6R14-ATT
+ * review step performed once the artifact set exists.
+ */
 function stageAndInstall(): { stageDir: string; consumerDir: string } {
   const stageDir = mkdtempSync(join(tmpdir(), "lugas-consumer-stage-"));
   cleanupDirs.push(stageDir);

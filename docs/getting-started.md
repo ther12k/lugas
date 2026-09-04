@@ -152,8 +152,7 @@ Lugas exposes a browser-safe client through `lugas/client`.
 ```ts
 import type { AppContract } from "lugas";
 import { createClient } from "lugas/client";
-
-import app from "./app";
+import type app from "./app";
 
 type API = AppContract<typeof app>;
 
