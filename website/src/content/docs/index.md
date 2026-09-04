@@ -1,6 +1,9 @@
 ---
 title: Lugas
 description: Explicit, Bun-native typed HTTP APIs — without runtime proxies, code generation, or production dependencies.
+head:
+  - tag: title
+    content: Lugas — Explicit, Bun-native typed HTTP APIs
 hero:
   tagline: Explicit, Bun-native typed HTTP APIs — without runtime proxies, code generation, or production dependencies.
   actions:
