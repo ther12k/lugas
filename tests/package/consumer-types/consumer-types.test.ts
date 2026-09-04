@@ -1,5 +1,5 @@
 /**
- * Installed-tarball TypeScript consumer test (M6R7).
+ * Installed-tarball TypeScript consumer test (M6R7, extended M6R14-ATT).
  *
  * The in-repo type tests import `src/` directly and bypass the package
  * boundary; the release rehearsal's consumer exercised a fixed contract
@@ -9,22 +9,27 @@
  * into a throwaway consumer project, and compiles the README's typed-client
  * example with `tsc --noEmit`. A negative control proves the harness can
  * fail, including on unknown client paths (finding 4).
+ *
+ * The M6R14-ATT extension compiles the REAL README snippet fixtures
+ * (tests/docs/fixtures/, the verbatim drift-guarded quick-start flow) from
+ * the installed tarball, so the publication checklist item
+ * "installed-tarball README/type fixtures compile" is demonstrated against
+ * the exact package bytes, not an in-repo self-reference.
  */
 import { afterAll, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "../../..");
 const TSC = join(ROOT, "node_modules", "typescript", "bin", "tsc");
 
-let stageDir: string | undefined;
-let consumerDir: string | undefined;
+const cleanupDirs: string[] = [];
 
 afterAll(() => {
-  for (const dir of [stageDir, consumerDir]) {
-    if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
+  for (const dir of cleanupDirs) {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
@@ -36,11 +41,26 @@ function tsc(configPath: string): ReturnType<typeof spawnSync> {
   return spawnSync(process.execPath, [TSC, "-p", configPath], { encoding: "utf8" });
 }
 
-test("README typed-client example compiles against the installed tarball", () => {
-  // Stage 1: package staging copy, mirroring scripts/release/package-beta.ts.
-  stageDir = mkdtempSync(join(tmpdir(), "lugas-consumer-stage-"));
-  const stageSrc = join(stageDir, "src");
-  cpSync(join(ROOT, "src"), stageSrc, { recursive: true });
+const baseCompilerOptions = {
+  target: "esnext",
+  module: "esnext",
+  moduleResolution: "bundler",
+  lib: ["esnext"],
+  types: ["bun"],
+  typeRoots: [join(ROOT, "node_modules", "@types")],
+  strict: true,
+  exactOptionalPropertyTypes: true,
+  verbatimModuleSyntax: true,
+  isolatedModules: true,
+  skipLibCheck: true,
+  noEmit: true,
+};
+
+/** Stages the package exactly like scripts/release/package-beta.ts, packs it, and installs the tarball into a throwaway consumer project. */
+function stageAndInstall(): { stageDir: string; consumerDir: string } {
+  const stageDir = mkdtempSync(join(tmpdir(), "lugas-consumer-stage-"));
+  cleanupDirs.push(stageDir);
+  cpSync(join(ROOT, "src"), join(stageDir, "src"), { recursive: true });
   for (const entry of ["package.json", "README.md", "NOTICE", "AGENTS.md"]) {
     cpSync(join(ROOT, entry), join(stageDir, entry));
   }
@@ -55,14 +75,19 @@ test("README typed-client example compiles against the installed tarball", () =>
   expect(existsSync(join(stageDir, tgzName))).toBe(true);
   expect(pack.stderr).toBe("");
 
-  // Stage 2: throwaway consumer project installing the packed tarball.
-  consumerDir = mkdtempSync(join(tmpdir(), "lugas-consumer-pkg-"));
+  const consumerDir = mkdtempSync(join(tmpdir(), "lugas-consumer-pkg-"));
+  cleanupDirs.push(consumerDir);
   writeFileSync(
     join(consumerDir, "package.json"),
     `${JSON.stringify({ name: "lugas-consumer", private: true, type: "module" })}\n`,
   );
   const install = runInWorktreeArgs(["add", join(stageDir, tgzName)], consumerDir);
   expect(install.status).toBe(0);
+  return { stageDir, consumerDir };
+}
+
+test("README typed-client example compiles against the installed tarball", () => {
+  const { consumerDir } = stageAndInstall();
 
   // Stage 3: the README's typed-client example, verbatim in shape.
   writeFileSync(
@@ -96,20 +121,6 @@ export async function main(): Promise<string> {
 `,
   );
 
-  const baseCompilerOptions = {
-    target: "esnext",
-    module: "esnext",
-    moduleResolution: "bundler",
-    lib: ["esnext"],
-    types: ["bun"],
-    typeRoots: [join(ROOT, "node_modules", "@types")],
-    strict: true,
-    exactOptionalPropertyTypes: true,
-    verbatimModuleSyntax: true,
-    isolatedModules: true,
-    skipLibCheck: true,
-    noEmit: true,
-  };
   writeFileSync(
     join(consumerDir, "tsconfig.json"),
     JSON.stringify({ compilerOptions: baseCompilerOptions, include: ["consumer.ts"] }, null, 2),
@@ -159,3 +170,48 @@ export async function bad(): Promise<string> {
   expect(negativeOutput).toMatch(/\/does-not-exist/);
 });
 
+test("README snippet fixtures compile against the installed tarball", () => {
+  const { consumerDir } = stageAndInstall();
+
+  // Copy the real verbatim README fixtures (guarded against drift by
+  // tests/docs/readme-snippets.test.ts) into the consumer project.
+  const fixturesRoot = join(ROOT, "tests", "docs", "fixtures");
+  const fixtureFiles: string[] = [];
+  const visit = (dir: string, rel: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const childRel = rel === "" ? entry.name : `${rel}/${entry.name}`;
+      if (entry.isDirectory()) visit(join(dir, entry.name), childRel);
+      else if (entry.isFile() && entry.name.endsWith(".ts")) fixtureFiles.push(childRel);
+    }
+  };
+  visit(fixturesRoot, "");
+  expect(fixtureFiles.length).toBeGreaterThanOrEqual(4);
+
+  for (const rel of fixtureFiles) {
+    const dest = join(consumerDir, "fixtures", ...rel.split("/"));
+    mkdirSync(dirname(dest), { recursive: true });
+    cpSync(join(fixturesRoot, ...rel.split("/")), dest);
+  }
+
+  // readme-invoices/app.ts imports zod; give the consumer the same spec as
+  // the repository toolchain.
+  const zodSpec = (
+    JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
+      devDependencies: Record<string, string>;
+    }
+  ).devDependencies["zod"];
+  expect(zodSpec).toBeDefined();
+  const zodInstall = runInWorktreeArgs(["add", `zod@${zodSpec}`], consumerDir);
+  expect(zodInstall.status).toBe(0);
+
+  writeFileSync(
+    join(consumerDir, "tsconfig.fixtures.json"),
+    JSON.stringify({ compilerOptions: baseCompilerOptions, include: ["fixtures/**/*.ts"] }, null, 2),
+  );
+  const result = tsc(join(consumerDir, "tsconfig.fixtures.json"));
+  expect(
+    result.status === 0
+      ? { status: 0 }
+      : { status: result.status, output: `${result.stdout}\n${result.stderr}` },
+  ).toEqual({ status: 0 });
+});
