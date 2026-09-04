@@ -1,0 +1,35 @@
+{
+  "format": "lugas-release-evidence-v2",
+  "packageSourceCommit": "c62b678828192021a0a42028a355b3436802189a",
+  "attestationCommit": "c62b678828192021a0a42028a355b3436802189a",
+  "measuredAt": "2026-09-04T22:40:57.947Z",
+  "bunVersion": "1.4.0",
+  "plainStaticRps": 130246,
+  "plainJsonRps": 101739,
+  "validatedPostRps": 62550,
+  "typecheckMs": 926,
+  "clientBundleBytes": 14900,
+  "tarballSha256": "adab187143c86a5abb0cf357ca074a5a00a466fa37e02202ad9f5251e0415796",
+  "rawBunPlainStaticRps": 112054,
+  "rawBunValidatedPostRps": 73051,
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "cpuModel": "13th Gen Intel(R) Core(TM) i5-13420H",
+    "bunVersion": "1.4.0"
+  },
+  "loadAverage": {
+    "before": [
+      1.65,
+      1.45,
+      2.42
+    ],
+    "after": [
+      1.94,
+      1.55,
+      2.42
+    ]
+  },
+  "blockingFailures": 0,
+  "alerts": 0
+}
