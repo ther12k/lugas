@@ -92,14 +92,23 @@ export type DeclaredSlot<Key extends string, TSchema> =
 /**
  * Non-response contribution of one guard. Short-circuit-only guards
  * (returning a Response on every path) contribute nothing.
+ *
+ * The enrichment is extracted from the resolved non-response branch
+ * (`Exclude<Awaited<Result>, Response>`, which distributes over union
+ * results): a guard that either short-circuits (`TypedResponse<401, …>`) or
+ * enriches (`{ user: … }`) — synchronously, via Promise, or mixed —
+ * contributes exactly the enrichment, never a poisoned
+ * `Record<never, never>` union member (#328).
  */
 export type GuardContribution<Guard> =
   Guard extends GuardDescriptor<any, infer Result>
-    ? Result extends Response
-      ? Record<never, never>
-      : Result extends object
-        ? Result
-        : Record<never, never>
+    ? Exclude<Awaited<Result>, Response> extends infer Enrichment
+      ? [Enrichment] extends [never]
+        ? Record<never, never>
+        : Enrichment extends object
+          ? Enrichment
+          : Record<never, never>
+      : Record<never, never>
     : Record<never, never>;
 
 /**

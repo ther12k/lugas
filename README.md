@@ -1,5 +1,3 @@
-# LugasJS
-
 <div align="center">
   <img src="./docs/assets/lugas-logo.svg" alt="Lugas logo" width="112" />
   <h1>LugasJS</h1>
@@ -67,6 +65,7 @@ Routes stay ordinary HTTP: native `Request`, explicit statuses, real `fetch` und
 Validation and guards compose per route; schema outputs and guard enrichments arrive typed on the handler context:
 
 ```ts
+import { defineApp, defineModule, guard, json, route } from "lugas";
 import { z } from "zod"; // any Standard Schema v1 validator works
 
 const auth = guard({
@@ -77,7 +76,7 @@ const auth = guard({
   },
 });
 
-const invoices = defineApp({
+export default defineApp({
   modules: [
     defineModule({
       name: "invoices",
@@ -85,7 +84,7 @@ const invoices = defineApp({
         "/invoices": {
           POST: route({
             before: [auth],
-            body: z.object({ amount: z.number().positive() }),
+            body: z.object({ amount: z.number().positive(), currency: z.string().length(3) }),
             handler: (ctx) => json(201, { id: "inv_1", amount: ctx.body.amount, user: ctx.user.id }),
           }),
         },

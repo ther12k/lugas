@@ -26,8 +26,12 @@ const authenticate = guard({
 // Application-level role check guard
 const requireAdmin = guard({
   name: "requireAdmin",
-  handler: (ctx: any) => {
-    if (ctx.user?.role !== "admin") {
+  handler: (ctx) => {
+    // Reads of earlier guards' enrichments arrive through the context index
+    // signature (typed unknown); narrow with an ordinary runtime check.
+    const user = ctx.user;
+    const isAdmin = typeof user === "object" && user !== null && "role" in user && user.role === "admin";
+    if (!isAdmin) {
       return json(403, { error: "Admin role required" });
     }
     return { adminVerified: true };
@@ -44,13 +48,13 @@ export const app = defineApp({
     "/profile": {
       GET: route({
         before: [authenticate],
-        handler: (ctx: any) => json(200, { user: ctx.user }),
+        handler: (ctx) => json(200, { user: ctx.user }),
       }),
     },
     "/admin/dashboard": {
       GET: route({
         before: [authenticate, requireAdmin],
-        handler: (ctx: any) => json(200, { message: "Welcome Admin", user: ctx.user }),
+        handler: (ctx) => json(200, { message: "Welcome Admin", user: ctx.user, adminVerified: ctx.adminVerified }),
       }),
     },
   },
