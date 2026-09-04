@@ -10,7 +10,7 @@
   </p>
   <p>
     <a href="https://github.com/ther12k/lugas/actions/workflows/ci.yml"><img src="https://github.com/ther12k/lugas/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <img src="https://img.shields.io/badge/status-beta--candidate%20v0.1.0--beta.1-orange" alt="Status: attested beta candidate" />
+    <img src="https://img.shields.io/badge/channel-beta-orange" alt="Release channel: beta" />
     <img src="https://img.shields.io/badge/bun-1.4.x-f472b6" alt="Bun 1.4.x" />
     <img src="https://img.shields.io/badge/TypeScript-7.0.x-3178c6?logo=typescript&logoColor=white" alt="TypeScript 7.0.x" />
     <img src="https://img.shields.io/badge/runtime%20dependencies-0-brightgreen" alt="Zero runtime dependencies" />
@@ -20,13 +20,15 @@
 
 ## Status and install
 
-Lugas is an attested `v0.1.0-beta.1` release candidate. npm publication is an explicit owner action and has not happened yet — do not assume the package is available until it is announced.
+Lugas uses the `beta` dist-tag for prerelease builds. Check [npm](https://www.npmjs.com/package/lugas) or [GitHub Releases](https://github.com/ther12k/lugas/releases) for the currently available version.
+
+For published beta builds:
 
 ```bash
 bun add lugas@beta
 ```
 
-Requires [Bun](https://bun.sh) 1.4.x; TypeScript 7.0.2 is the verified toolchain for the full compile-time contract experience. See [`docs/releases/beta/RELEASE_PACKET.md`](docs/releases/beta/RELEASE_PACKET.md) for the candidate evidence and [`docs/releases/beta/POST-FREEZE-NOTES.md`](docs/releases/beta/POST-FREEZE-NOTES.md) for how this README relates to the frozen tarball.
+Requires [Bun](https://bun.sh) 1.4.x; TypeScript 7.0.2 is the verified toolchain for the full compile-time contract experience.
 
 ## 30-second example
 
@@ -179,6 +181,7 @@ Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). Planned 
 | [`docs/client-error-semantics.md`](docs/client-error-semantics.md) | Client error and redaction policy |
 | [`docs/performance-gates.md`](docs/performance-gates.md) | Release performance budgets and evidence policy |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history |
+| [Release evidence](https://github.com/ther12k/lugas/blob/main/docs/releases/beta/RELEASE_PACKET.md) | Candidate evidence packet, provenance, and checksums (GitHub) |
 
 Agent-facing context: [`llms.txt`](llms.txt) and [`llms-full.txt`](llms-full.txt). Governance, delivery history, and architecture decisions live under [`docs/okf/`](docs/okf/index.md); implementation evidence under [`docs/reports/`](docs/reports/).
 
