@@ -1,7 +1,7 @@
 # Lugas
 
 A Bun-native HTTP framework with derived types, Standard Schema validation,
-ordered guards, and a typed client. Server-only TSX rendering.
+ordered guards, wire-honest JSON response types, and a typed client.
 
 ## Non-negotiable constraints
 
@@ -66,12 +66,17 @@ const authGuard = guard({
 ## Diagnostic codes
 
 Stable codes `LUGAS_CLIENT_001`–`LUGAS_CLIENT_010` for client errors,
-`LUGAS_APP_001`–`LUGAS_ROUTES_004` for startup/config errors.
-See docs/client-error-semantics.md.
+`LUGAS_APP_001`–`LUGAS_ROUTES_004` for startup/config errors,
+`LUGAS_RESPONSE_001`–`LUGAS_RESPONSE_005` for typed response helpers.
+See docs/diagnostics.md.
 
 ## Key files
 
+- docs/getting-started.md — install, first app, validation, guards, client, testing, CLI
+- docs/wire-honest-types.md — how response types model JSON serialization truth
+- docs/roadmap.md — shipped beta surface and planned first-party batteries
+- docs/choosing-lugas.md — positioning and framework comparisons
 - docs/manifest-v1.md — frozen manifest schema
 - docs/client-error-semantics.md — error/redaction policy
 - docs/diagnostics.md — full diagnostic catalog
-- examples/basic/, examples/validation/, examples/auth/, examples/client/
+- examples/README.md — runnable example index

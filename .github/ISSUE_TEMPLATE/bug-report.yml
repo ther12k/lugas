@@ -1,0 +1,46 @@
+name: Bug report
+description: Report a defect in Lugas
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for a reproducible report. Security vulnerabilities must **not** be reported here — use [GitHub Security Advisories](https://github.com/ther12k/lugas/security/advisories/new).
+  - type: input
+    id: versions
+    attributes:
+      label: Environment
+      description: Bun version (`bun --version`), OS, and TypeScript version if relevant.
+      placeholder: Bun 1.4.x, Linux x86-64, TypeScript 7.0.2
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: The smallest complete code that shows the problem.
+      placeholder: |
+        ```ts
+        import { defineApp, route, json } from "lugas";
+        ```
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected, including the types you expected where applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead — runtime output, compiler output, or both.
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Workarounds found, related issues, or suspected cause.

@@ -1,0 +1,41 @@
+name: Feature proposal
+description: Propose a capability or integration for Lugas
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: What are you trying to build, and what is missing?
+    validations:
+      required: true
+  - type: dropdown
+    id: placement
+    attributes:
+      label: Proposed placement
+      description: Where should this capability live?
+      options:
+        - Core (zero-dependency)
+        - Optional first-party integration
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Proposed public contract
+      description: The smallest explicit API surface that would solve it (object-based, statically searchable).
+      placeholder: |
+        ```ts
+        // sketch of the proposed API
+        ```
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and requirements
+      description: Effect on the zero-dependency core, typing/contract implications, testing needs, and compatibility (Bun 1.4.x, browser client).
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing workarounds or other frameworks' approaches.
