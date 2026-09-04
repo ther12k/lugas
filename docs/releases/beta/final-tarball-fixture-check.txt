@@ -1,0 +1,5 @@
+path=/home/ther12k/Workspace/Learning/lugas-attest/docs/releases/beta/lugas-0.1.0-beta.1.tgz
+sha256=adab187143c86a5abb0cf357ca074a5a00a466fa37e02202ad9f5251e0415796
+evidence=adab187143c86a5abb0cf357ca074a5a00a466fa37e02202ad9f5251e0415796
+rehearsal=adab187143c86a5abb0cf357ca074a5a00a466fa37e02202ad9f5251e0415796
+result=README fixtures compile against exact release tarball
