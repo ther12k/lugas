@@ -13,7 +13,7 @@ generated:
 
 # Complete GitHub Issue Index
 
-Total: **116** tasks and gates.
+Total: **122** tasks and gates.
 
 | ID | Title | Milestone | Global wave | Local wave | Depends on | Blocks |
 |---|---|---|---:|---:|---|---|
@@ -132,4 +132,10 @@ Total: **116** tasks and gates.
 | [M6-008](../issues/m6/M6-008-run-an-independent-clean-room-agent-implementation-and-review.md) | Run an independent clean-room agent implementation and review | M6 | 43 | 1 | M5-GATE, M4-015, M5-016 | M6-010, M6-GATE |
 | [M6-009](../issues/m6/M6-009-rerun-final-security-performance-type-and-package-evidence.md) | Rerun final security, performance, type, and package evidence | M6 | 44 | 2 | M6-001, M6-006, M6-007 | M6-010, M6-GATE |
 | [M6-010](../issues/m6/M6-010-assemble-the-v0-1-0-beta-1-release-packet.md) | Assemble the v0.1.0-beta.1 release packet | M6 | 45 | 3 | M6-002, M6-003, M6-004, M6-005, M6-008, M6-009 | M6-GATE |
-| [M6-GATE](../issues/m6/M6-GATE-approve-or-reject-the-v0-1-0-beta-1-release-candidate.md) | Approve or reject the v0.1.0-beta.1 release candidate | M6 | 46 | 4 | M6-001, M6-002, M6-003, M6-004, M6-005, M6-006, M6-007, M6-008, M6-009, M6-010 | — |
+| [M6-GATE](../issues/m6/M6-GATE-approve-or-reject-the-v0-1-0-beta-1-release-candidate.md) | Approve or reject the v0.1.0-beta.1 release candidate | M6 | 46 | 4 | M6-001, M6-002, M6-003, M6-004, M6-005, M6-006, M6-007, M6-008, M6-009, M6-010 | M7-001, M7-002, M7-003, M7-004, M7-005 |
+| [M7-001](../issues/m7/M7-001-add-opt-in-native-asset-routes-with-explicit-api-ownership-and-safe-misses.md) | Add opt-in native asset routes with explicit API ownership and safe misses | M7 | 47 | 1 | M6-GATE | M7-GATE |
+| [M7-002](../issues/m7/M7-002-pin-delegated-body-limit-behavior-and-document-transport-level-rejection.md) | Pin delegated body-limit behavior and document transport-level rejection | M7 | 47 | 1 | M6-GATE | M7-003, M7-GATE |
+| [M7-003](../issues/m7/M7-003-add-application-default-and-route-specific-body-budgets.md) | Add application-default and route-specific body budgets | M7 | 48 | 2 | M6-GATE, M7-002 | M7-GATE |
+| [M7-004](../issues/m7/M7-004-add-application-service-lifecycle-with-drain-ordered-shutdown.md) | Add application service lifecycle with drain-ordered shutdown | M7 | 48 | 2 | M6-GATE | M7-GATE |
+| [M7-005](../issues/m7/M7-005-ship-browser-ready-client-javascript.md) | Ship browser-ready client JavaScript | M7 | 48 | 2 | M6-GATE | M7-GATE |
+| [M7-GATE](../issues/m7/M7-GATE-verify-same-origin-milestone-evidence-and-approve-release-integration.md) | Verify same-origin milestone evidence and approve release integration | M7 | 49 | 3 | M7-001, M7-002, M7-003, M7-004, M7-005 | — |
