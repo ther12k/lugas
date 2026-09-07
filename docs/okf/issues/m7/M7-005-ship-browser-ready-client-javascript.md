@@ -65,8 +65,9 @@ A no-build browser cannot resolve the bare `lugas/client` specifier from an npm 
 - Browser-target ESM build of `lugas/client` added to the tarball; `.ts` sources remain the only type source of truth; no hand-maintained `.d.ts` fork.
 - Minimal export-map surface for browser resolvability (exact specifier decided here, per the approved ADR scope — not a general export rewrite).
 - Release pipeline: artifact regenerated per release; enters SBOM/attestation inventory; reproducible from the attested commit.
-- Two distinct browser stages: stage one — plain-JS no-bundler fixture with ordinary `fetch` (browser-to-server evidence); stage two — fixture loading the **installed artifact** in a real browser (module resolution + correct JavaScript MIME type).
-- Final acceptance anchor: the browser loads JavaScript from the installed release artifact, calls the application successfully, and handles the required error and cancellation cases **without rebuilding client source or resolving anything from the source checkout**.
+- Two distinct browser stages: stage one — plain-JS no-bundler fixture with ordinary `fetch` (browser-to-server evidence); stage two — fixture loading the **installed artifact** in a real browser (module resolution + correct JavaScript MIME type). Stage one may be prepared independently; it does not close stage two.
+- Final acceptance anchor: the browser loads JavaScript from the installed release artifact, calls the application successfully, and handles successful responses, declared application failures, native empty errors, cancellation, and transport failures **without rebuilding client source or resolving anything from the source checkout**.
+- Evidence records source SHA, tarball digest, unrelated temporary install path, browser/engine versions, and actual loaded module paths; this lane is same-origin only and does not imply CORS or browser-hosted Bun execution.
 - Consumer fixture installs the packed artifact into an **unrelated temporary directory** with the source checkout out of the resolution path.
 - Type-checking independence: `checkJs` and independent-`tsconfig` fixtures; the plain-JS demonstration requires no TypeScript configuration.
 - Graph test: browser artifact pulls no server-runtime dependency.

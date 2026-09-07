@@ -70,6 +70,7 @@ An application with one large-upload endpoint must currently raise the server-wi
 - Framework-parsed bodies: effective budget enforced during bounded consumption, before parsing and handler execution.
 - Raw-stream routes: byte-counted enforcement through the budgeted body interface that stops further budgeted reads on overflow (handler may have started; no rollback of earlier side effects; no promised replacement of an already-committed response). Permitted narrower implementation: reject budget configuration on unsupported raw paths. An apparently-active but inert budget is a defect, not a design.
 - Dual-threshold evidence: a Lugas-level rejection exercised with a threshold below Bun's threshold.
+- Evidence must distinguish route-level rejection from native-server transport rejection, including their response-envelope boundaries.
 
 ## Non-goals
 

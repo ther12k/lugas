@@ -64,9 +64,16 @@ on Linux CI.
 ## How this was verified
 
 - Matrix: `.github/workflows/compatibility.yml` — 3 OS × 2 Bun = 6 cells,
-  all green. Authoritative merged-tree run (incl. this doc's verifier):
-  [33021193847](https://github.com/ther12k/lugas/actions/runs/33021193847) @ `d9cfd08`;
-  pre-PR candidate run: [33000006619](https://github.com/ther12k/lugas/actions/runs/33000006619) @ `5324aee`.
+  all green. Historical M6 evidence remains in
+  [`docs/reports/m6-compatibility.md`](reports/m6-compatibility.md).
+  The later asset-security matrix run
+  [34087764865](https://github.com/ther12k/lugas/actions/runs/34087764865)
+  tested PR head `418aca29ce8984b7671795e68c9b9867cc543d89`; the landed merge
+  baseline is separately `6d335bfa5ffd572dfca15fb14947127d88d57d21`.
+  These are distinct provenance fields, and the asset run does not replace the
+  historical M6 matrix result.
+  Pre-PR M6 candidate evidence remains
+  [33000006619](https://github.com/ther12k/lugas/actions/runs/33000006619) @ `5324aee`.
 - Local deep verification (full `bun run verify`: typecheck, 605 tests incl.
   security/integration/conformance/docs/golden): linux-x64, Bun 1.4.0, TS 7.0.2.
 - Matrix cells run: `bun install --frozen-lockfile`, `bun run typecheck`,
