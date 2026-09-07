@@ -32,7 +32,12 @@ issue:
   - M6-008
   - M6-009
   - M6-010
-  blocks: []
+  blocks:
+  - M7-001
+  - M7-002
+  - M7-003
+  - M7-004
+  - M7-005
   conflict_group: gate
   owner_decision: true
   recommended_branch: agent/M6-GATE-approve-or-reject-the-v0-1-0-beta-1-release-cand

@@ -52,9 +52,9 @@ interface YamlLine {
   number: number;
 }
 
-const MILESTONES = ["m0", "m1", "m2", "m3", "m4", "m5", "m6"] as const;
+const MILESTONES = ["m0", "m1", "m2", "m3", "m4", "m5", "m6", "m7"] as const;
 const RECOGNIZED_STATUSES = new Set(["draft", "proposed", "accepted", "superseded", "stable"]);
-const ISSUE_ID_PATTERN = /^M[0-6]-(?:GATE|[0-9]{3})$/;
+const ISSUE_ID_PATTERN = /^M[0-7]-(?:GATE|[0-9]{3})$/;
 const DATED_SECTION_PATTERN = /^## \d{4}-\d{2}-\d{2}(?: — .+)?$/;
 
 /** Remove a trailing YAML comment, honoring simple quote state. */
@@ -654,7 +654,7 @@ function collectIssues(rootAbs: string, bundleFiles: BundleFile[], errors: Diagn
     }
     const trimmedId = id.trim();
     if (!ISSUE_ID_PATTERN.test(trimmedId)) {
-      addError(errors, file.rel, "ISSUE_ID_FORMAT", `issue.id '${trimmedId}' does not match M<0-6>-(GATE|NNN)`);
+      addError(errors, file.rel, "ISSUE_ID_FORMAT", `issue.id '${trimmedId}' does not match M<0-7>-(GATE|NNN)`);
     }
     const milestoneDir = segments[1] ?? "";
     const declaredMilestone = (issue as { [key: string]: YamlValue })["milestone"];

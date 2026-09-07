@@ -9,3 +9,4 @@ Each task is one Markdown issue designed for one subagent worktree. Import instr
 - [M4 issues](m4/index.md)
 - [M5 issues](m5/index.md)
 - [M6 issues](m6/index.md)
+- [M7 issues](m7/index.md)
