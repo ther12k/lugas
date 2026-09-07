@@ -11,6 +11,7 @@ import { brand } from "../internal/brands";
 import { compose, type Composition } from "../internal/compose";
 import { buildManifest, type LugasManifestV1 } from "../internal/manifest";
 import { prepareApp, type PreparedApp } from "../internal/prepared-app";
+import type { AssetsConfig } from "../internal/assets";
 import type { LugasApp, MergeModulesRoutes, ModuleDescriptor } from "./types";
 import { serveApp } from "../internal/serve";
 import { assertValidRoutePath } from "../internal/path";
@@ -19,11 +20,18 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
   services?: TServices;
   routes?: TRoutes;
   modules?: ReadonlyArray<ModuleDescriptor<TServices, any>>;
+  /**
+   * Opt-in public asset serving (ADR-0018): explicit file mappings and
+   * directory mounts under explicit URL prefixes, served natively by Bun
+   * through GET/HEAD. Ownership conflicts with API routes are rejected at
+   * startup. Absent assets leave every behavior unchanged.
+   */
+  assets?: AssetsConfig;
   notFound?: (request: Request) => Response | Promise<Response>;
   onError?: (error: unknown, request: Request) => Response | Promise<Response>;
 };
 
-const APP_KEYS = new Set(["services", "routes", "modules", "notFound", "onError"]);
+const APP_KEYS = new Set(["services", "routes", "modules", "assets", "notFound", "onError"]);
 
 export type AppInternals<TServices = unknown> = {
   readonly composition: Composition;
@@ -109,6 +117,7 @@ export function defineApp<
     routes: config.routes,
     modules: config.modules as ReadonlyArray<ModuleDescriptor<TServices, any>> | undefined,
     services: config.services as TServices,
+    assets: config.assets,
     notFound: config.notFound,
     onError: config.onError,
   });

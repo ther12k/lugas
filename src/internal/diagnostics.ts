@@ -14,10 +14,11 @@
  * Data-only diagnostic results (non-throwing, e.g. path analysis) reuse the
  * same code registry through the `LugasDiagnostic` shape.
  */
-export type DiagnosticFamily = "APP" | "MODULE" | "ROUTE" | "GUARD" | "ROUTES" | "RESPONSE" | "TEST";
+export type DiagnosticFamily = "APP" | "ASSET" | "MODULE" | "ROUTE" | "GUARD" | "ROUTES" | "RESPONSE" | "TEST";
 
 export type DiagnosticCode =
   | "LUGAS_APP_001" | "LUGAS_APP_002" | "LUGAS_APP_003" | "LUGAS_APP_004" | "LUGAS_APP_005" | "LUGAS_APP_006"
+  | "LUGAS_ASSET_001" | "LUGAS_ASSET_002" | "LUGAS_ASSET_003" | "LUGAS_ASSET_004"
   | "LUGAS_MODULE_001" | "LUGAS_MODULE_002" | "LUGAS_MODULE_003" | "LUGAS_MODULE_004" | "LUGAS_MODULE_005"
   | "LUGAS_ROUTE_001" | "LUGAS_ROUTE_002" | "LUGAS_ROUTE_003" | "LUGAS_ROUTE_004" | "LUGAS_ROUTE_005"
   | "LUGAS_GUARD_001" | "LUGAS_GUARD_002" | "LUGAS_GUARD_003" | "LUGAS_GUARD_004"
