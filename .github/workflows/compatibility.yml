@@ -30,7 +30,7 @@ jobs:
       # M6-006: the user-facing table must never drift from the matrix source.
       - run: bun run verify:compatibility-report
       - run: bun run typecheck
-      - run: bun test tests/unit/ tests/conformance/
+      - run: bun test tests/unit/ tests/conformance/ tests/static/
       # M6-006-EH (#294): CLI is process/spawn-heavy — verify it per platform.
       - run: bun test tests/cli/ --timeout 30000
       - run: bun test tests/security/ --timeout 30000
