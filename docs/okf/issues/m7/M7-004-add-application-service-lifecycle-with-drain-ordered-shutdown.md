@@ -63,8 +63,8 @@ Applications hand-roll signal handling and cleanup with no defined relationship 
 
 - Service init (declaration order, pre-traffic) and startup-failure disposal of already-initialized services.
 - Drain deadline with documented default and override; deadline expiry reports an **unsuccessful/incomplete outcome**; resources possibly still in use are **not** disposed merely because connections closed.
-- Three distinct reported outcomes: connection closure, tracked-work completion, disposal completion — never one "stopped" boolean.
-- Idempotent shutdown; programmatic stop driving the same path as signals; opt-in SIGINT/SIGTERM handling only.
+- Three distinct reported outcomes: connection closure, tracked-work completion, disposal completion — never one "stopped" boolean. A bounded unsuccessful shutdown does not prove all application work finished; the guarantee covers tracked work only.
+- Idempotent shutdown with cooperative cancellation; programmatic stop driving the same path as signals; opt-in SIGINT/SIGTERM handling only, with no import-time handlers or implicit process exit.
 - Tracked-work boundary documented: detached (unawaited, unregistered) work is not accounted; no implicit process exit; no task-orchestration system.
 - The invariant regression: handler begins database-dependent work → deadline expires → connection force-closed → handler attempts to continue → resource not closed underneath; outcome reported non-cooperating; never fabricated success.
 

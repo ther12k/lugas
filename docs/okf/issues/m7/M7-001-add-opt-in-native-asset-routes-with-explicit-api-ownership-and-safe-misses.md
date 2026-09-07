@@ -46,6 +46,10 @@ An opt-in asset configuration that mounts explicit file mappings and directory m
 
 Same-origin no-build applications need first-party asset serving; the handwritten workaround exposes development diagnostics on misses and entangles API and asset 404s. Approved by owner decision ODR-0003 (`docs/owner-decisions/colorjoy-adr-approvals.md`); acceptance anchor: ColorJoy deletes its custom static-serving implementation without changing API behavior or adding a frontend build requirement.
 
+## Completion evidence
+
+Completed in merged PR [#335](https://github.com/ther12k/lugas/pull/335), landed in `6d335bfa5ffd572dfca15fb14947127d88d57d21`. Final asset-security matrix evidence is [run 34087764865](https://github.com/ther12k/lugas/actions/runs/34087764865), which tested PR head `418aca29ce8984b7671795e68c9b9867cc543d89`; the run head and landed merge baseline are distinct provenance fields. Detailed acceptance mapping remains in `docs/reports/issues/M7-001.md`. This record is complete and is not reopened.
+
 ## Source documents
 
 - [ADR-0018 — Opt-In Public Asset Serving Through the Bun Adapter](../../decisions/0018-opt-in-public-asset-serving.md)

@@ -62,6 +62,8 @@ Milestone gates are the owner's accept/reject point. The already-attested `v0.1.
 - **Global wave:** 49 · **Milestone wave:** 3 · **Conflict group:** `gate`
 - **Agent-ready when:** all five issues are merged with complete evidence and the integrated no-build acceptance fixture has run.
 
+M7-001 and M7-002 are satisfied dependencies, not removed dependencies: M7-001 landed in merged PR [#335](https://github.com/ther12k/lugas/pull/335), and M7-002 landed in merged PR [#334](https://github.com/ther12k/lugas/pull/334). M7-003, M7-004, and M7-005 remain declared incomplete dependencies with their existing owner and dispatch gates.
+
 ## In scope
 
 - Review every `docs/reports/issues/M7-00*.md` against its acceptance checklist; mark unexecuted checks explicitly.
