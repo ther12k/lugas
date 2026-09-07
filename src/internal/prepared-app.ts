@@ -31,6 +31,14 @@ export type SafeServeOptions = {
   port?: number | string;
   hostname?: string;
   development?: boolean;
+  /**
+   * Server body ceiling in bytes, forwarded to `Bun.serve`. Bun enforces it
+   * while consuming the body: requests whose body is larger than this value
+   * are rejected at the transport layer with a bare `413` (empty body) before
+   * parsing, validation, or handler execution. Bodies of exactly this size
+   * are accepted. See `docs/body-limits.md`.
+   */
+  maxRequestBodySize?: number;
   fetch?: (request: Request, server: Bun.Server<unknown>) => Response | Promise<Response>;
   routes?: Record<string, unknown>;
   [key: string]: unknown;
