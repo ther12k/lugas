@@ -18,12 +18,10 @@ import { sendRawRequest } from "./raw-http";
  *   the response. The pinned expectations below are the actual measured
  *   server behavior on Bun 1.4.0 / linux-x64.
  *
- * Measured result (2026-09-07): the server receives the raw encoded target
- * unchanged and returns 404 for `/assets/%2e%2e/index.html` — the directory
- * mount contains the path at the filesystem boundary and performs no
- * route-table normalization of its own. The earlier 200 equivalence
- * (fetch(`/assets/%2e%2e/index.html`) === fetch(`/index.html`)) is therefore
- * attributed to the CLIENT-side URL parser, not to Bun's server.
+ * Bounded conclusion: for the tested verbatim request targets on the
+ * recorded runtime, the native asset path returns an empty 404 without
+ * invoking application not-found handling. The corresponding high-level-client
+ * request is normalized before transmission.
  */
 const PUB = join(import.meta.dir, "fixtures", "public");
 
@@ -59,11 +57,10 @@ describe("M7-001 raw-request provenance (request-target sent verbatim)", () => {
     const { server, port } = startAssetApp();
     try {
       const raw = await sendRawRequest(port!, "/assets/%2e%2e/index.html");
-      // Pinned measured behavior: raw encoded target → 404. The mount never
-      // escapes its directory and Bun does not re-dispatch encoded dot-segments
-      // against the route table. Attribution: the previously observed
-      // fetch-level 200 equivalence is produced by the client-side URL
-      // Standard parser (double-dot segment removal), not by the server.
+      // Bounded finding: for the tested verbatim request target on the recorded
+      // runtime, the native asset path returns an empty 404 without invoking
+      // application not-found handling. The corresponding high-level-client
+      // request is normalized before transmission per the WHATWG URL Standard.
       expect(raw.status).toBe(404);
       expect(raw.body).not.toContain("ColorJoy");
 
