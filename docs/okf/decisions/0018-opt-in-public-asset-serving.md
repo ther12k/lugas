@@ -1,7 +1,7 @@
 ---
 type: Architecture Decision Record
 title: ADR-0018 — Opt-In Public Asset Serving Through the Bun Adapter
-status: proposed
+status: accepted
 tags:
 - adr
 - architecture
