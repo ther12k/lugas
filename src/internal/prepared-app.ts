@@ -22,6 +22,7 @@
 import { diagnostic, duplicateRoute } from "./diagnostics";
 import { makeFact, descriptorFacts, type RouteFact } from "./route-fact";
 import { classifyRoute } from "./classify-route";
+import { compileAssets, type AssetsConfig } from "./assets";
 import { compileRoute } from "./compile-route";
 import { defaultNotFound, defaultOnError, withErrorPolicy, type ErrorPolicy, type NotFoundPolicy } from "./error-policy";
 import type { ModuleDescriptor } from "../core/types";
@@ -82,6 +83,7 @@ export function prepareApp<TServices>(config: {
   routes?: Readonly<Record<string, unknown>> | undefined;
   modules?: ReadonlyArray<ModuleDescriptor<TServices, any>> | undefined;
   services: TServices;
+  assets?: AssetsConfig | undefined;
   notFound?: NotFoundPolicy | undefined;
   onError?: ErrorPolicy | undefined;
 }): PreparedApp {
@@ -240,6 +242,12 @@ export function prepareApp<TServices>(config: {
     }
     compiled[path] = Object.freeze(methodMap);
   }
+
+  // Assets (ADR-0018): ownership is validated against every declared API
+  // path, then compiled to native Bun route values. Asset entries never
+  // produce manifest facts and bypass the Lugas request pipeline.
+  const assetRoutes = compileAssets(config.assets, new Set(declarationsByPath.keys()));
+  Object.assign(compiled, assetRoutes);
 
   return Object.freeze({
     bunRoutes: Object.freeze(freezeContainers(compiled)),

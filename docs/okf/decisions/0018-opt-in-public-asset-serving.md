@@ -72,6 +72,21 @@ The frozen method contract, in substance: **asset mounts serve through GET and H
 - **Error disclosure:** the ENOENT classification in the Problem section; regressions cover both development and production modes. A missing asset remains an ordinary 404; genuine unexpected failures follow an explicit, sanitized response policy and are not indiscriminately disguised as file-not-found.
 - **Containment:** percent-decode-once semantics, double/mixed-encoded traversal rejection, and symlink behavior are probed on Linux — Bun documents Linux containment through `openat2(RESOLVE_IN_ROOT)` — and become mandatory per-platform acceptance gates for whichever platforms the feature claims to support. The Linux result must not become a blanket cross-platform containment claim; symlink/junction and case-folding semantics differ across OSes.
 
+## Amendment: Linux-Only Native Directory Mounts (ODR-0003, 2026-09-07)
+
+Following the empirical compatibility matrix run (GitHub Actions Workflow Run 34085280205 across Linux, macOS, and Windows runners under Bun 1.4.0), native directory routes (`{ dir }`) were proven to follow outside-root symlinks on macOS and Windows, exposing external files with `200 OK`. On Linux, Bun delegates to kernel `openat2(..., RESOLVE_IN_ROOT)` (introduced in Linux 5.6), returning a safe bare 404.
+
+By owner decision, the support contract is tightened: **native directory mounts (`assets.dirs`) are supported on Linux only** (within the evidenced runtime/platform environment and documented `openat2(RESOLVE_IN_ROOT)` containment mechanism). On macOS and Windows, configuring non-empty `assets.dirs` fails closed before server startup with diagnostic `LUGAS_ASSET_004`. Explicit file mappings (`assets.files`), absent assets, and empty directory maps (`dirs: {}`) remain fully supported across all platforms.
+
+| Configuration | Verified Linux environment | macOS / Windows |
+|---|---|---|
+| No assets configured | Existing behavior unchanged | Existing behavior unchanged |
+| Explicit `assets.files` mappings only | Supported under existing contract and tests | Supported under existing contract and tests |
+| Nonempty `assets.dirs` | Supported, with containment regressions required | Rejected before server startup (`LUGAS_ASSET_004`) |
+| Mixed file and directory mappings | Supported, with existing validation | Entire configuration rejected atomically; no partial listener |
+
+Lugas does not become Linux-only; this particular directory-serving capability does. Explicit `assets.files` mappings remain available across platforms under their own trust boundary: the application explicitly selects trusted files for publication (noting that file-backed responses read the filesystem during requests and do not constitute an immutable memory cache against subsequent disk mutations).
+
 ## Release impact
 
 The approved target is the next release candidate after `v0.1.0-beta.1`; the attested beta.1 artifact set is preserved unmodified. New implementation and package bytes enter through the normal release pipeline and require their own applicable release evidence (attestation, checksums, consumer rehearsal) per the evidence-gated claims policy ([ADR-0016](0016-evidence-gated-claims.md)).

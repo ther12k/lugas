@@ -16,6 +16,8 @@
 
 Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
 
+`defineApp()` also accepts `assets` (opt-in, ADR-0018): `{ files: { "/robots.txt": "./public/robots.txt" }, dirs: { "/assets/*": "./public/assets" } }`. File mappings are literal exact paths; directory mounts are explicit prefixes ending in `/*`. Native directory mounts (`assets.dirs`) are supported on Linux only (relying on kernel `openat2(RESOLVE_IN_ROOT)` for symlink containment); configuring `dirs` on macOS or Windows fails closed before startup (`LUGAS_ASSET_004`). File mappings (`assets.files`) are supported across all platforms. Assets are served natively by Bun through GET/HEAD; other methods reach the app's not-found policy (no 405). Ownership conflicts with API routes are rejected at startup (`LUGAS_ASSET_002`). Asset routes are outside the manifest and the request pipeline (no guards, no `onError`).
+
 ## Client subpath (`lugas/client`)
 
 | Export | Kind | Status |

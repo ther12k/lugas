@@ -262,6 +262,34 @@ problem(status, problem);
 empty(status);
 ```
 
+## Serving public assets
+
+Opt-in, same-origin, no build step (ADR-0018):
+
+```ts
+import { defineApp, json, route } from "lugas";
+
+const app = defineApp({
+  routes: {
+    "/api/ping": {
+      GET: route({ handler: () => json(200, { pong: true }) }),
+    },
+  },
+  assets: {
+    files: { "/index.html": "./public/index.html" },
+    dirs: { "/assets/*": "./public/assets" },
+  },
+});
+```
+
+- File mappings are exact literal paths (`/robots.txt`); directory mounts are explicit prefixes ending in `/*` (root catch-alls are not supported).
+- Native directory mounts (`assets.dirs`) require Linux with `openat2(RESOLVE_IN_ROOT)` for symlink containment; on macOS and Windows, configuring directory mounts fails closed at startup (`LUGAS_ASSET_004`). Explicit file mappings (`assets.files`) are supported across all platforms.
+- Assets are served natively by Bun: correct MIME types, `ETag`/`Last-Modified` conditional requests, and range requests.
+- Methods: GET and HEAD serve assets. Other methods reach the app's not-found policy — a 405 is not promised.
+- Misses stay distinguishable: a missing file under `/assets/*` is a plain asset 404; an unknown API path gets your API's not-found response.
+- Ownership is validated at startup: an asset declaration that overlaps an API route (or another asset declaration) fails with `LUGAS_ASSET_002` instead of silently winning or losing by declaration order.
+- Keep protected files outside served directories; asset responses bypass guards and `onError` (they never enter the request pipeline).
+
 ## Next steps
 
 - [`examples/`](../examples/README.md) — runnable single-concept applications.

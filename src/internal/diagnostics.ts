@@ -14,10 +14,11 @@
  * Data-only diagnostic results (non-throwing, e.g. path analysis) reuse the
  * same code registry through the `LugasDiagnostic` shape.
  */
-export type DiagnosticFamily = "APP" | "MODULE" | "ROUTE" | "GUARD" | "ROUTES" | "RESPONSE" | "TEST";
+export type DiagnosticFamily = "APP" | "ASSET" | "MODULE" | "ROUTE" | "GUARD" | "ROUTES" | "RESPONSE" | "TEST";
 
 export type DiagnosticCode =
   | "LUGAS_APP_001" | "LUGAS_APP_002" | "LUGAS_APP_003" | "LUGAS_APP_004" | "LUGAS_APP_005" | "LUGAS_APP_006"
+  | "LUGAS_ASSET_001" | "LUGAS_ASSET_002" | "LUGAS_ASSET_003" | "LUGAS_ASSET_004"
   | "LUGAS_MODULE_001" | "LUGAS_MODULE_002" | "LUGAS_MODULE_003" | "LUGAS_MODULE_004" | "LUGAS_MODULE_005"
   | "LUGAS_ROUTE_001" | "LUGAS_ROUTE_002" | "LUGAS_ROUTE_003" | "LUGAS_ROUTE_004" | "LUGAS_ROUTE_005"
   | "LUGAS_GUARD_001" | "LUGAS_GUARD_002" | "LUGAS_GUARD_003" | "LUGAS_GUARD_004"
@@ -58,6 +59,10 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_APP_004", thrownBy: "defineApp()", meaning: "modules entry is not a defineModule() descriptor", hint: "create modules with defineModule({ name, routes })" },
   { code: "LUGAS_APP_005", thrownBy: "defineApp()", meaning: "duplicate module name", hint: "module names must be unique within an app" },
   { code: "LUGAS_APP_006", thrownBy: "defineApp()", meaning: "'routes' must be an object keyed by full path", hint: 'use string paths like "/users/:id"' },
+  { code: "LUGAS_ASSET_001", thrownBy: "defineApp()", meaning: "invalid asset configuration", hint: "files keys are literal exact paths; dirs keys are explicit prefixes ending in '/*'" },
+  { code: "LUGAS_ASSET_002", thrownBy: "defineApp()", meaning: "ambiguous asset/API ownership", hint: "asset declarations and API routes must own disjoint paths; change one of them" },
+  { code: "LUGAS_ASSET_003", thrownBy: "defineApp()", meaning: "asset declaration does not point at existing content", hint: "check the filesystem path (relative paths resolve from process working directory)" },
+  { code: "LUGAS_ASSET_004", thrownBy: "defineApp()", meaning: "native directory mounts unsupported on this platform", hint: "assets.dirs requires Linux with openat2(RESOLVE_IN_ROOT); use explicit assets.files on other platforms" },
   { code: "LUGAS_MODULE_001", thrownBy: "defineModule()", meaning: "config must be an object", hint: "pass defineModule({ name, routes })" },
   { code: "LUGAS_MODULE_002", thrownBy: "defineModule()", meaning: "unknown config key", hint: "allowed keys: name, routes" },
   { code: "LUGAS_MODULE_003", thrownBy: "defineModule()", meaning: "'name' must be a non-empty string", hint: "module names appear in manifests; use stable names" },
