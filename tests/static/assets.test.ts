@@ -6,6 +6,7 @@ import { route } from "../../src/core/route";
 import { json } from "../../src/core/response";
 import { defineModule } from "../../src/core/module";
 import { guard } from "../../src/core/guard";
+import { sendRawRequest } from "./raw-http";
 
 /**
  * M7-001 — opt-in public asset serving (ADR-0018).
@@ -219,10 +220,10 @@ describe("M7-001 containment (platform: linux-x64, Bun 1.4.0)", () => {
     }
   });
 
-  test("symlinked entry pointing outside the served tree does not serve (linux-x64)", async () => {
-    // linux-only label: symlink containment was verified on linux-x64 only;
-    // macOS/Windows lanes must assert their own behavior before any claim.
-    if (process.platform !== "linux") return;
+  test.skipIf(process.platform !== "linux")("symlinked entry pointing outside the served tree does not serve (linux-x64 only; other platforms: NOT EXERCISED)", async () => {
+    // Deliberately linux-gated via skipIf so the skip is VISIBLE in non-linux
+    // runs: symlink containment is verified on linux-x64 only; macOS/Windows
+    // lanes must assert their own behavior before any containment claim.
     if (!existsSync(SYMLINK)) symlinkSync("/etc/hostname", SYMLINK);
     try {
       const { server, get } = await serve(appConfig());
@@ -238,11 +239,21 @@ describe("M7-001 containment (platform: linux-x64, Bun 1.4.0)", () => {
     }
   });
 
-  test("case variations do not resolve on the case-sensitive tested filesystem (linux-x64)", async () => {
+  test("case variations follow the tested platform's filesystem semantics (per-platform pin)", async () => {
     const { server, get } = await serve(appConfig());
     try {
       const r = await get("/assets/App.js");
-      expect(r.status).toBe(404);
+      if (process.platform === "linux") {
+        // linux-x64: case-sensitive filesystem — the variation is a miss.
+        expect(r.status).toBe(404);
+      } else {
+        // darwin/windows: case-insensitive default filesystems — the variation
+        // RESOLVES. This is the documented hazard: overlapping route protection
+        // must never rely on case-sensitive routing over such filesystems
+        // (ADR-0018 public-directory boundary). Pinned as platform truth, not
+        // as a containment pass.
+        expect(r.status).toBe(200);
+      }
     } finally {
       server.stop(true);
     }
@@ -290,6 +301,76 @@ describe("M7-001 framework boundaries", () => {
       const manifestRoutes = JSON.stringify(app.manifest.routes);
       expect(manifestRoutes).toContain("/api/secret");
       expect(manifestRoutes).not.toContain("/assets");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("encoded path normalizing onto a guarded API route preserves the guard decision (owner merge condition)", async () => {
+    let guardRuns = 0;
+    let handlerRuns = 0;
+    const auth = guard({
+      name: "auth",
+      handler: (ctx) => {
+        guardRuns += 1;
+        if (ctx.request.headers.get("authorization") !== "Bearer tok") {
+          return json(401, { error: "unauthorized" });
+        }
+        return {};
+      },
+    });
+    const app = defineApp({
+      routes: {
+        "/api/private": {
+          GET: route({
+            before: [auth],
+            handler: () => {
+              handlerRuns += 1;
+              return json(200, { secret: "protected-payload" });
+            },
+          }),
+        },
+      },
+      assets: {
+        files: { "/index.html": join(PUB, "index.html") },
+        dirs: { "/assets/*": join(PUB, "assets") },
+      },
+    });
+    const server = app.serve({ port: 0, development: false });
+    const base = `http://localhost:${server.port}`;
+    try {
+      // Direct: guard rejects, handler never runs.
+      const direct = await fetch(base + "/api/private");
+      expect(direct.status).toBe(401);
+      expect(guardRuns).toBe(1);
+      expect(handlerRuns).toBe(0);
+
+      // High-level client with the encoded spelling: the URL parser normalizes
+      // it to /api/private before the server sees it — the guard decision
+      // must be identical, the handler still gated, no asset bytes returned.
+      const encoded = await fetch(base + "/assets/%2e%2e/api/private");
+      expect(encoded.status).toBe(401);
+      expect(JSON.parse(await encoded.text())).toEqual({ error: "unauthorized" });
+      expect(guardRuns).toBe(2);
+      expect(handlerRuns).toBe(0);
+
+      // Authenticated: the normalized spelling reaches the handler identically.
+      const ok = await fetch(base + "/assets/%2e%2e/api/private", { headers: { authorization: "Bearer tok" } });
+      expect(ok.status).toBe(200);
+      expect(await ok.text()).toContain("protected-payload");
+      expect(handlerRuns).toBe(1);
+      expect(guardRuns).toBe(3);
+
+      // Raw request-target sent verbatim (provenance per raw-request.test.ts):
+      // the server declines the encoded target at the native routing layer —
+      // bare 404, empty body; the route, its guard, and its handler are never
+      // reached, and no protected bytes appear.
+      const raw = await sendRawRequest(server.port!, "/assets/%2e%2e/api/private");
+      expect(raw.status).toBe(404);
+      expect(raw.body).toBe("");
+      expect(guardRuns).toBe(3);
+      expect(handlerRuns).toBe(1);
+      expect(raw.body).not.toContain("protected-payload");
     } finally {
       server.stop(true);
     }
