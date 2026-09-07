@@ -29,7 +29,7 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_ASSET_001 | defineApp() assets | invalid asset configuration | files keys are literal exact paths; dirs keys are explicit prefixes ending in "/*" pointing at existing directories |
 | LUGAS_ASSET_002 | defineApp() assets | ambiguous asset/API ownership | asset declarations and API routes must own disjoint paths; change one of them |
 | LUGAS_ASSET_003 | defineApp() assets | asset declaration does not point at existing content | check the filesystem path (relative paths resolve from the process working directory) |
-| LUGAS_ASSET_004 | defineApp() assets | asset configuration requires an existing public directory | public content only; keep protected files outside served directories |
+| LUGAS_ASSET_004 | defineApp() assets | native directory mounts unsupported on this platform | assets.dirs requires Linux with openat2(RESOLVE_IN_ROOT); use explicit assets.files on other platforms |
 | LUGAS_MODULE_001 | defineModule() | config must be an object | pass defineModule({ name, routes }) |
 | LUGAS_MODULE_002 | defineModule() | unknown config key | allowed keys: name, routes |
 | LUGAS_MODULE_003 | defineModule() | 'name' must be a non-empty string | module names appear in manifests; use stable names |

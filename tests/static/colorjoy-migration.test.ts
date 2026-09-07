@@ -18,7 +18,9 @@ import { z } from "zod";
  * behavior and requiring zero build step.
  */
 describe("M7-001 ColorJoy migration consumer fixture", () => {
-  test("ColorJoy application structure functions cleanly with native asset routes", async () => {
+  test.skipIf(process.platform !== "linux")(
+    "ColorJoy application structure functions cleanly with native asset routes (Linux supported environment)",
+    async () => {
     const root = mkdtempSync(join(tmpdir(), "colorjoy-fixture-"));
     mkdirSync(join(root, "artworks"), { recursive: true });
     mkdirSync(join(root, "source"), { recursive: true });
@@ -201,4 +203,44 @@ describe("M7-001 ColorJoy migration consumer fixture", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test.skipIf(process.platform === "linux")(
+    "ColorJoy configuration with /artworks/* directory mount fails closed before startup on non-Linux platforms (ADR-0018 amendment)",
+    () => {
+      const root = mkdtempSync(join(tmpdir(), "colorjoy-fixture-nonlinux-"));
+      mkdirSync(join(root, "artworks"), { recursive: true });
+      writeFileSync(join(root, "index.html"), "<!doctype html>ColorJoy", "utf8");
+
+      try {
+        let thrown: unknown;
+        try {
+          defineApp({
+            routes: {
+              "/api/health": {
+                GET: route({ handler: () => json(200, { ok: true, service: "colorjoy" }) }),
+              },
+            },
+            assets: {
+              files: {
+                "/": join(root, "index.html"),
+              },
+              dirs: {
+                "/artworks/*": join(root, "artworks"),
+              },
+            },
+          });
+        } catch (e) {
+          thrown = e;
+        }
+
+        const err = thrown as { name?: string; code?: string; message?: string; hint?: string };
+        expect(err?.name).toBe("LugasDiagnosticError");
+        expect(err?.code).toBe("LUGAS_ASSET_004");
+        expect(err?.message).toContain("unsupported on platform");
+        expect(err?.hint).toContain("openat2(RESOLVE_IN_ROOT)");
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 });

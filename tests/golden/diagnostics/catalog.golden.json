@@ -36,6 +36,30 @@
     "hint": "use string paths like \"/users/:id\""
   },
   {
+    "code": "LUGAS_ASSET_001",
+    "thrownBy": "defineApp()",
+    "meaning": "invalid asset configuration",
+    "hint": "files keys are literal exact paths; dirs keys are explicit prefixes ending in '/*'"
+  },
+  {
+    "code": "LUGAS_ASSET_002",
+    "thrownBy": "defineApp()",
+    "meaning": "ambiguous asset/API ownership",
+    "hint": "asset declarations and API routes must own disjoint paths; change one of them"
+  },
+  {
+    "code": "LUGAS_ASSET_003",
+    "thrownBy": "defineApp()",
+    "meaning": "asset declaration does not point at existing content",
+    "hint": "check the filesystem path (relative paths resolve from process working directory)"
+  },
+  {
+    "code": "LUGAS_ASSET_004",
+    "thrownBy": "defineApp()",
+    "meaning": "native directory mounts unsupported on this platform",
+    "hint": "assets.dirs requires Linux with openat2(RESOLVE_IN_ROOT); use explicit assets.files on other platforms"
+  },
+  {
     "code": "LUGAS_MODULE_001",
     "thrownBy": "defineModule()",
     "meaning": "config must be an object",

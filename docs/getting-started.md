@@ -283,6 +283,7 @@ const app = defineApp({
 ```
 
 - File mappings are exact literal paths (`/robots.txt`); directory mounts are explicit prefixes ending in `/*` (root catch-alls are not supported).
+- Native directory mounts (`assets.dirs`) require Linux with `openat2(RESOLVE_IN_ROOT)` for symlink containment; on macOS and Windows, configuring directory mounts fails closed at startup (`LUGAS_ASSET_004`). Explicit file mappings (`assets.files`) are supported across all platforms.
 - Assets are served natively by Bun: correct MIME types, `ETag`/`Last-Modified` conditional requests, and range requests.
 - Methods: GET and HEAD serve assets. Other methods reach the app's not-found policy — a 405 is not promised.
 - Misses stay distinguishable: a missing file under `/assets/*` is a plain asset 404; an unknown API path gets your API's not-found response.

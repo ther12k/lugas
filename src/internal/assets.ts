@@ -130,6 +130,22 @@ export function compileAssets(assets: AssetsConfig | undefined, apiPaths: Readon
     }
   }
 
+  // Native directory mounts require OS-level symlink containment (openat2 on Linux).
+  // On non-Linux platforms (macOS, Windows), Bun's native directory routes follow
+  // outside-root symlinks, exposing external files over HTTP (ADR-0018 amendment).
+  // Fail closed before startup: reject nonempty assets.dirs on non-Linux platforms.
+  const dirKeys = Object.keys(dirs);
+  if (dirKeys.length > 0 && process.platform !== "linux") {
+    throw diagnostic(
+      "LUGAS_ASSET_004",
+      `defineApp(): native directory mounts ('assets.dirs') are unsupported on platform '${process.platform}'`,
+      {
+        hint: "assets.dirs requires Linux with openat2(RESOLVE_IN_ROOT); use explicit assets.files on other platforms",
+        context: { platform: process.platform, count: dirKeys.length },
+      },
+    );
+  }
+
   // Fail-closed ownership: reject mutual pattern overlap with API routes or
   // other asset declarations. Bun's match specificity is never relied upon
   // to resolve API/asset ambiguity.

@@ -38,7 +38,9 @@ function startAssetApp(): { server: Bun.Server<unknown>; port: number } {
   return { server, port: server.port! };
 }
 
-describe("M7-001 raw-request provenance (request-target sent verbatim)", () => {
+describe.skipIf(process.platform !== "linux")(
+  "M7-001 raw-request provenance (request-target sent verbatim, Linux native mounts)",
+  () => {
   test("controls: literal asset targets serve over raw TCP", async () => {
     const { server, port } = startAssetApp();
     try {
