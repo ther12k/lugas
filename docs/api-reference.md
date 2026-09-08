@@ -8,15 +8,41 @@
 | `defineModule(config)` | function | stable |
 | `route(config)` | function | stable |
 | `guard(config)` | function | stable |
+| `service(config)` | function | stable (M7-004) |
 | `json(status, data)` | function | stable |
 | `text(status, body)` | function | stable |
 | `empty()` | function | stable |
 | `problem(status, fields)` | function | stable |
 | `redirect(location)` | function | stable |
 
-Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
+Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
 
 `defineApp()` also accepts `assets` (opt-in, ADR-0018): `{ files: { "/robots.txt": "./public/robots.txt" }, dirs: { "/assets/*": "./public/assets" } }`. File mappings are literal exact paths; directory mounts are explicit prefixes ending in `/*`. Native directory mounts (`assets.dirs`) are supported on Linux only (relying on kernel `openat2(RESOLVE_IN_ROOT)` for symlink containment); configuring `dirs` on macOS or Windows fails closed before startup (`LUGAS_ASSET_004`). File mappings (`assets.files`) are supported across all platforms. Assets are served natively by Bun through GET/HEAD; other methods reach the app's not-found policy (no 405). Ownership conflicts with API routes are rejected at startup (`LUGAS_ASSET_002`). Asset routes are outside the manifest and the request pipeline (no guards, no `onError`).
+
+### Service lifecycle (ADR-0020)
+
+`service()` attaches lifecycle behavior to one entry of `defineApp({ services })`:
+
+```ts
+import { defineApp, service } from "lugas";
+
+defineApp({
+  services: {
+    db: service({
+      name: "db",
+      value: createDb(),
+      init: async (db) => { await db.connect(); },
+      dispose: async (db) => { await db.close(); },
+    }),
+  },
+});
+```
+
+- `init` runs at serve time in declaration order (the `services` object key order) and **no Lugas handler executes before every `init` has settled**; requests arriving early are held. A startup failure disposes already-initialized services in reverse and surfaces through `server.lugasLifecycle.ready` (rejection) plus a redacted `503` on held routes. Plain (non-`service()`) values keep today's live-reference behavior and are never initialized or disposed.
+- `server.lugasLifecycle.shutdown()` is idempotent and runs: stop accepting → drain in-flight requests **and** tasks registered through `track()` under a deadline (`serve({ shutdown: { drainDeadlineMs } })`, default 10s) → reverse-order disposal. Three outcomes are reported distinctly (`connectionsClosed`, `trackedWorkCompleted`, `disposalCompleted`) plus `disposalFailures`.
+- **Deadline invariant:** when the deadline expires with work remaining, the outcome is unsuccessful (`cooperated: false`, `deadlineExpired: true`); connections are force-closed but services possibly still in use are **not** disposed — continuing work observes an intact resource, never fabricated success. The guarantee covers tracked work only; detached work is the application's responsibility.
+- Signals are opt-in: `serve({ shutdown: { signals: true } })` handles SIGINT/SIGTERM through the same shutdown path. Importing Lugas installs no handlers and never exits the process.
+- Raw/native route values (plain functions, `Response`, `Bun.file`, `{ dir }`) and asset routes bypass the framework pipeline and are therefore not lifecycle-gated.
 
 ## Client subpath (`lugas/client`)
 

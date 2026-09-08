@@ -141,6 +141,7 @@ Types describe the wire. A handler returning `json(200, { createdAt: new Date() 
 | Status-discriminated, wire-honest responses (`json`/`text`/`problem`/`empty`) | Available |
 | RFC 9457 Problem Details + redacted 500s | Available |
 | End-to-end typed client (`lugas/client`, browser-safe) | Available |
+| Service lifecycle: init, drain-ordered shutdown, reverse disposal (`service()`) | Available |
 | Test-server helpers (`lugas/testing`) | Available |
 | Static route manifest + inspection CLI (`lugas-manifest-v1`) | Available |
 | OpenAPI 3.1, Scalar, CORS, SSE, structured logging, Drizzle | Planned — see [roadmap](#roadmap) |
