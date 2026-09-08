@@ -1,6 +1,6 @@
 {
   "format": "lugas-sbom-v0",
-  "generatedAt": "2026-09-04T22:40:31.119Z",
+  "generatedAt": "2026-09-08T20:38:36.636Z",
   "packageName": "lugas",
   "packageVersion": "0.1.0-beta.1",
   "derivation": "staged package.json dependencies/optionalDependencies/peerDependencies",
@@ -31,6 +31,15 @@
       "scope": "dev"
     }
   ],
-  "tarballEntryCount": 70,
+  "generatedComponents": [
+    {
+      "name": "lugas-client-browser",
+      "path": "build/lugas-client.esm.js",
+      "sha256": "a991b7522270762c6b9644e77ec5ae4c70706fbdbbfa3324c4464597f2e8cf50",
+      "builtFrom": "src/client/index.ts",
+      "builtBy": "scripts/release/build-browser-client.ts (Bun 1.4.0, target=browser, format=esm)"
+    }
+  ],
+  "tarballEntryCount": 75,
   "zeroProductionRuntimeDependency": true
 }

@@ -2,8 +2,8 @@
 
 | Field | Value |
 |---|---|
-| Package Source Commit | `c62b678828192021a0a42028a355b3436802189a` (tag must point here) |
-| Attestation Commit | `c62b678828192021a0a42028a355b3436802189a` (checkout that ran the gate + builder) |
+| Package Source Commit | `ae4e29f758fd49b045a03e0af1dbb2a8fb98e1cd` (tag must point here) |
+| Attestation Commit | `ae4e29f758fd49b045a03e0af1dbb2a8fb98e1cd` (checkout that ran the gate + builder) |
 | Target Package | `lugas@0.1.0-beta.1` |
 | Registry Target | `https://registry.npmjs.org/` with tag `beta` |
 
@@ -14,7 +14,7 @@
 - [x] **Repository Verification:** `bun run verify` executed by this builder with `LUGAS_PERF_RELEASE=1` — exit 0 (typecheck, tests, docs, diff, release-mode perf gate).
 - [x] **Typecheck Integrity:** included in the builder-executed verify (`tsc --noEmit`, strict compiler options).
 - [x] **Performance Gate:** release-mode gate executed during assembly; `release-evidence.json` records 0 blocking failures, 0 alerts, bound to the commits above.
-- [x] **Package Rehearsal:** `release:package:rehearse` passed 16/16 checks with dry-run publication validated (`package-rehearsal.json`).
+- [x] **Package Rehearsal:** `release:package:rehearse` passed 21/21 checks with dry-run publication validated (`package-rehearsal.json`).
 - [x] **Clean-Room Proof:** independent clean-room suite ran inside the builder-executed verify (`bun test`).
 - [x] **Owner Decisions Recorded:** `docs/owner-decisions/naming-assets.md` (ODR-0001), `docs/owner-decisions/license-governance.md` (ODR-0002) — presence checked by the builder.
 - [x] **Legal & Attribution:** `LICENSE` (full Apache-2.0), `NOTICE`, `SECURITY.md`, `GOVERNANCE.md` — presence checked by the builder.
@@ -43,7 +43,7 @@ if npm view lugas version >/dev/null 2>&1; then  # the name MUST still be unclai
 fi
 
 # 1. Pin the reviewed source BEFORE the irreversible registry action
-git tag -a "v0.1.0-beta.1" "c62b678828192021a0a42028a355b3436802189a" -m "LugasJS v0.1.0-beta.1 release candidate"
+git tag -a "v0.1.0-beta.1" "ae4e29f758fd49b045a03e0af1dbb2a8fb98e1cd" -m "LugasJS v0.1.0-beta.1 release candidate"
 git push origin "v0.1.0-beta.1"
 
 # 2. Publish the exact attested tarball
