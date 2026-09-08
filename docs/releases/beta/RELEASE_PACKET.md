@@ -1,10 +1,10 @@
 # LugasJS v0.1.0-beta.1 Release Packet
 
 **Candidate Version:** `0.1.0-beta.1`  
-**Package Source Commit:** `c62b678828192021a0a42028a355b3436802189a`  
-**Attestation Commit:** `c62b678828192021a0a42028a355b3436802189a` (`c62b678`)
+**Package Source Commit:** `ae4e29f758fd49b045a03e0af1dbb2a8fb98e1cd`  
+**Attestation Commit:** `ae4e29f758fd49b045a03e0af1dbb2a8fb98e1cd` (`ae4e29f`)
 
-**Generated:** 2026-09-04T22:40:45.096Z  
+**Generated:** 2026-09-08T22:41:55.678Z  
 **Runtime:** Bun 1.4.0 · TypeScript 7.0.2 · Linux x86-64 / macOS arm64 / Windows x64  
 **Package:** `lugas` (unscoped) · License: Apache-2.0 · Repo: `ther12k/lugas`
 
@@ -44,6 +44,7 @@ Publication remains strictly gated on owner approval in **M6-GATE**.
 - [`docs/reports/gates/M5.md`](../../reports/gates/M5.md)
 - [`docs/reports/gates/M5R1-GATE.md`](../../reports/gates/M5R1-GATE.md)
 - [`docs/reports/gates/M6.md`](../../reports/gates/M6.md)
+- [`docs/reports/gates/M7.md`](../../reports/gates/M7.md)
 
 ### Candidate Evidence (canonical for THIS candidate)
 - [`docs/releases/beta/release-evidence.json`](release-evidence.json) — `lugas-release-evidence-v2`; two-identity bindings (`packageSourceCommit` + `attestationCommit`), measured medians, tarball hash
@@ -65,10 +66,10 @@ Publication remains strictly gated on owner approval in **M6-GATE**.
 
 | Scenario / Metric | Release Floor | Alert Floor | Target | Candidate Measured | Result |
 |---|---|---|---|---|---|
-| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **130,246 rps** (-16.2% vs raw Bun) | ✅ Exceeded |
-| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **101,739 rps** | ✅ Exceeded |
-| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **62,550 rps** | ✅ Exceeded (14.4% validated overhead vs raw Bun) |
-| Typecheck Duration | — | — | < 2,000ms | **926ms** | ✅ Measured on candidate |
+| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **120,562 rps** (-8.6% vs raw Bun) | ✅ Exceeded |
+| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **95,186 rps** | ✅ Exceeded |
+| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **57,452 rps** | ✅ Exceeded (13.9% validated overhead vs raw Bun) |
+| Typecheck Duration | — | — | < 2,000ms | **979ms** | ✅ Measured on candidate |
 | Client Bundle Size | — | — | < 25,000 B | **14900 B** | ✅ Measured on candidate |
 
 ---
@@ -95,7 +96,7 @@ Publication remains strictly gated on owner approval in **M6-GATE**.
 ## 7. Supply Chain & Package Verification
 
 - **Production Dependencies:** **0** (zero runtime dependencies).
-- **Tarball Entry Count:** **70** files (strict whitelist; no tests/benchmarks/worktrees).
+- **Tarball Entry Count:** **75** files (strict whitelist; no tests/benchmarks/worktrees).
 - **Publication Dry-Run:** Validated via `npm publish --dry-run --access public --tag beta`.
 - **Artifact Manifest:** Checksums and provenance recorded in `docs/releases/beta/SHA256SUMS`.
 
