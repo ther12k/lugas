@@ -52,8 +52,9 @@ on Linux CI.
 
 | Environment | Status |
 |---|---|
+| Prebuilt browser artifact (`lugas/client/browser` → `build/lugas-client.esm.js`) | ✅ shipped in the packed tarball; same-origin real-browser execution verified — see [`reports/issues/M7-005.md`](reports/issues/M7-005.md) |
 | Bun.build browser target → standalone Node execution with fetch stub | ✅ (linux-x64 CI; no Bun global references permitted by graph check) |
-| Real browsers | ⚠️ not executed in CI — bundle-level proof only (source-graph browser-safety checks); no automation driver in beta scope |
+| Real browsers in the per-OS compatibility matrix | ⚠️ not part of the 6-cell matrix — the automation-driven same-origin lane (`tests/browser/`, zero-dependency CDP driver) executes in the Linux verify gate and skips cleanly where no browser binary exists |
 
 ## Explicit non-goals / unsupported
 

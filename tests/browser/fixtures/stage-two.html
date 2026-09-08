@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8" /><title>lugas stage two — installed artifact</title></head>
+  <body>
+    <!--
+      M7-005 stage two (ADR-0021): a plain-JS, no-bundler page importing the
+      INSTALLED prebuilt artifact by same-origin URL. The artifact file is
+      served from node_modules/lugas/build/ of a temporary tarball install —
+      the source checkout is not on this page's resolution path. No
+      TypeScript configuration of any kind participates in this flow.
+    -->
+    <script type="module">
+      window.__started = true;
+      window.addEventListener("error", (event) => {
+        window.__pageError = String(event.message ?? event.error ?? "unknown error");
+      });
+      window.addEventListener("unhandledrejection", (event) => {
+        window.__pageError = String(event.reason?.message ?? event.reason ?? "unhandled rejection");
+      });
+      import { createClient } from "/lugas-client.esm.js";
+      window.__moduleUrl = import.meta.url;
+      const origin = window.location.origin;
+      const api = createClient({ baseUrl: origin });
+      const results = {};
+      const record = async (name, fn) => {
+        try {
+          results[name] = { ok: true, value: await fn() };
+        } catch (error) {
+          results[name] = { ok: false, error: error && error.name ? error.name : String(error) };
+        }
+      };
+      await record("mime", async () => {
+        const response = await fetch("/lugas-client.esm.js");
+        window.__moduleUrl = response.url;
+        return response.headers.get("content-type");
+      });
+      await record("typed-ok", async () => {
+        const result = await api.get("/api/ok");
+        return { ok: result.ok, status: result.status, data: result.data };
+      });
+      await record("typed-conflict", async () => {
+        const result = await api.get("/api/conflict");
+        return { ok: result.ok, status: result.status, isProblem: Boolean(result.error && result.error.title) };
+      });
+      await record("typed-server-error", async () => {
+        const result = await api.get("/api/boom");
+        return {
+          ok: result.ok,
+          status: result.status,
+          leaksSecret: JSON.stringify(result.error ?? null).includes("boom-secret"),
+        };
+      });
+      await record("typed-empty", async () => {
+        const result = await api.get("/api/empty");
+        return { ok: result.ok, status: result.status, data: result.data };
+      });
+      await record("typed-abort", async () => {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 20);
+        const result = await api.get("/api/slow", { init: { signal: controller.signal } });
+        return { ok: result.ok };
+      });
+      await record("typed-transport", async () => {
+        const broken = createClient({ baseUrl: origin, fetch: () => Promise.reject(new TypeError("simulated network failure")) });
+        const result = await broken.get("/api/ok");
+        return { ok: result.ok };
+      });
+      window.__results = results;
+      window.__done = true;
+    </script>
+  </body>
+</html>

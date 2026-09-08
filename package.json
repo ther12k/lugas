@@ -13,6 +13,9 @@
       "types": "./src/client/index.ts",
       "default": "./src/client/index.ts"
     },
+    "./client/browser": {
+      "default": "./build/lugas-client.esm.js"
+    },
     "./testing": {
       "types": "./src/testing/index.ts",
       "default": "./src/testing/index.ts"
@@ -20,6 +23,7 @@
   },
   "files": [
     "src",
+    "build",
     "README.md",
     "NOTICE",
     "AGENTS.md",
@@ -29,6 +33,7 @@
     "versions": "bun --version && tsc --version",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "build:browser-client": "bun run scripts/release/build-browser-client.ts",
     "verify:docs": "bun run scripts/verify-okf.ts",
     "verify": "bun run scripts/verify.ts",
     "release:package:rehearse": "bun run scripts/release/package-beta.ts",

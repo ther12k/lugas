@@ -114,6 +114,19 @@ async function main(): Promise<void> {
   writeFileSync(pkgJsonPath, JSON.stringify(pkg, null, 2) + "\n");
 
   // ------------------------------------------------------------------
+  // Stage 1b: browser-executable client artifact (M7-005 / ADR-0021).
+  // Built from the same committed sources into the staged copy so the
+  // packed tarball carries the prebuilt ESM artifact under build/.
+  // ------------------------------------------------------------------
+  const { buildBrowserClient, ARTIFACT_PACKAGE_PATH } = await import("./build-browser-client");
+  const browserArtifact = await buildBrowserClient(join(stagePkg, "build"));
+  check(
+    "browser client artifact built into staged package",
+    existsSync(join(stagePkg, ARTIFACT_PACKAGE_PATH)),
+    `${ARTIFACT_PACKAGE_PATH} bytes=${browserArtifact.bytes} sha256=${browserArtifact.sha256.slice(0, 16)}…`,
+  );
+
+  // ------------------------------------------------------------------
   // Stage 2: pack the exact beta tarball.
   // ------------------------------------------------------------------
   const pack = run("npm pack --json", stagePkg);
@@ -184,6 +197,29 @@ console.log("CLIENT-CONSUMER-OK");`,
     check("bundled client executes under Node (no Bun global)", nodeSmoke.code === 0 && nodeSmoke.stdout.includes("NODE-RUN-OK"), nodeSmoke.stdout.trim() || nodeSmoke.stderr.slice(0, 200));
   }
 
+  // Consumer B2: the PREBUILT browser artifact (M7-005 / ADR-0021).
+  // Executes the shipped build/lugas-client.esm.js from the installed
+  // tarball — no bundler, no source checkout — under Node with a fetch stub.
+  const artifactConsumer = makeConsumer("consumer-browser-artifact");
+  const installedArtifact = join(artifactConsumer, "node_modules", "lugas", "build", "lugas-client.esm.js");
+  const artifactPresent = existsSync(installedArtifact);
+  check("prebuilt browser artifact ships in installed tarball", artifactPresent, artifactPresent ? installedArtifact.replace(stage, "<stage>") : "missing build/lugas-client.esm.js");
+  const installedExportsKeys = artifactPresent
+    ? Object.keys((JSON.parse(readFileSync(join(artifactConsumer, "node_modules", "lugas", "package.json"), "utf8")) as { exports: Record<string, unknown> }).exports).sort()
+    : [];
+  check(
+    "installed export map exposes ./client/browser (prebuilt artifact)",
+    installedExportsKeys.join(",") === [".", "./client", "./client/browser", "./testing"].join(","),
+    installedExportsKeys.join(", ") || "no exports",
+  );
+  if (artifactPresent) {
+    const artifactSmoke = run(
+      `node -e "globalThis.fetch=async()=>new Response('{}');import('./node_modules/lugas/build/lugas-client.esm.js').then(m=>{const c=m.createClient({baseUrl:'https://x.test'});if(typeof c.get!=='function')throw new Error('bad client');console.log('ARTIFACT-RUN-OK')}).catch(e=>{console.error(e);process.exit(1)})"`,
+      artifactConsumer,
+    );
+    check("prebuilt artifact executes under Node (no bundler, no Bun global)", artifactSmoke.code === 0 && artifactSmoke.stdout.includes("ARTIFACT-RUN-OK"), artifactSmoke.stdout.trim() || artifactSmoke.stderr.slice(0, 200));
+  }
+
   // Consumer C: testing + CLI surface.
   const testConsumer = makeConsumer("consumer-testing");
   writeFileSync(
@@ -250,6 +286,16 @@ export default defineApp({ routes: { "/x": { GET: route({ handler: () => text(20
     version: BETA_VERSION,
     tarballEntries: entryCount,
     files: packOut[0]!.files.map((f) => f.path).sort(),
+    generatedArtifacts: [
+      {
+        path: ARTIFACT_PACKAGE_PATH,
+        bytes: browserArtifact.bytes,
+        sha256: browserArtifact.sha256,
+        entrypoint: "src/client/index.ts",
+        target: "browser",
+        format: "esm",
+      },
+    ],
     generatedAt: new Date().toISOString(),
   };
   writeFileSync(join(OUT_DIR, "inventory.json"), JSON.stringify(inventory, null, 2));
@@ -268,6 +314,15 @@ export default defineApp({ routes: { "/x": { GET: route({ handler: () => text(20
     derivation: "staged package.json dependencies/optionalDependencies/peerDependencies",
     productionDependencies: prodDeps,
     devDependencies: Object.keys(pkg.devDependencies ?? {}).map((d) => ({ name: d, scope: "dev" })),
+    generatedComponents: [
+      {
+        name: "lugas-client-browser",
+        path: ARTIFACT_PACKAGE_PATH,
+        sha256: browserArtifact.sha256,
+        builtFrom: "src/client/index.ts",
+        builtBy: `scripts/release/build-browser-client.ts (Bun ${Bun.version}, target=browser, format=esm)`,
+      },
+    ],
     tarballEntryCount: entryCount,
     zeroProductionRuntimeDependency: prodDeps.length === 0,
   }, null, 2));
@@ -300,6 +355,7 @@ export default defineApp({ routes: { "/x": { GET: route({ handler: () => text(20
   check("SBOM shows zero production deps (derived)", prodDeps.length === 0, `${OUT_DIR}/sbom.json (derived from staged metadata)`);
   check("provenance statement marked unpublished", provenance.publishedToRegistry === false, `${OUT_DIR}/provenance.json`);
   check("tarball inventory recorded", inventory.files.length === entryCount, `${inventory.files.length} entries`);
+  check("browser artifact present in packed tarball", inventory.files.includes(ARTIFACT_PACKAGE_PATH), ARTIFACT_PACKAGE_PATH);
 
   // Forbidden content gate on the actual artifact list.
   const forbiddenPrefixes = ["benchmarks/", ".worktrees/", "tests/", "spikes/", "scripts/release/", ".env"];
