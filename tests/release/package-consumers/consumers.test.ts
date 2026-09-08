@@ -95,6 +95,7 @@ function installConsumer(stage: string, name: string, tgzPath: string): string {
 }
 
 function npmAvailable(): boolean {
+  if (Bun.which("npm") === null) return false;
   const probe = Bun.spawnSync(["npm", "--version"], { stdout: "pipe", stderr: "pipe" });
   return probe.exitCode === 0 && new TextDecoder().decode(probe.stdout).trim() !== "";
 }

@@ -102,10 +102,19 @@ describe("lugas/client export surface", () => {
     const outputs = readdirSync(outDir);
     expect(outputs).toContain("bundle-entry.js");
     try {
-      const smoke = Bun.spawnSync(["node", join(outDir, "bundle-entry.js")], {
-        stdout: "pipe",
-        stderr: "pipe",
-      });
+      let smoke;
+      try {
+        smoke = Bun.spawnSync(["node", join(outDir, "bundle-entry.js")], {
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+      } catch (error) {
+        if ((error as { code?: string }).code === "ENOENT") {
+          console.warn("[client-export] node unavailable; execution smoke skipped");
+          return;
+        }
+        throw error;
+      }
       expect({
         code: smoke.exitCode,
         stdout: new TextDecoder().decode(smoke.stdout).trim(),
