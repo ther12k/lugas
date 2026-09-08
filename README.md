@@ -159,7 +159,7 @@ Runnable, single-concept applications under [`examples/`](examples/) — indexed
 
 ## Compatibility
 
-Verified matrix (see [`docs/compatibility.md`](docs/compatibility.md)): Bun **1.4.x** on Linux x86-64, macOS arm64, and Windows x64; TypeScript **7.0.2**; Zod **4.4.3** and Valibot **1.4.2** (any Standard Schema v1 validator works). Browser-safe client bundle; real-browser automation is not yet in CI.
+Verified matrix (see [`docs/compatibility.md`](docs/compatibility.md)): Bun **1.4.x** on Linux x86-64, macOS arm64, and Windows x64; TypeScript **7.0.2**; Zod **4.4.3** and Valibot **1.4.2** (any Standard Schema v1 validator works). Browser-safe client bundle plus a prebuilt browser artifact (`lugas/client/browser`) verified in a same-origin real-browser lane; real browsers are not part of the per-OS CI matrix.
 
 Known beta limitations: the server core and CLI are Bun-only (the client bundle is runtime-neutral), declarations ship as direct `.ts` sources, and in-flight handler work is not cancelled on client disconnect.
 

@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8" /><title>lugas stage one — plain fetch</title></head>
+  <body>
+    <!--
+      M7-005 stage one (ADR-0021): a plain-JS, no-bundler page exercising the
+      same-origin API with ordinary fetch. This proves browser-to-server
+      behavior only; it does not exercise the packaged Lugas client.
+    -->
+    <script type="module">
+      window.__started = true;
+      window.addEventListener("error", (event) => {
+        window.__pageError = String(event.message ?? event.error ?? "unknown error");
+      });
+      window.addEventListener("unhandledrejection", (event) => {
+        window.__pageError = String(event.reason?.message ?? event.reason ?? "unhandled rejection");
+      });
+      const results = {};
+      const record = async (name, fn) => {
+        try {
+          results[name] = { ok: true, value: await fn() };
+        } catch (error) {
+          results[name] = { ok: false, error: error && error.name ? error.name : String(error) };
+        }
+      };
+      await record("ok", async () => {
+        const response = await fetch("/api/ok");
+        return { status: response.status, body: await response.json() };
+      });
+      await record("conflict", async () => {
+        const response = await fetch("/api/conflict");
+        return { status: response.status, contentType: response.headers.get("content-type") };
+      });
+      await record("serverError", async () => {
+        const response = await fetch("/api/boom");
+        return { status: response.status, leaksSecret: (await response.text()).includes("boom-secret") };
+      });
+      await record("empty", async () => {
+        const response = await fetch("/api/empty");
+        return { status: response.status, body: await response.text() };
+      });
+      await record("abort", async () => {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 20);
+        const response = await fetch("/api/slow", { signal: controller.signal });
+        return { status: response.status };
+      });
+      await record("transport", async () => {
+        await fetch("http://127.0.0.1:9/closed");
+        return {};
+      });
+      window.__results = results;
+      window.__done = true;
+    </script>
+  </body>
+</html>

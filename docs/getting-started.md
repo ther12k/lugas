@@ -192,6 +192,47 @@ api.get("/users/:id", {
 
 No runtime `Proxy`, generated SDK, or object-tree RPC façade. How response types model serialization truth is covered in [wire-honest types](./wire-honest-types.md).
 
+## Using the client without a build step
+
+The release package ships a prebuilt, browser-executable ESM artifact of the client, exposed as the `lugas/client/browser` subpath (file `build/lugas-client.esm.js`). The `.ts` sources remain the only type source of truth; the artifact is runtime JavaScript only. Three consumption arrangements:
+
+1. **Same-origin serving** (pairs with [public assets](#serving-public-assets)): serve the installed artifact from your application origin and import it by URL.
+
+   ```ts
+   import { defineApp } from "lugas";
+
+   export default defineApp({
+     assets: {
+       files: {
+         "/": "./public/index.html",
+         "/lugas-client.esm.js": "./node_modules/lugas/build/lugas-client.esm.js",
+       },
+     },
+   });
+   ```
+
+   ```html
+   <script type="module">
+     import { createClient } from "/lugas-client.esm.js";
+     const api = createClient({ baseUrl: window.location.origin });
+   </script>
+   ```
+
+2. **Import map**: keep bare-specifier imports in page code and map them to the artifact URL.
+
+   ```html
+   <script type="importmap">
+     { "imports": { "lugas/client": "/lugas-client.esm.js" } }
+   </script>
+   <script type="module">
+     import { createClient } from "lugas/client";
+   </script>
+   ```
+
+3. **Bundler**: keep importing `lugas/client` — the direct `.ts` sources remain shipped and bundle as before; nothing changes for bundler-based consumers.
+
+Plain-JavaScript pages need no TypeScript configuration and no bundler. Editors and frontends that want static checking can use `checkJs` with their own `tsconfig.json` against the installed package — no declarations fork ships with the artifact. The artifact lane is same-origin only; it makes no CORS claim.
+
 ## Testing
 
 Use `lugas/testing` to run an application through a real ephemeral server.

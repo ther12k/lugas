@@ -26,13 +26,16 @@ import { join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "../../..");
 const BETA_VERSION = "0.1.0-beta.1";
+// M7-005: the staged tarball carries the prebuilt browser artifact, mirroring
+// the rehearsal's Stage 1b, so consumers exercise the shipped bytes.
+const { buildBrowserClient } = await import("../../../scripts/release/build-browser-client");
 
 interface Staged {
   stage: string;
   tgzPath: string;
 }
 
-function stageTarball(): Staged | null {
+async function stageTarball(): Promise<Staged | null> {
   const probe = Bun.spawnSync(["npm", "--version"], { stdout: "pipe", stderr: "pipe" });
   if (probe.exitCode !== 0) return null;
 
@@ -68,6 +71,8 @@ function stageTarball(): Staged | null {
   pkg.bin = { lugas: "./src/cli/main.ts" };
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
 
+  await buildBrowserClient(join(stagePkg, "build"));
+
   try {
     const out = execSync("npm pack --json", { cwd: stagePkg, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
     const parsed = JSON.parse(out) as Array<{ filename: string }>;
@@ -95,16 +100,16 @@ function npmAvailable(): boolean {
 }
 
 describe.skipIf(!npmAvailable())("beta package consumers (M6R1-006)", () => {
-  test("npm pack produces a valid tarball for consumers", () => {
-    const stagedLocal = stageTarball();
+  test("npm pack produces a valid tarball for consumers", async () => {
+    const stagedLocal = await stageTarball();
     expect(stagedLocal).not.toBeNull();
     if (!stagedLocal) return;
     expect(existsSync(stagedLocal.tgzPath)).toBe(true);
     rmSync(stagedLocal.stage, { recursive: true, force: true });
   });
 
-  test("server consumer runs an app from the packed beta tarball", () => {
-    const staged2 = stageTarball();
+  test("server consumer runs an app from the packed beta tarball", async () => {
+    const staged2 = await stageTarball();
     if (!staged2) throw new Error("stage failed");
     const { stage, tgzPath } = staged2;
     try {
@@ -125,7 +130,7 @@ console.log("OK format=" + app.manifest.format);`,
   });
 
   test("client consumer bundles and runs in Node from the packed beta tarball", async () => {
-    const staged2 = stageTarball();
+    const staged2 = await stageTarball();
     if (!staged2) throw new Error("stage failed");
     const { stage, tgzPath } = staged2;
     try {
@@ -149,8 +154,8 @@ if (typeof c.get !== "function") throw new Error("bad client");`,
     }
   });
 
-  test("testing consumer round-trips createTestServer from the packed beta tarball", () => {
-    const staged2 = stageTarball();
+  test("testing consumer round-trips createTestServer from the packed beta tarball", async () => {
+    const staged2 = await stageTarball();
     if (!staged2) throw new Error("stage failed");
     const { stage, tgzPath } = staged2;
     try {
@@ -175,22 +180,22 @@ console.log("TESTING-OK");`,
     }
   });
 
-  test("packed export map exposes only root, client, and testing subpaths", () => {
-    const staged2 = stageTarball();
+  test("packed export map exposes root, client, prebuilt browser artifact, and testing subpaths", async () => {
+    const staged2 = await stageTarball();
     if (!staged2) throw new Error("stage failed");
     const { stage, tgzPath } = staged2;
     try {
       const dir = installConsumer(stage, "t-freeze", tgzPath);
       const installedExports = JSON.parse(readFileSync(join(dir, "node_modules/lugas/package.json"), "utf8")) as { exports: Record<string, unknown>; version: string };
       expect(installedExports.version).toBe(BETA_VERSION);
-      expect(Object.keys(installedExports.exports).sort()).toEqual([".", "./client", "./testing"]);
+      expect(Object.keys(installedExports.exports).sort()).toEqual([".", "./client", "./client/browser", "./testing"]);
     } finally {
       rmSync(stage, { recursive: true, force: true });
     }
   });
 
-  test("CLI executes a real route inspection through the installed bin link", () => {
-    const stagedLocal = stageTarball();
+  test("CLI executes a real route inspection through the installed bin link", async () => {
+    const stagedLocal = await stageTarball();
     if (!stagedLocal) throw new Error("stage failed");
     const dir = installConsumer(stagedLocal.stage, "t-cli", stagedLocal.tgzPath);
     try {
