@@ -43,7 +43,7 @@ export type AppInternals<TServices = unknown> = {
 
 export type LugasAppInstance<TServices = unknown, TRoutes = unknown> = LugasApp<TServices, TRoutes> & {
   readonly manifest: AppInternals<TServices>["manifest"];
-  readonly serve: (options?: import("../internal/serve").SafeServeOptions) => Bun.Server<unknown>;
+  readonly serve: (options?: import("../internal/serve").SafeServeOptions) => import("../internal/serve").LugasServer;
 };
 
 export function defineApp<

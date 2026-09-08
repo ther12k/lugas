@@ -25,6 +25,9 @@ import { classifyRoute } from "./classify-route";
 import { compileAssets, type AssetsConfig } from "./assets";
 import { compileRoute } from "./compile-route";
 import { defaultNotFound, defaultOnError, withErrorPolicy, type ErrorPolicy, type NotFoundPolicy } from "./error-policy";
+import { isServiceDescriptor } from "../core/service";
+import type { LifecycleService, ShutdownOptions } from "./lifecycle";
+import { problem } from "../core/response";
 import type { ModuleDescriptor } from "../core/types";
 
 export type SafeServeOptions = {
@@ -39,6 +42,11 @@ export type SafeServeOptions = {
    * are accepted. See `docs/body-limits.md`.
    */
   maxRequestBodySize?: number;
+  /**
+   * Lifecycle shutdown options (ADR-0020): drain deadline (default 10s) and
+   * opt-in SIGINT/SIGTERM handling. See `server.lugasLifecycle`.
+   */
+  shutdown?: ShutdownOptions;
   fetch?: (request: Request, server: Bun.Server<unknown>) => Response | Promise<Response>;
   routes?: Record<string, unknown>;
   [key: string]: unknown;
@@ -52,6 +60,12 @@ export type PreparedApp = {
   readonly notFound: NotFoundPolicy;
   /** Route facts captured at classification time (ADR-0017 single interpreter). */
   readonly facts: ReadonlyArray<RouteFact>;
+  /** Service entries with declared lifecycle hooks (ADR-0020), declaration order. */
+  readonly lifecycleServices: ReadonlyArray<LifecycleService>;
+  /** Live services view handlers close over; descriptor slots fill at serve time. */
+  readonly serviceSlots: Record<string, unknown>;
+  /** Serve-time gate: Lugas handlers execute only after `gate` settles. */
+  readonly trafficGate: { gate: Promise<void> };
 };
 
 function freezeContainers(value: Record<string, unknown>): Record<string, unknown> {
@@ -88,6 +102,42 @@ export function prepareApp<TServices>(config: {
   onError?: ErrorPolicy | undefined;
 }): PreparedApp {
   const onError = config.onError ?? defaultOnError;
+
+  // M7-004 (ADR-0020): split services into the live handler view and the
+  // lifecycle-coordinated entries. The view prototype-chains to the user's
+  // services object, so plain values keep the live-reference contract
+  // (mutations stay visible). `service()` descriptors are shadowed with an
+  // own slot that the coordinator fills once their `init` resolves — the raw
+  // descriptor is never exposed to handlers.
+  const lifecycleServices: LifecycleService[] = [];
+  const serviceSlots = Object.create(
+    typeof config.services === "object" && config.services !== null ? config.services : null,
+  ) as Record<string, unknown>;
+  if (typeof config.services === "object" && config.services !== null) {
+    for (const [key, value] of Object.entries(config.services as Record<string, unknown>)) {
+      if (isServiceDescriptor(value)) {
+        serviceSlots[key] = undefined;
+        lifecycleServices.push({ name: value.name, value: value.value, init: value.init, dispose: value.dispose });
+      }
+    }
+  }
+
+  // Traffic gate: replaced by serveApp() with the real init promise. Lugas
+  // handlers await it, so no handler executes before initialization settles;
+  // a startup failure answers held requests with a redacted 503 problem.
+  const trafficGate: { gate: Promise<void> } = { gate: Promise.resolve() };
+  const gateHandler = (
+    handler: (request: Request) => Response | Promise<Response>,
+  ): (request: Request) => Response | Promise<Response> => {
+    return (request: Request): Response | Promise<Response> => {
+      return Promise.resolve(trafficGate.gate).then(
+        () => handler(request),
+        () => problem(503, { title: "unavailable", status: 503, detail: "service initialization did not complete" }),
+      );
+    };
+  };
+  const compileLugasHandler = (routeId: string, descriptor: unknown): (request: Request) => Response | Promise<Response> =>
+    gateHandler(withErrorPolicy(compileRoute(routeId, descriptor as never, serviceSlots).handler, onError, routeId));
 
   // Collect declarations per path, in declaration order (root first, then
   // modules in order). Ownership is tracked per method for diagnostics.
@@ -126,7 +176,7 @@ export function prepareApp<TServices>(config: {
     }
     if (kind.kind === "lugas-descriptor") {
       const routeId = `${method} ${path}`;
-      return withErrorPolicy(compileRoute(routeId, kind.descriptor, config.services).handler, onError, routeId);
+      return compileLugasHandler(routeId, kind.descriptor);
     }
     if (kind.kind === "unsupported") {
       throw diagnostic("LUGAS_ROUTES_002", `unsupported route entry at ${method} ${path}`, {
@@ -218,8 +268,7 @@ export function prepareApp<TServices>(config: {
       }
       if (kind.kind === "lugas-descriptor") {
         const routeId = `* ${path}`;
-        const handler = compileRoute(routeId, kind.descriptor, config.services).handler;
-        compiled[path] = withErrorPolicy(handler, onError, routeId);
+        compiled[path] = compileLugasHandler(routeId, kind.descriptor);
       } else if (kind.kind === "unsupported") {
         throw diagnostic("LUGAS_ROUTES_003", `unsupported route entry at ${path}`, {
           context: { path },
@@ -253,5 +302,8 @@ export function prepareApp<TServices>(config: {
     bunRoutes: Object.freeze(freezeContainers(compiled)),
     notFound: config.notFound ?? defaultNotFound,
     facts: Object.freeze(facts),
+    lifecycleServices: Object.freeze(lifecycleServices),
+    serviceSlots,
+    trafficGate,
   });
 }

@@ -60,6 +60,12 @@
     "hint": "assets.dirs requires Linux with openat2(RESOLVE_IN_ROOT); use explicit assets.files on other platforms"
   },
   {
+    "code": "LUGAS_LIFECYCLE_001",
+    "thrownBy": "service()",
+    "meaning": "invalid service lifecycle descriptor",
+    "hint": "use service({ name, value, init?, dispose? }) with a non-empty name"
+  },
+  {
     "code": "LUGAS_MODULE_001",
     "thrownBy": "defineModule()",
     "meaning": "config must be an object",
