@@ -27,11 +27,17 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
    * startup. Absent assets leave every behavior unchanged.
    */
   assets?: AssetsConfig;
+  /**
+   * Application-default body budget in bytes (M7-003, ADR-0019). Applied to
+   * routes with a declared framework-parsed body when the route declares no
+   * own `budget`; clamped by the serve-time `maxRequestBodySize` ceiling.
+   */
+  bodyBudget?: number;
   notFound?: (request: Request) => Response | Promise<Response>;
   onError?: (error: unknown, request: Request) => Response | Promise<Response>;
 };
 
-const APP_KEYS = new Set(["services", "routes", "modules", "assets", "notFound", "onError"]);
+const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "notFound", "onError"]);
 
 export type AppInternals<TServices = unknown> = {
   readonly composition: Composition;
@@ -81,6 +87,12 @@ export function defineApp<
       throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, assets, notFound, onError", context: { key } });
     }
   }
+  if (config.bodyBudget !== undefined && (typeof config.bodyBudget !== "number" || !Number.isInteger(config.bodyBudget) || config.bodyBudget <= 0)) {
+    throw diagnostic("LUGAS_BODY_001", "defineApp(): 'bodyBudget' must be a positive integer number of bytes", {
+      hint: "bodyBudget is the application default; per-route budgets override it, the server ceiling always wins",
+      context: { key: "bodyBudget" },
+    });
+  }
   if (config.modules !== undefined) {
     if (!Array.isArray(config.modules)) throw diagnostic("LUGAS_APP_003", "defineApp(): 'modules' must be an array", { hint: "wrap modules: modules: [defineModule(...)]" });
     const names = new Set<string>();
@@ -118,6 +130,7 @@ export function defineApp<
     modules: config.modules as ReadonlyArray<ModuleDescriptor<TServices, any>> | undefined,
     services: config.services as TServices,
     assets: config.assets,
+    bodyBudget: config.bodyBudget,
     notFound: config.notFound,
     onError: config.onError,
   });

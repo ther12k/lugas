@@ -60,8 +60,8 @@ describe("M7-005 prebuilt browser artifact", () => {
   });
 
   test("artifact executes standalone under Node (no Bun global)", async () => {
-    const probe = Bun.spawnSync(["node", "--version"], { stdout: "pipe" });
-    if (!(probe.exitCode === 0 && new TextDecoder().decode(probe.stdout).trim() !== "")) {
+    const node = Bun.which("node");
+    if (node === null) {
       console.warn("[m7-005] node unavailable; artifact execution smoke skipped");
       return;
     }
@@ -80,12 +80,20 @@ const r = await c.get("/anything").catch((e) => ({ transportRejected: e instance
 console.log("ARTIFACT-NODE-OK " + (r.transportRejected === true || r.ok === true));
 `,
       );
-      const runner = Bun.spawnSync(["node", entry], { cwd: out, stdout: "pipe", stderr: "pipe" });
-      expect({
-        code: runner.exitCode,
-        stdout: new TextDecoder().decode(runner.stdout).trim(),
-        stderr: new TextDecoder().decode(runner.stderr).trim(),
-      }).toEqual({ code: 0, stdout: "ARTIFACT-NODE-OK true", stderr: "" });
+      try {
+        const runner = Bun.spawnSync(["node", entry], { cwd: out, stdout: "pipe", stderr: "pipe" });
+        expect({
+          code: runner.exitCode,
+          stdout: new TextDecoder().decode(runner.stdout).trim(),
+          stderr: new TextDecoder().decode(runner.stderr).trim(),
+        }).toEqual({ code: 0, stdout: "ARTIFACT-NODE-OK true", stderr: "" });
+      } catch (error) {
+        if ((error as { code?: string }).code === "ENOENT") {
+          console.warn("[m7-005] node unavailable; artifact execution smoke skipped");
+          return;
+        }
+        throw error;
+      }
       void readdirSync;
     } finally {
       rmSync(out, { recursive: true, force: true });

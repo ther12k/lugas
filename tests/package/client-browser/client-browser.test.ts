@@ -71,27 +71,43 @@ describe("client browser-safety proof", () => {
   });
 
   test("bundle executes under standalone Node (no Bun global) against a fetch stub", async () => {
-    const probe = Bun.spawnSync([NODE, "--version"], { stdout: "pipe" });
-    if (!(probe.exitCode === 0 && new TextDecoder().decode(probe.stdout).trim() !== "")) {
+    if (Bun.which(NODE) === null) {
       console.warn("[client-browser] node unavailable; execution smoke skipped");
       return;
     }
-    const { outDir, entryPoint } = await bundleBrowser(FIXTURE);
-    expect(entryPoint).toBeDefined();
-    const proc = Bun.spawn([NODE, WRAPPER], {
-      env: { ...process.env, SMOKE_BUNDLE_PATH: entryPoint! },
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const exit = await proc.exited;
-    const stdout = await new Response(proc.stdout).text();
-    const stderr = await new Response(proc.stderr).text();
-    expect({ exit, stdout, stderr }).toEqual({
-      exit: 0,
-      stdout: "CLIENT-SMOKE-OK\n",
-      stderr: "",
-    });
-    rmSync(outDir, { recursive: true, force: true });
+    let outDir: string | null = null;
+    let entryPoint: string | undefined;
+    try {
+      const bundled = await bundleBrowser(FIXTURE);
+      outDir = bundled.outDir;
+      entryPoint = bundled.entryPoint;
+      expect(entryPoint).toBeDefined();
+      const proc = Bun.spawn([NODE, WRAPPER], {
+        env: { ...process.env, SMOKE_BUNDLE_PATH: entryPoint! },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const exit = await proc.exited;
+      const stdout = await new Response(proc.stdout).text();
+      const stderr = await new Response(proc.stderr).text();
+      if (stdout.startsWith("SMOKE-SKIP")) {
+        console.warn("[client-browser] node resolved to the bun shim; execution smoke skipped");
+        return;
+      }
+      expect({ exit, stdout, stderr }).toEqual({
+        exit: 0,
+        stdout: "CLIENT-SMOKE-OK\n",
+        stderr: "",
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code === "ENOENT") {
+        console.warn("[client-browser] node unavailable; execution smoke skipped");
+        return;
+      }
+      throw error;
+    } finally {
+      if (outDir !== null) rmSync(outDir, { recursive: true, force: true });
+    }
   });
 
   test("tree shaking excludes unused surface where the build supports it", async () => {

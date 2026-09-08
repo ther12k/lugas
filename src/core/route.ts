@@ -36,9 +36,14 @@ export type RouteConfig<
   query?: TQuery;
   headers?: THeaders;
   body?: TBody;
+  /**
+   * Route-specific body budget in bytes (M7-003, ADR-0019). Requires a
+   * declared framework-parsed `body`; clamped by the server ceiling.
+   */
+  budget?: number;
 };
 
-const ROUTE_KEYS = new Set(["handler", "before", "params", "query", "headers", "body"]);
+const ROUTE_KEYS = new Set(["handler", "before", "params", "query", "headers", "body", "budget"]);
 
 export function route<
   TServices = unknown,
@@ -75,6 +80,12 @@ export function route<
   if (typeof config.handler !== "function") {
     throw diagnostic("LUGAS_ROUTE_003", "route(): 'handler' must be a function", { hint: "handler receives the validated context and returns a Response" });
   }
+  if (config.budget !== undefined && (typeof config.budget !== "number" || !Number.isInteger(config.budget) || config.budget <= 0)) {
+    throw diagnostic("LUGAS_BODY_001", "route(): 'budget' must be a positive integer number of bytes", {
+      hint: "budgets clamp to the server ceiling; override the app default, never the ceiling",
+      context: { key: "budget" },
+    });
+  }
   if (config.before !== undefined) {
     if (!Array.isArray(config.before)) throw diagnostic("LUGAS_ROUTE_004", "route(): 'before' must be an array of guard descriptors", { hint: "list guards in execution order: before: [authGuard]" });
     for (const g of config.before) {
@@ -98,6 +109,7 @@ export function route<
       query: config.query,
       headers: config.headers,
       body: config.body,
+      budget: config.budget,
     }),
     "RouteDescriptor",
   );

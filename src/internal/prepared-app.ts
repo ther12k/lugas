@@ -26,6 +26,7 @@ import { compileAssets, type AssetsConfig } from "./assets";
 import { compileRoute } from "./compile-route";
 import { defaultNotFound, defaultOnError, withErrorPolicy, type ErrorPolicy, type NotFoundPolicy } from "./error-policy";
 import { isServiceDescriptor } from "../core/service";
+import { createBudgetsContext, type BudgetsContext } from "./body-budget";
 import type { LifecycleService, ShutdownOptions } from "./lifecycle";
 import { problem } from "../core/response";
 import type { ModuleDescriptor } from "../core/types";
@@ -66,6 +67,8 @@ export type PreparedApp = {
   readonly serviceSlots: Record<string, unknown>;
   /** Serve-time gate: Lugas handlers execute only after `gate` settles. */
   readonly trafficGate: { gate: Promise<void> };
+  /** Body-budget context (M7-003): app default, route budgets, ceiling slot. */
+  readonly budgets: BudgetsContext;
 };
 
 function freezeContainers(value: Record<string, unknown>): Record<string, unknown> {
@@ -98,6 +101,7 @@ export function prepareApp<TServices>(config: {
   modules?: ReadonlyArray<ModuleDescriptor<TServices, any>> | undefined;
   services: TServices;
   assets?: AssetsConfig | undefined;
+  bodyBudget?: number | undefined;
   notFound?: NotFoundPolicy | undefined;
   onError?: ErrorPolicy | undefined;
 }): PreparedApp {
@@ -136,8 +140,12 @@ export function prepareApp<TServices>(config: {
       );
     };
   };
-  const compileLugasHandler = (routeId: string, descriptor: unknown): (request: Request) => Response | Promise<Response> =>
-    gateHandler(withErrorPolicy(compileRoute(routeId, descriptor as never, serviceSlots).handler, onError, routeId));
+  const budgetsCtx = createBudgetsContext(config.bodyBudget);
+  const compileLugasHandler = (routeId: string, descriptor: unknown): (request: Request) => Response | Promise<Response> => {
+    const budget = (descriptor as { budget?: unknown }).budget;
+    if (typeof budget === "number") budgetsCtx.routeBudgets.push(budget);
+    return gateHandler(withErrorPolicy(compileRoute(routeId, descriptor as never, serviceSlots, budgetsCtx).handler, onError, routeId));
+  };
 
   // Collect declarations per path, in declaration order (root first, then
   // modules in order). Ownership is tracked per method for diagnostics.
@@ -305,5 +313,6 @@ export function prepareApp<TServices>(config: {
     lifecycleServices: Object.freeze(lifecycleServices),
     serviceSlots,
     trafficGate,
+    budgets: budgetsCtx,
   });
 }

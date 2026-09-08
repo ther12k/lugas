@@ -53,6 +53,7 @@ export async function validateBody<
 >(
   schema: TSchema,
   request: Request,
+  budget?: number | undefined,
 ): Promise<
   TSchema extends StandardSchema<any, infer Output>
     ? ValidateBodyResult<Output>
@@ -65,7 +66,7 @@ export async function validateBody<
     } as any;
   }
 
-  const parsed = await parseJsonBody(request);
+  const parsed = await parseJsonBody(request, budget);
   if (!parsed.ok) {
     return {
       ok: false,

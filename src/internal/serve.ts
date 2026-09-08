@@ -1,5 +1,6 @@
 /** Native Bun server assembly for `app.serve()` (M1-015, M4R1-001, M7-004). */
 import { defaultNotFound } from "./error-policy";
+import { diagnostic } from "./diagnostics";
 import { startLifecycle, type LugasLifecycle, type ShutdownOptions } from "./lifecycle";
 import type { PreparedApp, SafeServeOptions } from "./prepared-app";
 
@@ -62,6 +63,27 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
   // Hold traffic until initialization settles; a startup failure answers
   // held requests with a redacted 503 problem (see prepareApp gateHandler).
   prepared.trafficGate.gate = lifecycle.ready;
+
+  // M7-003: the ceiling is the explicitly configured serve-time
+  // `maxRequestBodySize`. Above-ceiling budgets are rejected at startup;
+  // otherwise the ceiling slot enables clamping during enforcement.
+  const ceiling = options.maxRequestBodySize;
+  if (typeof ceiling === "number") {
+    const over: string[] = [];
+    if (prepared.budgets.appDefault !== undefined && prepared.budgets.appDefault > ceiling) {
+      over.push(`application default ${prepared.budgets.appDefault}`);
+    }
+    for (const routeBudget of prepared.budgets.routeBudgets) {
+      if (routeBudget > ceiling) over.push(`route budget ${routeBudget}`);
+    }
+    if (over.length > 0) {
+      throw diagnostic("LUGAS_BODY_003", `serve(): body budget above the server ceiling (${ceiling}): ${over[0]}`, {
+        hint: "an override relaxes the default, never the ceiling; lower the budget or raise maxRequestBodySize",
+        context: { ceiling, count: over.length },
+      });
+    }
+    prepared.budgets.ceilingRef.current = ceiling;
+  }
 
   const server = Bun.serve({
     ...options,

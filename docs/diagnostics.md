@@ -31,6 +31,9 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_ASSET_003 | defineApp() assets | asset declaration does not point at existing content | check the filesystem path (relative paths resolve from the process working directory) |
 | LUGAS_ASSET_004 | defineApp() assets | native directory mounts unsupported on this platform | assets.dirs requires Linux with openat2(RESOLVE_IN_ROOT); use explicit assets.files on other platforms |
 | LUGAS_LIFECYCLE_001 | service() | invalid service lifecycle descriptor | use service({ name, value, init?, dispose? }) with a non-empty name |
+| LUGAS_BODY_001 | defineApp() / route() | invalid body budget configuration | budget must be a positive integer number of bytes |
+| LUGAS_BODY_002 | defineApp() | body budget requires a declared framework-parsed body | declare a body schema on the route or remove the budget |
+| LUGAS_BODY_003 | serve() | body budget above the configured server ceiling | an override relaxes the default, never the ceiling; lower the budget or raise maxRequestBodySize |
 | LUGAS_MODULE_001 | defineModule() | config must be an object | pass defineModule({ name, routes }) |
 | LUGAS_MODULE_002 | defineModule() | unknown config key | allowed keys: name, routes |
 | LUGAS_MODULE_003 | defineModule() | 'name' must be a non-empty string | module names appear in manifests; use stable names |

@@ -16,6 +16,7 @@ import { ROOT } from "./browser-env";
 const BETA_VERSION = "0.1.0-beta.1";
 
 export function npmAvailable(): boolean {
+  if (Bun.which("npm") === null) return false;
   const probe = Bun.spawnSync(["npm", "--version"], { stdout: "pipe", stderr: "pipe" });
   return probe.exitCode === 0 && new TextDecoder().decode(probe.stdout).trim() !== "";
 }
