@@ -11,6 +11,7 @@
  */
 import type { RouteDescriptor } from "../core/types";
 import { compilePipeline } from "./compile-pipeline";
+import type { BudgetsContext } from "./body-budget";
 
 export type CompiledRoute = {
   routeId: string;
@@ -22,13 +23,14 @@ export function compileRoute(
   routeId: string,
   descriptor: RouteDescriptor<never>,
   services: unknown,
+  budgets?: BudgetsContext | undefined,
 ): CompiledRoute {
   const rawHandler = descriptor.handler as unknown;
   const isAsync =
     (descriptor as any).body !== undefined ||
     (typeof rawHandler === "function" &&
       Object.prototype.toString.call(rawHandler) === "[object AsyncFunction]");
-  const handler = compilePipeline(routeId, descriptor, services);
+  const handler = compilePipeline(routeId, descriptor, services, budgets);
   return {
     routeId,
     isAsync,

@@ -25,6 +25,7 @@ export type DiagnosticCode =
   | "LUGAS_GUARD_005" | "LUGAS_GUARD_006" | "LUGAS_GUARD_007"
   | "LUGAS_ROUTES_001" | "LUGAS_ROUTES_002" | "LUGAS_ROUTES_003" | "LUGAS_ROUTES_004"
   | "LUGAS_RESPONSE_001" | "LUGAS_RESPONSE_002" | "LUGAS_RESPONSE_003" | "LUGAS_RESPONSE_004" | "LUGAS_RESPONSE_005"
+  | "LUGAS_BODY_001" | "LUGAS_BODY_002" | "LUGAS_BODY_003"
   | "LUGAS_LIFECYCLE_001"
   | "LUGAS_TEST_001"
   | "LUGAS_CLI_001";
@@ -64,6 +65,9 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_ASSET_002", thrownBy: "defineApp()", meaning: "ambiguous asset/API ownership", hint: "asset declarations and API routes must own disjoint paths; change one of them" },
   { code: "LUGAS_ASSET_003", thrownBy: "defineApp()", meaning: "asset declaration does not point at existing content", hint: "check the filesystem path (relative paths resolve from process working directory)" },
   { code: "LUGAS_ASSET_004", thrownBy: "defineApp()", meaning: "native directory mounts unsupported on this platform", hint: "assets.dirs requires Linux with openat2(RESOLVE_IN_ROOT); use explicit assets.files on other platforms" },
+  { code: "LUGAS_BODY_001", thrownBy: "defineApp() / route()", meaning: "invalid body budget configuration", hint: "budget must be a positive integer number of bytes" },
+  { code: "LUGAS_BODY_002", thrownBy: "defineApp()", meaning: "body budget requires a declared framework-parsed body", hint: "declare a body schema on the route or remove the budget" },
+  { code: "LUGAS_BODY_003", thrownBy: "serve()", meaning: "body budget above the configured server ceiling", hint: "an override relaxes the default, never the ceiling; lower the budget or raise maxRequestBodySize" },
   { code: "LUGAS_LIFECYCLE_001", thrownBy: "service()", meaning: "invalid service lifecycle descriptor", hint: "use service({ name, value, init?, dispose? }) with a non-empty name" },
   { code: "LUGAS_MODULE_001", thrownBy: "defineModule()", meaning: "config must be an object", hint: "pass defineModule({ name, routes })" },
   { code: "LUGAS_MODULE_002", thrownBy: "defineModule()", meaning: "unknown config key", hint: "allowed keys: name, routes" },

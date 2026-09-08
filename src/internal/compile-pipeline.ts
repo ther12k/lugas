@@ -13,6 +13,8 @@
  * are synchronous.
  */
 import type { GuardDescriptor, RouteDescriptor } from "../core/types";
+import { diagnostic } from "./diagnostics";
+import { resolveEffectiveBudget, type BudgetsContext } from "./body-budget";
 import { validateHeaders } from "./validate-headers";
 import { validateParams } from "./validate-params";
 import { validateQuery } from "./validate-query";
@@ -38,6 +40,7 @@ export function compilePipeline(
   routeId: string,
   descriptor: RouteDescriptor<never>,
   services: unknown,
+  budgets?: BudgetsContext | undefined,
 ): (request: Request) => Response | Promise<Response> {
   const {
     before: guards = [],
@@ -45,7 +48,19 @@ export function compilePipeline(
     query: querySchema,
     headers: headersSchema,
     body: bodySchema,
+    budget: routeBudget,
   } = descriptor as any;
+
+  // M7-003 narrower form (ADR-0019 amendment): budget configuration on a
+  // route without a declared framework-parsed body is rejected at startup —
+  // never a silently inert budget.
+  if (routeBudget !== undefined && bodySchema === undefined) {
+    throw diagnostic("LUGAS_BODY_002", `route(): 'budget' requires a declared body schema at ${routeId}`, {
+      hint: "body budgets enforce framework-parsed bodies; declare a body schema or remove the budget",
+      context: { route: routeId },
+    });
+  }
+  const bodyBudget = budgets !== undefined ? resolveEffectiveBudget(routeBudget, budgets) : undefined;
 
   const userHandler = descriptor.handler as (context: PipelineContext) => Response | Promise<Response>;
   const base = { services };
@@ -108,8 +123,8 @@ export function compilePipeline(
         queryData = qRes.data;
       }
 
-      // 4. Body validation
-      const bRes = await validateBody(bodySchema, request);
+      // 4. Body validation (bounded by the effective budget when configured)
+      const bRes = await validateBody(bodySchema, request, bodyBudget);
       if (!bRes.ok) return bRes.response;
       const bodyData = bRes.data;
 

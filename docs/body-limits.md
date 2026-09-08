@@ -31,6 +31,16 @@ The ceiling is enforced by Bun **while consuming the body**, before Lugas parses
 
 Client-side aborts while a body is still streaming are transport failures as well: the client observes its own abort error, and no fabricated response or handler execution occurs.
 
+## Body budgets (M7-003, ADR-0019 as amended)
+
+Routes that declare a framework-parsed `body` may enforce a Lugas-level budget, layered under the delegated ceiling:
+
+- Selection: `effectiveBudget = min(serverCeiling, route.budget ?? app.bodyBudget)`. A route `budget` relaxes the application default (`defineApp({ bodyBudget })`), never the ceiling.
+- Startup rejection: a budget above an explicitly configured `maxRequestBodySize` fails at `serve()` (`LUGAS_BODY_003`); budgets on routes without a declared `body` are rejected at `defineApp()` (`LUGAS_BODY_002`, the accepted narrower form — no silently inert budgets); invalid shapes fail at definition (`LUGAS_BODY_001`).
+- Enforcement point: bounded consumption — a `Content-Length` above the budget rejects without reading; chunked bodies are counted byte-by-byte and all further reads stop at overflow. The oversized request never reaches schema validation or the handler.
+- Rejection envelope: the Lugas-level rejection is `413` **Problem Details** (`BODY_BUDGET_EXCEEDED`) — deliberately distinct from the bare, empty-body transport `413` the delegated ceiling produces. Both are pinned side by side in `tests/security/body-budgets.test.ts`.
+- No configuration → existing server-ceiling behavior, byte-for-byte unchanged (regression-tested).
+
 ## Scope note
 
-This document describes the **existing delegated ceiling only**. Application-default and route-specific body budgets are a separately gated feature defined by ADR-0019 (`docs/okf/decisions/0019-body-budget-policy.md`); they are not part of the current API.
+Without an explicit `maxRequestBodySize`, Bun's runtime default remains the ceiling and budgets enforce as configured (clamping against an unknown ceiling is not claimed).

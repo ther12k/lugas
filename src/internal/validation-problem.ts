@@ -16,6 +16,7 @@ export type ValidationSource = "params" | "query" | "headers" | "body";
 export const VALIDATION_PROBLEM_URI = "https://lugasjs.dev/problems/validation";
 export const UNSUPPORTED_MEDIA_TYPE_URI = "https://lugasjs.dev/problems/unsupported-media-type";
 export const MALFORMED_JSON_URI = "https://lugasjs.dev/problems/malformed-json";
+export const BODY_BUDGET_URI = "https://lugasjs.dev/problems/body-budget";
 
 export type ValidationProblemFields = {
   type: string;
@@ -65,6 +66,24 @@ export function createMalformedJsonProblem(
     title: "Malformed JSON",
     status: 400,
     code: "MALFORMED_JSON",
+    source: "body",
+    detail,
+  });
+}
+
+/**
+ * Lugas-level body-budget rejection (M7-003): Problem Details envelope with
+ * status 413 — deliberately distinct from the bare transport-level `413`
+ * that Bun emits for the server ceiling (M7-002 pin).
+ */
+export function createBodyBudgetProblem(
+  detail: string = "Request body exceeds the configured body budget",
+): Response {
+  return problem(413, {
+    type: BODY_BUDGET_URI,
+    title: "Payload Too Large",
+    status: 413,
+    code: "BODY_BUDGET_EXCEEDED",
     source: "body",
     detail,
   });

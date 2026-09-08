@@ -60,6 +60,24 @@
     "hint": "assets.dirs requires Linux with openat2(RESOLVE_IN_ROOT); use explicit assets.files on other platforms"
   },
   {
+    "code": "LUGAS_BODY_001",
+    "thrownBy": "defineApp() / route()",
+    "meaning": "invalid body budget configuration",
+    "hint": "budget must be a positive integer number of bytes"
+  },
+  {
+    "code": "LUGAS_BODY_002",
+    "thrownBy": "defineApp()",
+    "meaning": "body budget requires a declared framework-parsed body",
+    "hint": "declare a body schema on the route or remove the budget"
+  },
+  {
+    "code": "LUGAS_BODY_003",
+    "thrownBy": "serve()",
+    "meaning": "body budget above the configured server ceiling",
+    "hint": "an override relaxes the default, never the ceiling; lower the budget or raise maxRequestBodySize"
+  },
+  {
     "code": "LUGAS_LIFECYCLE_001",
     "thrownBy": "service()",
     "meaning": "invalid service lifecycle descriptor",
