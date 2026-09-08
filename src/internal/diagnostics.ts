@@ -54,7 +54,7 @@ type CatalogEntry = {
 /** The authoritative catalog. Order is documentation order, not semantics. */
 export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_APP_001", thrownBy: "defineApp()", meaning: "config must be an object", hint: "pass defineApp({ routes }) with an object literal" },
-  { code: "LUGAS_APP_002", thrownBy: "defineApp()", meaning: "unknown config key", hint: "allowed keys: services, routes, modules, notFound, onError" },
+  { code: "LUGAS_APP_002", thrownBy: "defineApp()", meaning: "unknown config key", hint: "allowed keys: services, routes, modules, assets, notFound, onError" },
   { code: "LUGAS_APP_003", thrownBy: "defineApp()", meaning: "'modules' must be an array", hint: "wrap modules: modules: [defineModule(...)]" },
   { code: "LUGAS_APP_004", thrownBy: "defineApp()", meaning: "modules entry is not a defineModule() descriptor", hint: "create modules with defineModule({ name, routes })" },
   { code: "LUGAS_APP_005", thrownBy: "defineApp()", meaning: "duplicate module name", hint: "module names must be unique within an app" },

@@ -78,7 +78,7 @@ export function defineApp<
   }
   for (const key of Object.keys(config)) {
     if (!APP_KEYS.has(key)) {
-      throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, notFound, onError", context: { key } });
+      throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, assets, notFound, onError", context: { key } });
     }
   }
   if (config.modules !== undefined) {
