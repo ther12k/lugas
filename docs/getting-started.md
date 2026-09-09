@@ -17,7 +17,7 @@ bun add lugas@beta
 
 Lugas requires [Bun](https://bun.sh) 1.4.x. TypeScript 7.0.2 is the verified toolchain for the full compile-time contract experience.
 
-> The `v0.1.0-beta.1` candidate is attested but **not yet published** — npm publication is an explicit owner action. Until it is announced, the package should not be assumed available.
+> The `v0.1.0-beta.2` candidate is published under npm `beta`; stable publication remains an explicit owner action.
 
 ## Hello world
 

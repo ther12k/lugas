@@ -26,7 +26,7 @@ import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const OUT_DIR = resolve(ROOT, "docs", "releases", "beta");
-const BETA_VERSION = "0.1.0-beta.1";
+const BETA_VERSION = "0.1.0-beta.2"
 
 function sha256(data: Buffer | string): string {
   return createHash("sha256").update(data).digest("hex");
@@ -361,7 +361,7 @@ function main() {
 
 ## 1. Executive Summary
 
-This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.1** release candidate. All milestones (M0–M8) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
+This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.2** release candidate. All milestones (M0–M8) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
 
 Publication remains strictly gated on owner approval in **M8-GATE**.
 
