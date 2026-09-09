@@ -120,6 +120,18 @@
     "hint": "allowed keys: level, sink, requestIds, access; level is debug|info|warn|error"
   },
   {
+    "code": "LUGAS_OPENAPI_001",
+    "thrownBy": "defineApp()",
+    "meaning": "invalid openapi configuration",
+    "hint": "document requires title and version; paths must start with '/'"
+  },
+  {
+    "code": "LUGAS_OPENAPI_002",
+    "thrownBy": "defineApp()",
+    "meaning": "openapi endpoint path collision with route or assets",
+    "hint": "openapi.path and openapi.ui.path must be disjoint from routes and assets"
+  },
+  {
     "code": "LUGAS_LIFECYCLE_001",
     "thrownBy": "service()",
     "meaning": "invalid service lifecycle descriptor",

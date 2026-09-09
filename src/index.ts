@@ -21,6 +21,13 @@ export type {
   LugasLogFields,
   LugasLogLevel,
 } from "./internal/logging";
+export type {
+  CompiledOpenApi,
+  OpenApiConfig,
+  OpenApiDocumentInfo,
+  OpenApiRouteMetadata,
+  OpenApiUiConfig,
+} from "./internal/openapi";
 export { empty, json, problem, redirect, text } from "./core/response";
 export type { Jsonify, ProblemFields, RedirectStatus, TypedResponse } from "./core/response";
 export type {

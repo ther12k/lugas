@@ -14,6 +14,7 @@ import { prepareApp, type PreparedApp } from "../internal/prepared-app";
 import type { AssetsConfig } from "../internal/assets";
 import { compileCorsPolicy, type CompiledCorsPolicy, type CorsConfig } from "../internal/cors";
 import { compileLogging, type CompiledLogging, type LoggingConfig } from "../internal/logging";
+import { compileOpenApiConfig, type CompiledOpenApi, type OpenApiConfig } from "../internal/openapi";
 import type { LugasApp, MergeModulesRoutes, ModuleDescriptor } from "./types";
 import { serveApp } from "../internal/serve";
 import { assertValidRoutePath } from "../internal/path";
@@ -53,11 +54,19 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
    * are never logged by framework entries.
    */
   logging?: LoggingConfig;
+  /**
+   * OpenAPI 3.1 generation and Scalar reference UI (M8-004, ADR-0025).
+   * Generates a canonical OpenAPI 3.1 JSON document from routing facts and
+   * declared schemas, served at `path` (default `/openapi.json`), with an
+   * optional zero-dependency Scalar CDN HTML shell served at `ui.path`
+   * (default `/docs`).
+   */
+  openapi?: OpenApiConfig;
   notFound?: (request: Request) => Response | Promise<Response>;
   onError?: (error: unknown, request: Request) => Response | Promise<Response>;
 };
 
-const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "logging", "notFound", "onError"]);
+const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "logging", "openapi", "notFound", "onError"]);
 
 export type AppInternals<TServices = unknown> = {
   readonly composition: Composition;
@@ -104,7 +113,7 @@ export function defineApp<
   }
   for (const key of Object.keys(config)) {
     if (!APP_KEYS.has(key)) {
-      throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, notFound, onError", context: { key } });
+      throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, openapi, notFound, onError", context: { key } });
     }
   }
   if (config.bodyBudget !== undefined && (typeof config.bodyBudget !== "number" || !Number.isInteger(config.bodyBudget) || config.bodyBudget <= 0)) {
@@ -118,6 +127,8 @@ export function defineApp<
   const corsPolicy: CompiledCorsPolicy | undefined = config.cors !== undefined ? compileCorsPolicy(config.cors) : undefined;
   // M8-003 (ADR-0024): validate logging once here; preparation wraps handlers.
   const loggingConfig: CompiledLogging | undefined = config.logging !== undefined ? compileLogging(config.logging) : undefined;
+  // M8-004 (ADR-0025): validate openapi config once here.
+  const openApiConfig: CompiledOpenApi | undefined = config.openapi !== undefined ? compileOpenApiConfig(config.openapi) : undefined;
   if (config.modules !== undefined) {
     if (!Array.isArray(config.modules)) throw diagnostic("LUGAS_APP_003", "defineApp(): 'modules' must be an array", { hint: "wrap modules: modules: [defineModule(...)]" });
     const names = new Set<string>();
@@ -158,6 +169,7 @@ export function defineApp<
     bodyBudget: config.bodyBudget,
     cors: corsPolicy,
     logging: loggingConfig,
+    openapi: openApiConfig,
     notFound: config.notFound,
     onError: config.onError,
   });

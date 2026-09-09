@@ -24,25 +24,19 @@ tags:
 | Test-server helpers | Available |
 | Static route manifest | Available |
 | Route-inspection CLI | Available |
-| OpenAPI and Scalar | Planned first-party integration |
-| CORS middleware | Planned first-party integration |
-| Server-Sent Events | Planned core helper |
-| Structured request logging | Planned core facility |
+| OpenAPI and Scalar — shipped on `main` (M8-004, ADR-0025) | Available |
+| CORS middleware — shipped on `main` (M8-001, ADR-0022) | Available |
+| Server-Sent Events — shipped on `main` (M8-002, ADR-0023) | Available |
+| Structured request logging — shipped on `main` (M8-003, ADR-0024) | Available |
 | Drizzle ORM integration | Planned optional adapter |
 
 Planned capabilities are **not part of `v0.1.0-beta.1`** unless a later release explicitly documents them as available.
 
 ## Planned first-party batteries
 
-### OpenAPI 3.1
+### OpenAPI 3.1 and Scalar — shipped on `main` (M8-004, ADR-0025)
 
-Planned to generate an OpenAPI document from route methods and paths, path parameters, request bodies, response statuses, Problem Details responses, explicit route metadata, and schemas that expose a Standard JSON Schema representation.
-
-Standard Schema validation alone does not guarantee runtime schema introspection: validators without a JSON Schema representation will require explicit OpenAPI metadata rather than receiving a guessed or incomplete schema. The document should be available as JSON, usable independently of any documentation UI.
-
-### Scalar API reference
-
-Scalar is planned as an optional presentation layer over the generated OpenAPI document. OpenAPI JSON remains the canonical contract; Scalar documentation is opt-in, replaceable, and must be explicitly exposed in production. Starter projects may enable `/docs` during development; applications may disable interactive requests or protect the documentation route.
+Delivered as generation-first OpenAPI 3.1: the document is generated from route methods and paths, path parameters, request bodies, explicit route metadata (`route({ openapi })`), and schemas that expose the Standard JSON Schema interface (`~standard.jsonSchema`), feature-detected; validators without a JSON Schema representation document presence only, never a guessed shape. RFC 9457 Problem Details is documented as the standard error component. The document is served as JSON at `openapi.path` (default `/openapi.json`) and remains usable independently of any documentation UI. Scalar is the optional presentation layer: a zero-dependency HTML shell served at `ui.path` (default `/docs`) loading Scalar from its public CDN — OpenAPI JSON stays canonical, the UI is opt-in and replaceable, and production exposure is an explicit application choice. Reference: [`docs/openapi.md`](openapi.md). Not part of the attested `v0.1.0-beta.1` candidate; ships in the next release.
 
 ### CORS — shipped on `main` (M8-001, ADR-0022)
 
@@ -68,9 +62,9 @@ Once the planned integrations land, the intended defaults are:
 |---|---|
 | OpenAPI document | Explicitly enabled; starter may enable in development |
 | Scalar UI | Development-only in starter; explicit in production |
-| CORS | Disabled unless configured |
-| SSE | Available per route |
-| Access logging | Concise development logging; explicit production policy |
+| CORS | Disabled unless configured (shipped behavior) |
+| SSE | Available per route (shipped behavior) |
+| Access logging | Off unless configured — explicit production policy (shipped behavior; amends the earlier "concise development logging" proposal for the 0.x line, per ODR-0009) |
 | Drizzle | Never initialized implicitly |
 
 ## Release status

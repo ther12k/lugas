@@ -21,7 +21,7 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | Code | Thrown by | Meaning | Hint |
 |---|---|---|---|
 | LUGAS_APP_001 | defineApp() | config must be an object | pass defineApp({ routes }) with an object literal |
-| LUGAS_APP_002 | defineApp() | unknown config key | allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, notFound, onError |
+| LUGAS_APP_002 | defineApp() | unknown config key | allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, openapi, notFound, onError |
 | LUGAS_APP_003 | defineApp() | 'modules' must be an array | wrap modules: modules: [defineModule(...)] |
 | LUGAS_APP_004 | defineApp() | modules entry is not a descriptor | create modules with defineModule({ name, routes }) |
 | LUGAS_APP_005 | defineApp() | duplicate module name | module names must be unique within an app |
@@ -41,13 +41,15 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_SSE_001 | sse() | invalid sse configuration | pass sse({ start(writer) { ... } }) with an optional positive heartbeatMs |
 | LUGAS_SSE_002 | sse() writer | invalid SSE event input or non-serializable data | data is a string, number, boolean, null, or a JSON-serializable object; event/id/comment values are single-line |
 | LUGAS_LOG_001 | defineApp() | invalid logging configuration | allowed keys: level, sink, requestIds, access; level is debug\|info\|warn\|error |
+| LUGAS_OPENAPI_001 | defineApp() | invalid openapi configuration | document requires title and version; paths must start with '/' |
+| LUGAS_OPENAPI_002 | defineApp() | openapi endpoint path collision with route or assets | openapi.path and openapi.ui.path must be disjoint from routes and assets |
 | LUGAS_MODULE_001 | defineModule() | config must be an object | pass defineModule({ name, routes }) |
 | LUGAS_MODULE_002 | defineModule() | unknown config key | allowed keys: name, routes |
 | LUGAS_MODULE_003 | defineModule() | 'name' must be a non-empty string | module names appear in manifests; use stable names |
 | LUGAS_MODULE_004 | defineModule() | 'routes' must be an object keyed by full path | use string paths like "/invoices/:id" |
 | LUGAS_MODULE_005 | defineModule() | duplicate method/path inside one module | each method+path declared once per module |
 | LUGAS_ROUTE_001 | route() | config must be an object | pass route({ handler }) |
-| LUGAS_ROUTE_002 | route() | unknown config key | allowed keys: handler, before, params, query, headers, body |
+| LUGAS_ROUTE_002 | route() | unknown config key | allowed keys: handler, before, params, query, headers, body, budget, openapi |
 | LUGAS_ROUTE_003 | route() | 'handler' must be a function | handler receives validated context, returns Response |
 | LUGAS_ROUTE_004 | route() | 'before' must be an array | list guards in execution order |
 | LUGAS_ROUTE_005 | route() | 'before' entries must be guard() descriptors | create guards with guard({ name, handler }) |
