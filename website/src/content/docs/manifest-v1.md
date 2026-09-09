@@ -2,9 +2,6 @@
 title: "lugas-manifest-v1"
 description: "The frozen static route manifest schema."
 ---
-
-# Runtime Manifest v1 (`lugas-manifest-v1`)
-
 Frozen by M4-001 before any implementation exposes it publicly. This document
 is the single source of truth for what the manifest contains, where every
 field comes from, how output is ordered, and how the format may evolve.

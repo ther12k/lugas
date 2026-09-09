@@ -2,9 +2,6 @@
 title: "Wire-honest types"
 description: "How Lugas response types model JSON serialization truth."
 ---
-
-# Wire-honest types
-
 Lugas response types model what `JSON.stringify` actually puts on the wire, not the in-memory object type. The `Jsonify` contract mirrors ECMA-262 `SerializeJSONProperty` at compile time so the client's decoded type cannot silently disagree with what the server sends.
 
 ## Input vs output types

@@ -12,8 +12,14 @@ export default defineConfig({
       social: [
         { icon: "github", label: "GitHub", href: "https://github.com/ther12k/lugas" },
       ],
+      components: {
+        // Header-right navigation: Docs / Examples / API links + the
+        // default social icons (GitHub). See src/components/SocialIcons.astro.
+        SocialIcons: "./src/components/SocialIcons.astro",
+      },
       sidebar: [
         { label: "Start", items: ["getting-started", "examples"] },
+        { label: "Features", items: ["cors", "sse", "logging", "openapi", "drizzle"] },
         { label: "Concepts", items: ["wire-honest-types", "design-principles", "choosing-lugas"] },
         { label: "Reference", items: ["api-reference", "diagnostics", "manifest-v1", "client-error-semantics", "compatibility"] },
         { label: "Project", items: ["roadmap"] },

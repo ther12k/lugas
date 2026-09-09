@@ -2,9 +2,6 @@
 title: "Diagnostics"
 description: "The LUGAS_* diagnostic code catalog."
 ---
-
-# Lugas Diagnostic Catalog
-
 Every framework-raised diagnostic carries a frozen code
 (`LUGAS_<FAMILY>_<NNN>`), a message (wording may evolve), an optional
 corrective hint, and optional scalar context (route, module, method, key).
@@ -16,18 +13,37 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | Code | Thrown by | Meaning | Hint |
 |---|---|---|---|
 | LUGAS_APP_001 | defineApp() | config must be an object | pass defineApp({ routes }) with an object literal |
-| LUGAS_APP_002 | defineApp() | unknown config key | allowed keys: services, routes, modules, notFound, onError |
+| LUGAS_APP_002 | defineApp() | unknown config key | allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, openapi, notFound, onError |
 | LUGAS_APP_003 | defineApp() | 'modules' must be an array | wrap modules: modules: [defineModule(...)] |
 | LUGAS_APP_004 | defineApp() | modules entry is not a descriptor | create modules with defineModule({ name, routes }) |
 | LUGAS_APP_005 | defineApp() | duplicate module name | module names must be unique within an app |
 | LUGAS_APP_006 | defineApp() | 'routes' must be an object keyed by full path | use string paths like "/users/:id" |
+| LUGAS_ASSET_001 | defineApp() assets | invalid asset configuration | files keys are literal exact paths; dirs keys are explicit prefixes ending in "/*" pointing at existing directories |
+| LUGAS_ASSET_002 | defineApp() assets | ambiguous asset/API ownership | asset declarations and API routes must own disjoint paths; change one of them |
+| LUGAS_ASSET_003 | defineApp() assets | asset declaration does not point at existing content | check the filesystem path (relative paths resolve from the process working directory) |
+| LUGAS_ASSET_004 | defineApp() assets | native directory mounts unsupported on this platform | assets.dirs requires Linux with openat2(RESOLVE_IN_ROOT); use explicit assets.files on other platforms |
+| LUGAS_LIFECYCLE_001 | service() | invalid service lifecycle descriptor | use service({ name, value, init?, dispose? }) with a non-empty name |
+| LUGAS_BODY_001 | defineApp() / route() | invalid body budget configuration | budget must be a positive integer number of bytes |
+| LUGAS_BODY_002 | defineApp() | body budget requires a declared framework-parsed body | declare a body schema on the route or remove the budget |
+| LUGAS_BODY_003 | serve() | body budget above the configured server ceiling | an override relaxes the default, never the ceiling; lower the budget or raise maxRequestBodySize |
+| LUGAS_CORS_001 | defineApp() | invalid cors configuration | allowed keys: origin, methods, allowedHeaders, exposedHeaders, credentials, maxAge |
+| LUGAS_CORS_002 | defineApp() | invalid cors origin configuration | origin is a non-empty origin string, an allowlist without "*" mixing, "*" alone, or a function |
+| LUGAS_CORS_003 | defineApp() | cors credentials incompatible with wildcard origin | browsers reject credentialed wildcard responses; list concrete origins (or use a callback returning true) |
+| LUGAS_CORS_004 | defineApp() | cors combined with pipeline-bypass route kinds or assets | convert static values (Response, Bun.file, { dir }) to handlers or serve them from an app without cors |
+| LUGAS_SSE_001 | sse() | invalid sse configuration | pass sse({ start(writer) { ... } }) with an optional positive heartbeatMs |
+| LUGAS_SSE_002 | sse() writer | invalid SSE event input or non-serializable data | data is a string, number, boolean, null, or a JSON-serializable object; event/id/comment values are single-line |
+| LUGAS_LOG_001 | defineApp() | invalid logging configuration | allowed keys: level, sink, requestIds, access; level is debug\|info\|warn\|error |
+| LUGAS_OPENAPI_001 | defineApp() | invalid openapi configuration | document requires title and version; paths must start with '/' |
+| LUGAS_OPENAPI_002 | defineApp() | openapi endpoint path collision with route or assets | openapi.path and openapi.ui.path must be disjoint from routes and assets |
+| LUGAS_DRIZZLE_001 | drizzleService() | value is not a recognizable Drizzle instance | drizzleService({ db }) requires an object with select, insert, update, and delete functions; the adapter never imports drizzle-orm |
+| LUGAS_DRIZZLE_002 | drizzleService() | invalid closeOnDispose option or no closable $client | closeOnDispose must be a boolean and requires db.$client.close to be a function; compose service() directly for clients that dispose differently |
 | LUGAS_MODULE_001 | defineModule() | config must be an object | pass defineModule({ name, routes }) |
 | LUGAS_MODULE_002 | defineModule() | unknown config key | allowed keys: name, routes |
 | LUGAS_MODULE_003 | defineModule() | 'name' must be a non-empty string | module names appear in manifests; use stable names |
 | LUGAS_MODULE_004 | defineModule() | 'routes' must be an object keyed by full path | use string paths like "/invoices/:id" |
 | LUGAS_MODULE_005 | defineModule() | duplicate method/path inside one module | each method+path declared once per module |
 | LUGAS_ROUTE_001 | route() | config must be an object | pass route({ handler }) |
-| LUGAS_ROUTE_002 | route() | unknown config key | allowed keys: handler, before, params, query, headers, body |
+| LUGAS_ROUTE_002 | route() | unknown config key | allowed keys: handler, before, params, query, headers, body, budget, openapi |
 | LUGAS_ROUTE_003 | route() | 'handler' must be a function | handler receives validated context, returns Response |
 | LUGAS_ROUTE_004 | route() | 'before' must be an array | list guards in execution order |
 | LUGAS_ROUTE_005 | route() | 'before' entries must be guard() descriptors | create guards with guard({ name, handler }) |
