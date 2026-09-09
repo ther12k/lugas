@@ -22,3 +22,4 @@
 20. [ADR-0020 — Application Service Lifecycle with Drain-Ordered Shutdown](0020-application-service-lifecycle.md)
 21. [ADR-0021 — Prebuilt Browser-Executable Client Artifact](0021-prebuilt-browser-client-artifact.md)
 22. [ADR-0022 — First-Party CORS Policy Enforced at the Compile Boundary](0022-first-party-cors.md)
+23. [ADR-0023 — Server-Sent Events as a Native Response Helper](0023-server-sent-events-helper.md)
