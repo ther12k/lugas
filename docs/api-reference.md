@@ -9,6 +9,7 @@
 | `route(config)` | function | stable |
 | `guard(config)` | function | stable |
 | `service(config)` | function | stable (M7-004) |
+| `drizzleService(config)` | `lugas/drizzle` function | new (M9-001) |
 | `sse(config)` | function | new (M8-002) |
 | `formatSseEvent(input)` | function | new (M8-002) |
 | `json(status, data)` | function | stable |
@@ -40,6 +41,10 @@ Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardCon
 ### OpenAPI 3.1 and Scalar (ADR-0025)
 
 `defineApp({ openapi })` generates a canonical OpenAPI 3.1 document from routing facts and declared schemas, served as JSON at `path` (default `/openapi.json`), with an optional zero-dependency Scalar CDN HTML shell at `ui.path` (default `/docs`). Standard JSON Schema is feature-detected (`~standard.jsonSchema`); validators without a representation document structure only (never guessed shapes). RFC 9457 Problem Details is documented as the standard error component. `route({ openapi })` adds per-route metadata (summary, tags, operationId, responses). Path collisions with routes or assets are rejected at startup (`LUGAS_OPENAPI_002`). Details: [`docs/openapi.md`](openapi.md).
+
+### Drizzle integration (ADR-0026, `lugas/drizzle`)
+
+`drizzleService({ db, name, closeOnDispose? })` declares an application-owned Drizzle instance as a Lugas service: structural startup validation (`LUGAS_DRIZZLE_001`), typed `ctx.services.<name>` access with the exact instance type, deterministic lifecycle participation, and opt-in dispose through the structural `$client.close()` (`LUGAS_DRIZZLE_002` when not closable). No implicit I/O, no migrations, no transaction wrapping; the adapter never imports drizzle-orm. Details: [`docs/drizzle.md`](drizzle.md).
 
 ### Service lifecycle (ADR-0020)
 

@@ -209,7 +209,7 @@ console.log("CLIENT-CONSUMER-OK");`,
     : [];
   check(
     "installed export map exposes ./client/browser (prebuilt artifact)",
-    installedExportsKeys.join(",") === [".", "./client", "./client/browser", "./testing"].join(","),
+    installedExportsKeys.join(",") === [".", "./client", "./client/browser", "./drizzle", "./testing"].join(","),
     installedExportsKeys.join(", ") || "no exports",
   );
   if (artifactPresent) {

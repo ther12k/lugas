@@ -43,6 +43,8 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_LOG_001 | defineApp() | invalid logging configuration | allowed keys: level, sink, requestIds, access; level is debug\|info\|warn\|error |
 | LUGAS_OPENAPI_001 | defineApp() | invalid openapi configuration | document requires title and version; paths must start with '/' |
 | LUGAS_OPENAPI_002 | defineApp() | openapi endpoint path collision with route or assets | openapi.path and openapi.ui.path must be disjoint from routes and assets |
+| LUGAS_DRIZZLE_001 | drizzleService() | value is not a recognizable Drizzle instance | drizzleService({ db }) requires an object with select, insert, update, and delete functions; the adapter never imports drizzle-orm |
+| LUGAS_DRIZZLE_002 | drizzleService() | invalid closeOnDispose option or no closable $client | closeOnDispose must be a boolean and requires db.$client.close to be a function; compose service() directly for clients that dispose differently |
 | LUGAS_MODULE_001 | defineModule() | config must be an object | pass defineModule({ name, routes }) |
 | LUGAS_MODULE_002 | defineModule() | unknown config key | allowed keys: name, routes |
 | LUGAS_MODULE_003 | defineModule() | 'name' must be a non-empty string | module names appear in manifests; use stable names |
