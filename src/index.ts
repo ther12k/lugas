@@ -13,6 +13,14 @@ export { sse, formatSseEvent } from "./core/sse";
 export type { SseConfig, SseEventInput, SseWriter } from "./core/sse";
 export type { LugasLifecycle, ShutdownOutcome, ShutdownOptions } from "./internal/lifecycle";
 export type { CorsConfig, CorsOriginDecision, CorsOriginInput } from "./internal/cors";
+export type {
+  CompiledLogging,
+  LogSink,
+  LoggingConfig,
+  LugasLogEntry,
+  LugasLogFields,
+  LugasLogLevel,
+} from "./internal/logging";
 export { empty, json, problem, redirect, text } from "./core/response";
 export type { Jsonify, ProblemFields, RedirectStatus, TypedResponse } from "./core/response";
 export type {

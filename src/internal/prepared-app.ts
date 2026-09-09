@@ -28,6 +28,7 @@ import { defaultNotFound, defaultOnError, withErrorPolicy, type ErrorPolicy, typ
 import { isServiceDescriptor } from "../core/service";
 import { createBudgetsContext, type BudgetsContext } from "./body-budget";
 import { corsWrapHandler, type CompiledCorsPolicy } from "./cors";
+import { wrapLogHandler, type CompiledLogging } from "./logging";
 import type { LifecycleService, ShutdownOptions } from "./lifecycle";
 import { problem } from "../core/response";
 import type { ModuleDescriptor } from "../core/types";
@@ -72,6 +73,8 @@ export type PreparedApp = {
   readonly budgets: BudgetsContext;
   /** Compiled CORS policy (M8-001, ADR-0022); undefined when not configured. */
   readonly cors: CompiledCorsPolicy | undefined;
+  /** Compiled logging policy (M8-003, ADR-0024); undefined when not configured. */
+  readonly logging: CompiledLogging | undefined;
 };
 
 function freezeContainers(value: Record<string, unknown>): Record<string, unknown> {
@@ -106,6 +109,7 @@ export function prepareApp<TServices>(config: {
   assets?: AssetsConfig | undefined;
   bodyBudget?: number | undefined;
   cors?: CompiledCorsPolicy | undefined;
+  logging?: CompiledLogging | undefined;
   notFound?: NotFoundPolicy | undefined;
   onError?: ErrorPolicy | undefined;
 }): PreparedApp {
@@ -148,7 +152,8 @@ export function prepareApp<TServices>(config: {
   const compileLugasHandler = (routeId: string, descriptor: unknown): (request: Request) => Response | Promise<Response> => {
     const budget = (descriptor as { budget?: unknown }).budget;
     if (typeof budget === "number") budgetsCtx.routeBudgets.push(budget);
-    return gateHandler(withErrorPolicy(compileRoute(routeId, descriptor as never, serviceSlots, budgetsCtx).handler, onError, routeId));
+    const inner = gateHandler(withErrorPolicy(compileRoute(routeId, descriptor as never, serviceSlots, budgetsCtx).handler, onError, routeId));
+    return config.logging !== undefined ? wrapLogHandler(config.logging, routeId, inner) : inner;
   };
 
   // Collect declarations per path, in declaration order (root first, then
@@ -196,7 +201,10 @@ export function prepareApp<TServices>(config: {
       });
     }
     // Raw Bun semantics (M4R1-004): function values serve verbatim.
-    if (kind.kind === "native-handler") return kind.handler;
+    if (kind.kind === "native-handler") {
+      const handler = kind.handler;
+      return config.logging !== undefined ? wrapLogHandler(config.logging, `${method} ${path}`, handler) : handler;
+    }
     if (kind.kind === "native-response") return kind.response;
     if (kind.kind === "native-file") return kind.file;
     if (kind.kind === "native-dir") return { dir: kind.path };
@@ -265,7 +273,8 @@ export function prepareApp<TServices>(config: {
       // Raw Bun semantics (M4R1-004): function values serve verbatim,
       // untouched by the framework pipeline.
       if (kind.kind === "native-handler") {
-        compiled[path] = kind.handler;
+        const handler = kind.handler;
+        compiled[path] = config.logging !== undefined ? wrapLogHandler(config.logging, `* ${path}`, handler) : handler;
         facts.push(makeFact({ method: "*", path, module: moduleName, kind: "native", native: "handler", validates: [], guards: [] }));
         continue;
       }
@@ -366,5 +375,6 @@ export function prepareApp<TServices>(config: {
     trafficGate,
     budgets: budgetsCtx,
     cors: config.cors,
+    logging: config.logging,
   });
 }

@@ -52,9 +52,9 @@ Delivered as the app-level, opt-in `defineApp({ cors })` policy with the planned
 
 Delivered as the native response helper with the planned shape: correct `text/event-stream` headers, event IDs, named events, retry hints, comments and an opt-in heartbeat, the exported `formatSseEvent` serializer, `desiredSize`-aware streaming, and deterministic exactly-once cleanup when the connection closes (writer close, client disconnect, or server force-close). SSE belongs close to the core because it is an HTTP response primitive, not an infrastructure product — no broker, fan-out, or replay. Reference: [`docs/sse.md`](sse.md). Not part of the attested `v0.1.0-beta.1` candidate; ships in the next release.
 
-### Structured logging
+### Structured logging — shipped on `main` (M8-003, ADR-0024)
 
-A small logger contract rather than a logging-vendor binding: structured JSON logs, request IDs, method and route, response status, request duration, stable diagnostic codes, error redaction, child logger context, and configurable levels. Applications should be able to adapt the contract to Pino, OpenTelemetry-aware loggers, or another system without changing route code. Sensitive headers, cookies, authorization values, and request bodies must not be logged by default.
+Delivered as the small sink contract and opt-in access log facility: structured JSON logs, scalar-only fields (redaction by construction), request IDs (`x-request-id`), method, path, route, response status, duration in milliseconds, stable diagnostic `LUGAS_LOG_001`, and configurable levels. Adapts cleanly to Pino, OpenTelemetry loggers, or any standard sink. Reference: [`docs/logging.md`](logging.md). Not part of the attested `v0.1.0-beta.1` candidate; ships in the next release.
 
 ### Drizzle ORM integration
 

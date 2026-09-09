@@ -114,6 +114,12 @@
     "hint": "data is a string, number, boolean, null, or a JSON-serializable object; event/id/comment values are single-line"
   },
   {
+    "code": "LUGAS_LOG_001",
+    "thrownBy": "defineApp()",
+    "meaning": "invalid logging configuration",
+    "hint": "allowed keys: level, sink, requestIds, access; level is debug|info|warn|error"
+  },
+  {
     "code": "LUGAS_LIFECYCLE_001",
     "thrownBy": "service()",
     "meaning": "invalid service lifecycle descriptor",
