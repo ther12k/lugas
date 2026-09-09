@@ -102,6 +102,18 @@
     "hint": "convert static values (Response, Bun.file, { dir }) to handlers or serve them from an app without cors"
   },
   {
+    "code": "LUGAS_SSE_001",
+    "thrownBy": "sse()",
+    "meaning": "invalid sse configuration",
+    "hint": "pass sse({ start(writer) { ... } }) with an optional positive heartbeatMs"
+  },
+  {
+    "code": "LUGAS_SSE_002",
+    "thrownBy": "sse() writer",
+    "meaning": "invalid SSE event input or non-serializable data",
+    "hint": "data is a string, number, boolean, null, or a JSON-serializable object; event/id/comment values are single-line"
+  },
+  {
     "code": "LUGAS_LIFECYCLE_001",
     "thrownBy": "service()",
     "meaning": "invalid service lifecycle descriptor",

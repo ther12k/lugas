@@ -9,6 +9,8 @@ export { guard } from "./core/guard";
 export type { GuardConfig } from "./core/guard";
 export { service } from "./core/service";
 export type { ServiceConfig, ServiceDescriptor } from "./core/service";
+export { sse, formatSseEvent } from "./core/sse";
+export type { SseConfig, SseEventInput, SseWriter } from "./core/sse";
 export type { LugasLifecycle, ShutdownOutcome, ShutdownOptions } from "./internal/lifecycle";
 export type { CorsConfig, CorsOriginDecision, CorsOriginInput } from "./internal/cors";
 export { empty, json, problem, redirect, text } from "./core/response";

@@ -38,6 +38,8 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_CORS_002 | defineApp() | invalid cors origin configuration | origin is a non-empty origin string, an allowlist without "*" mixing, "*" alone, or a function |
 | LUGAS_CORS_003 | defineApp() | cors credentials incompatible with wildcard origin | browsers reject credentialed wildcard responses; list concrete origins (or use a callback returning true) |
 | LUGAS_CORS_004 | defineApp() | cors combined with pipeline-bypass route kinds or assets | convert static values (Response, Bun.file, { dir }) to handlers or serve them from an app without cors |
+| LUGAS_SSE_001 | sse() | invalid sse configuration | pass sse({ start(writer) { ... } }) with an optional positive heartbeatMs |
+| LUGAS_SSE_002 | sse() writer | invalid SSE event input or non-serializable data | data is a string, number, boolean, null, or a JSON-serializable object; event/id/comment values are single-line |
 | LUGAS_MODULE_001 | defineModule() | config must be an object | pass defineModule({ name, routes }) |
 | LUGAS_MODULE_002 | defineModule() | unknown config key | allowed keys: name, routes |
 | LUGAS_MODULE_003 | defineModule() | 'name' must be a non-empty string | module names appear in manifests; use stable names |

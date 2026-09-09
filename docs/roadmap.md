@@ -48,9 +48,9 @@ Scalar is planned as an optional presentation layer over the generated OpenAPI d
 
 Delivered as the app-level, opt-in `defineApp({ cors })` policy with the planned shape: explicit origin allowlists, callback-based origin decisions, preflight handling, exposed and allowed headers, credential configuration, `Vary: Origin` on every response, and stable configuration diagnostics (`LUGAS_CORS_001`–`004`). CORS will not default to a permissive wildcard policy — the safe default is **no cross-origin access unless the application explicitly enables it**. Reference: [`docs/cors.md`](cors.md). Not part of the attested `v0.1.0-beta.1` candidate; ships in the next release.
 
-### Server-Sent Events
+### Server-Sent Events — shipped on `main` (M8-002, ADR-0023)
 
-SSE is planned as a native response helper built on web streams: correct `text/event-stream` headers, event IDs, named events, retry hints, comments and heartbeats, serialization helpers, cancellation handling, backpressure-aware streaming, and deterministic cleanup when the connection closes. SSE belongs close to the core because it is an HTTP response primitive, not an infrastructure product.
+Delivered as the native response helper with the planned shape: correct `text/event-stream` headers, event IDs, named events, retry hints, comments and an opt-in heartbeat, the exported `formatSseEvent` serializer, `desiredSize`-aware streaming, and deterministic exactly-once cleanup when the connection closes (writer close, client disconnect, or server force-close). SSE belongs close to the core because it is an HTTP response primitive, not an infrastructure product — no broker, fan-out, or replay. Reference: [`docs/sse.md`](sse.md). Not part of the attested `v0.1.0-beta.1` candidate; ships in the next release.
 
 ### Structured logging
 
