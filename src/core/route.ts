@@ -11,6 +11,7 @@ import { diagnostic } from "../internal/diagnostics";
 import { brand } from "../internal/brands";
 import { type RouteContext, type SchemaOutputOrRawParams } from "../internal/context";
 import type { GuardDescriptor, RouteDescriptor, RouteHandler } from "./types";
+import type { OpenApiRouteMetadata } from "../internal/openapi";
 
 /**
  * Handler context is DERIVED from the declared schemas and guard chain
@@ -41,9 +42,14 @@ export type RouteConfig<
    * declared framework-parsed `body`; clamped by the server ceiling.
    */
   budget?: number;
+  /**
+   * Route-specific OpenAPI 3.1 documentation metadata (M8-004, ADR-0025).
+   * Used by `defineApp({ openapi })` when generating API documentation.
+   */
+  openapi?: OpenApiRouteMetadata;
 };
 
-const ROUTE_KEYS = new Set(["handler", "before", "params", "query", "headers", "body", "budget"]);
+const ROUTE_KEYS = new Set(["handler", "before", "params", "query", "headers", "body", "budget", "openapi"]);
 
 export function route<
   TServices = unknown,
@@ -72,7 +78,7 @@ export function route<
   for (const key of Object.keys(config)) {
     if (!ROUTE_KEYS.has(key)) {
       throw diagnostic("LUGAS_ROUTE_002", `route(): unknown config key '${key}'`, {
-        hint: "allowed keys: handler, before, params, query, headers, body",
+        hint: "allowed keys: handler, before, params, query, headers, body, budget, openapi",
         context: { key },
       });
     }
@@ -110,6 +116,7 @@ export function route<
       headers: config.headers,
       body: config.body,
       budget: config.budget,
+      openapi: config.openapi,
     }),
     "RouteDescriptor",
   );

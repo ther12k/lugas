@@ -147,7 +147,8 @@ Types describe the wire. A handler returning `json(200, { createdAt: new Date() 
 | First-party CORS (`defineApp({ cors })`, opt-in, fail-closed) | Available on `main` (post-beta, M8-001) |
 | Server-Sent Events (`sse()` helper, deterministic cleanup) | Available on `main` (post-beta, M8-002) |
 | Structured logging (`defineApp({ logging })`, sink contract) | Available on `main` (post-beta, M8-003) |
-| OpenAPI 3.1, Scalar, Drizzle | Planned — see [roadmap](#roadmap) |
+| OpenAPI 3.1 + Scalar reference UI (`defineApp({ openapi })`, zero-dependency) | Available on `main` (post-beta, M8-004) |
+| Drizzle ORM adapter | Planned — see [roadmap](#roadmap) |
 
 ## Examples
 
@@ -169,7 +170,7 @@ Known beta limitations: the server core and CLI are Bun-only (the client bundle 
 
 ## Roadmap
 
-Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). The remaining planned first-party batteries — OpenAPI 3.1 generation, Scalar reference UI, and an optional Drizzle adapter — are **not** part of `v0.1.0-beta.1`; each arrives only when a release documents it as available. First-party CORS ([`docs/cors.md`](docs/cors.md)), Server-Sent Events ([`docs/sse.md`](docs/sse.md)), and Structured Logging ([`docs/logging.md`](docs/logging.md)) landed on `main` after the beta candidate was attested and ship in the next release.
+Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). The only remaining planned first-party battery is the optional Drizzle adapter — **not** part of `v0.1.0-beta.1`; it arrives only when a release documents it as available. First-party CORS ([`docs/cors.md`](docs/cors.md)), Server-Sent Events ([`docs/sse.md`](docs/sse.md)), Structured Logging ([`docs/logging.md`](docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](docs/openapi.md)) landed on `main` after the beta candidate was attested and ship in the next release.
 
 ## Documentation
 

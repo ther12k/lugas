@@ -17,7 +17,7 @@
 | `problem(status, fields)` | function | stable |
 | `redirect(location)` | function | stable |
 
-Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `SseConfig`, `SseWriter`, `SseEventInput`, `LoggingConfig`, `LugasLogEntry`, `LugasLogFields`, `LugasLogLevel`, `LogSink`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
+Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `SseConfig`, `SseWriter`, `SseEventInput`, `LoggingConfig`, `LugasLogEntry`, `LugasLogFields`, `LugasLogLevel`, `LogSink`, `OpenApiConfig`, `OpenApiDocumentInfo`, `OpenApiRouteMetadata`, `OpenApiUiConfig`, `CompiledOpenApi`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
 
 `defineApp()` also accepts `assets` (opt-in, ADR-0018): `{ files: { "/robots.txt": "./public/robots.txt" }, dirs: { "/assets/*": "./public/assets" } }`. File mappings are literal exact paths; directory mounts are explicit prefixes ending in `/*`. Native directory mounts (`assets.dirs`) are supported on Linux only (relying on kernel `openat2(RESOLVE_IN_ROOT)` for symlink containment); configuring `dirs` on macOS or Windows fails closed before startup (`LUGAS_ASSET_004`). File mappings (`assets.files`) are supported across all platforms. Assets are served natively by Bun through GET/HEAD; other methods reach the app's not-found policy (no 405). Ownership conflicts with API routes are rejected at startup (`LUGAS_ASSET_002`). Asset routes are outside the manifest and the request pipeline (no guards, no `onError`).
 
@@ -36,6 +36,10 @@ Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardCon
 ### Structured Logging (ADR-0024)
 
 `defineApp({ logging })` configures structured logging with an explicit sink contract: `level` (default "info"), `sink` (pluggable `(entry) => void`), `requestIds` (`x-request-id` header + correlated id), and `access` (per-request entry). Scalar-only fields ensure redaction by construction: bodies, headers, and cookies are never logged by the framework. Details: [`docs/logging.md`](logging.md).
+
+### OpenAPI 3.1 and Scalar (ADR-0025)
+
+`defineApp({ openapi })` generates a canonical OpenAPI 3.1 document from routing facts and declared schemas, served as JSON at `path` (default `/openapi.json`), with an optional zero-dependency Scalar CDN HTML shell at `ui.path` (default `/docs`). Standard JSON Schema is feature-detected (`~standard.jsonSchema`); validators without a representation document structure only (never guessed shapes). RFC 9457 Problem Details is documented as the standard error component. `route({ openapi })` adds per-route metadata (summary, tags, operationId, responses). Path collisions with routes or assets are rejected at startup (`LUGAS_OPENAPI_002`). Details: [`docs/openapi.md`](openapi.md).
 
 ### Service lifecycle (ADR-0020)
 

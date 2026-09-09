@@ -3,7 +3,7 @@
     "family": "APP",
     "code": "LUGAS_APP_002",
     "message": "defineApp(): unknown config key 'bogus'",
-    "hint": "allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, notFound, onError",
+    "hint": "allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, openapi, notFound, onError",
     "context": {
       "key": "bogus"
     }
@@ -21,7 +21,7 @@
     "family": "ROUTE",
     "code": "LUGAS_ROUTE_002",
     "message": "route(): unknown config key 'bogus'",
-    "hint": "allowed keys: handler, before, params, query, headers, body",
+    "hint": "allowed keys: handler, before, params, query, headers, body, budget, openapi",
     "context": {
       "key": "bogus"
     }

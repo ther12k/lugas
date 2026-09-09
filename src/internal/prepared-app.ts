@@ -29,6 +29,7 @@ import { isServiceDescriptor } from "../core/service";
 import { createBudgetsContext, type BudgetsContext } from "./body-budget";
 import { corsWrapHandler, type CompiledCorsPolicy } from "./cors";
 import { wrapLogHandler, type CompiledLogging } from "./logging";
+import { generateOpenApiDocument, createScalarHtml, type CompiledOpenApi } from "./openapi";
 import type { LifecycleService, ShutdownOptions } from "./lifecycle";
 import { problem } from "../core/response";
 import type { ModuleDescriptor } from "../core/types";
@@ -110,6 +111,7 @@ export function prepareApp<TServices>(config: {
   bodyBudget?: number | undefined;
   cors?: CompiledCorsPolicy | undefined;
   logging?: CompiledLogging | undefined;
+  openapi?: CompiledOpenApi | undefined;
   notFound?: NotFoundPolicy | undefined;
   onError?: ErrorPolicy | undefined;
 }): PreparedApp {
@@ -175,12 +177,14 @@ export function prepareApp<TServices>(config: {
   }
 
   const facts: RouteFact[] = [];
+  const rawDescriptors = new Map<string, unknown>();
 
   const compileMethodValue = (method: string, path: string, moduleName: string | null, value: unknown): unknown => {
     const kind = classifyRoute(value);
     if (kind.kind === "lugas-descriptor") {
       const declared = descriptorFacts(kind.descriptor as unknown as Record<string, unknown>);
       facts.push(makeFact({ method, path, module: moduleName, kind: "lugas", ...declared }));
+      rawDescriptors.set(`${method} ${path}`, kind.descriptor);
     } else if (kind.kind === "native-handler") {
       facts.push(makeFact({ method, path, module: moduleName, kind: "native", native: "handler", validates: [], guards: [] }));
     } else if (kind.kind === "native-response" || kind.kind === "native-file") {
@@ -282,6 +286,7 @@ export function prepareApp<TServices>(config: {
       if (kind.kind === "lugas-descriptor") {
         const declared = descriptorFacts(kind.descriptor as unknown as Record<string, unknown>);
         facts.push(makeFact({ method: "*", path, module: moduleName, kind: "lugas", ...declared }));
+        rawDescriptors.set(`* ${path}`, kind.descriptor);
       } else if (kind.kind === "native-response" || kind.kind === "native-file") {
         facts.push(makeFact({ method: "*", path, module: moduleName, kind: "native", native: "static", validates: [], guards: [] }));
       } else if (kind.kind === "native-dir") {
@@ -363,6 +368,64 @@ export function prepareApp<TServices>(config: {
         wrappedMap[method] = corsWrapHandler(config.cors, entry as (request: Request) => Response | Promise<Response>);
       }
       compiled[path] = Object.freeze(wrappedMap);
+    }
+  }
+
+  // OpenAPI & Scalar endpoints (M8-004, ADR-0025):
+  // Generated and mounted as standard framework handlers.
+  // Validate collision against declared API routes and asset mappings first.
+  if (config.openapi !== undefined) {
+    const docPath = config.openapi.path;
+    const uiPath = config.openapi.uiPath;
+    const existingPaths = new Set(declarationsByPath.keys());
+    if (config.assets?.files) {
+      for (const f of Object.keys(config.assets.files)) existingPaths.add(f);
+    }
+    if (existingPaths.has(docPath)) {
+      throw diagnostic("LUGAS_OPENAPI_002", `defineApp(): openapi.path '${docPath}' collides with an existing route or asset`, {
+        hint: "configure a different path: openapi: { path: '/api-docs.json' }",
+        context: { path: docPath },
+      });
+    }
+    if (uiPath !== null && existingPaths.has(uiPath)) {
+      throw diagnostic("LUGAS_OPENAPI_002", `defineApp(): openapi.ui.path '${uiPath}' collides with an existing route or asset`, {
+        hint: "configure a different UI path: openapi: { ui: { path: '/scalar' } }",
+        context: { path: uiPath },
+      });
+    }
+
+    const doc = generateOpenApiDocument(config.openapi, facts, rawDescriptors);
+    const docJson = JSON.stringify(doc);
+
+    let docHandler: (request: Request) => Response | Promise<Response> = () => {
+      return new Response(docJson, {
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    };
+    if (config.logging !== undefined) {
+      docHandler = wrapLogHandler(config.logging, `GET ${docPath}`, docHandler);
+    }
+    if (config.cors !== undefined) {
+      docHandler = corsWrapHandler(config.cors, docHandler);
+    }
+    compiled[docPath] = Object.freeze({ GET: docHandler });
+    facts.push(makeFact({ method: "GET", path: docPath, module: null, kind: "native", native: "handler", validates: [], guards: [] }));
+
+    if (uiPath !== null) {
+      const html = createScalarHtml(docPath, config.openapi.document.title);
+      let uiHandler: (request: Request) => Response | Promise<Response> = () => {
+        return new Response(html, {
+          headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      };
+      if (config.logging !== undefined) {
+        uiHandler = wrapLogHandler(config.logging, `GET ${uiPath}`, uiHandler);
+      }
+      if (config.cors !== undefined) {
+        uiHandler = corsWrapHandler(config.cors, uiHandler);
+      }
+      compiled[uiPath] = Object.freeze({ GET: uiHandler });
+      facts.push(makeFact({ method: "GET", path: uiPath, module: null, kind: "native", native: "handler", validates: [], guards: [] }));
     }
   }
 
