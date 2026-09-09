@@ -68,7 +68,7 @@ describe("golden: thrown shape per family (json formatting)", () => {
       expect(golden).toEqual({
         code: "LUGAS_APP_002",
         message: "defineApp(): unknown config key 'bogus'",
-        hint: "allowed keys: services, routes, modules, assets, notFound, onError",
+        hint: "allowed keys: services, routes, modules, assets, bodyBudget, cors, notFound, onError",
         context: { key: "bogus" },
       });
     }

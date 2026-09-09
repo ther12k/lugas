@@ -27,6 +27,7 @@ import { compileRoute } from "./compile-route";
 import { defaultNotFound, defaultOnError, withErrorPolicy, type ErrorPolicy, type NotFoundPolicy } from "./error-policy";
 import { isServiceDescriptor } from "../core/service";
 import { createBudgetsContext, type BudgetsContext } from "./body-budget";
+import { corsWrapHandler, type CompiledCorsPolicy } from "./cors";
 import type { LifecycleService, ShutdownOptions } from "./lifecycle";
 import { problem } from "../core/response";
 import type { ModuleDescriptor } from "../core/types";
@@ -69,6 +70,8 @@ export type PreparedApp = {
   readonly trafficGate: { gate: Promise<void> };
   /** Body-budget context (M7-003): app default, route budgets, ceiling slot. */
   readonly budgets: BudgetsContext;
+  /** Compiled CORS policy (M8-001, ADR-0022); undefined when not configured. */
+  readonly cors: CompiledCorsPolicy | undefined;
 };
 
 function freezeContainers(value: Record<string, unknown>): Record<string, unknown> {
@@ -102,6 +105,7 @@ export function prepareApp<TServices>(config: {
   services: TServices;
   assets?: AssetsConfig | undefined;
   bodyBudget?: number | undefined;
+  cors?: CompiledCorsPolicy | undefined;
   notFound?: NotFoundPolicy | undefined;
   onError?: ErrorPolicy | undefined;
 }): PreparedApp {
@@ -302,9 +306,56 @@ export function prepareApp<TServices>(config: {
 
   // Assets (ADR-0018): ownership is validated against every declared API
   // path, then compiled to native Bun route values. Asset entries never
-  // produce manifest facts and bypass the Lugas request pipeline.
+  // produce manifest facts and bypass the Lugas request pipeline — which is
+  // exactly why they are incompatible with a CORS policy (M8-001, ADR-0022):
+  // headers cannot be enforced on natively served values, so configuring
+  // both fails closed instead of serving un-policy'd responses.
+  if (config.cors !== undefined && config.assets !== undefined) {
+    throw diagnostic("LUGAS_CORS_004", "defineApp(): cors cannot be combined with 'assets'", {
+      hint: "asset routes bypass the framework response pipeline, so CORS cannot be enforced on them; serve assets from a separate app or convert them to handlers",
+    });
+  }
   const assetRoutes = compileAssets(config.assets, new Set(declarationsByPath.keys()));
   Object.assign(compiled, assetRoutes);
+
+  // CORS (M8-001, ADR-0022): the policy wraps every compiled handler as the
+  // outermost layer (outside the traffic gate and error policy, so held 503s
+  // and error 500s carry it too). Static native values cannot be wrapped
+  // without losing their serving semantics — they fail closed here. No
+  // routes are synthesized and no path matching is reimplemented: preflights
+  // that match no declared OPTIONS/any-method entry reach the wrapped fetch
+  // fallback through Bun's own routing.
+  if (config.cors !== undefined) {
+    const rejectStatic = (path: string, method: string | null, kind: string): never => {
+      const at = method === null ? path : `${method} ${path}`;
+      throw diagnostic("LUGAS_CORS_004", `defineApp(): cors requires the framework response pipeline, but a ${kind} is declared at ${at}`, {
+        hint: "convert the static value to a handler (function or route()) or serve it from an app without cors",
+        context: { path, ...(method !== null ? { method } : {}), kind },
+      });
+    };
+    for (const [path, value] of Object.entries(compiled)) {
+      if (typeof value === "function") {
+        compiled[path] = corsWrapHandler(config.cors, value as (request: Request) => Response | Promise<Response>);
+        continue;
+      }
+      if (value instanceof Response) rejectStatic(path, null, "static Response value");
+      if (value instanceof Blob) rejectStatic(path, null, "Bun.file/Blob value");
+      if (typeof value !== "object" || value === null) rejectStatic(path, null, "static value");
+      const record = value as Record<string, unknown>;
+      const keys = Object.keys(record);
+      if (keys.length === 1 && typeof record["dir"] === "string") rejectStatic(path, null, "native { dir } mount");
+      // Method maps built above are frozen; wrap into a fresh frozen map.
+      const wrappedMap: Record<string, unknown> = {};
+      for (const [method, entry] of Object.entries(record)) {
+        if (typeof entry !== "function") {
+          const kind = entry instanceof Response ? "static Response value" : entry instanceof Blob ? "Bun.file/Blob value" : "static value";
+          rejectStatic(path, method, kind);
+        }
+        wrappedMap[method] = corsWrapHandler(config.cors, entry as (request: Request) => Response | Promise<Response>);
+      }
+      compiled[path] = Object.freeze(wrappedMap);
+    }
+  }
 
   return Object.freeze({
     bunRoutes: Object.freeze(freezeContainers(compiled)),
@@ -314,5 +365,6 @@ export function prepareApp<TServices>(config: {
     serviceSlots,
     trafficGate,
     budgets: budgetsCtx,
+    cors: config.cors,
   });
 }

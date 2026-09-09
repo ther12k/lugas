@@ -15,13 +15,17 @@
 | `problem(status, fields)` | function | stable |
 | `redirect(location)` | function | stable |
 
-Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
+Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
 
 `defineApp()` also accepts `assets` (opt-in, ADR-0018): `{ files: { "/robots.txt": "./public/robots.txt" }, dirs: { "/assets/*": "./public/assets" } }`. File mappings are literal exact paths; directory mounts are explicit prefixes ending in `/*`. Native directory mounts (`assets.dirs`) are supported on Linux only (relying on kernel `openat2(RESOLVE_IN_ROOT)` for symlink containment); configuring `dirs` on macOS or Windows fails closed before startup (`LUGAS_ASSET_004`). File mappings (`assets.files`) are supported across all platforms. Assets are served natively by Bun through GET/HEAD; other methods reach the app's not-found policy (no 405). Ownership conflicts with API routes are rejected at startup (`LUGAS_ASSET_002`). Asset routes are outside the manifest and the request pipeline (no guards, no `onError`).
 
 ### Body budgets (ADR-0019)
 
 `defineApp({ bodyBudget })` sets an application default; `route({ budget })` sets a per-route override; both are byte counts clamped by `serve({ maxRequestBodySize })`. Budgets require a declared framework-parsed `body` (`LUGAS_BODY_002` otherwise) and above-ceiling configuration is rejected at `serve()` (`LUGAS_BODY_003`). Enforcement is bounded consumption ending in a `413` Problem Details response (`BODY_BUDGET_EXCEEDED`) before validation or handler execution; the transport ceiling's bare `413` is unchanged.
+
+### CORS (ADR-0022)
+
+`defineApp({ cors })` enables the first-party, opt-in, app-level CORS policy: `origin` (exact string, allowlist, `"*"`, or sync/async callback), `methods`, `allowedHeaders`, `exposedHeaders`, `credentials`, `maxAge`. When configured, every response carries `Vary: Origin`; allowed origins receive `Access-Control-Allow-Origin` (+ credentials/exposed headers as configured); preflights are answered `204` before application handlers (denied preflights get `204` with `Vary` only, so the browser fails them). Pipeline-bypass route kinds (static `Response`, `Bun.file`, `{ dir }`) and `assets` are rejected at startup when `cors` is configured (`LUGAS_CORS_004`). Absent `cors`, behavior is unchanged. Details: [`docs/cors.md`](cors.md).
 
 ### Service lifecycle (ADR-0020)
 

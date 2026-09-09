@@ -44,9 +44,9 @@ Standard Schema validation alone does not guarantee runtime schema introspection
 
 Scalar is planned as an optional presentation layer over the generated OpenAPI document. OpenAPI JSON remains the canonical contract; Scalar documentation is opt-in, replaceable, and must be explicitly exposed in production. Starter projects may enable `/docs` during development; applications may disable interactive requests or protect the documentation route.
 
-### CORS
+### CORS — shipped on `main` (M8-001, ADR-0022)
 
-Maintained CORS middleware is planned with explicit origin allowlists, callback-based origin decisions, preflight handling, exposed and allowed headers, credential configuration, `Vary: Origin` correctness, and stable configuration diagnostics. CORS will not default to a permissive wildcard policy — the safe default is **no cross-origin access unless the application explicitly enables it**.
+Delivered as the app-level, opt-in `defineApp({ cors })` policy with the planned shape: explicit origin allowlists, callback-based origin decisions, preflight handling, exposed and allowed headers, credential configuration, `Vary: Origin` on every response, and stable configuration diagnostics (`LUGAS_CORS_001`–`004`). CORS will not default to a permissive wildcard policy — the safe default is **no cross-origin access unless the application explicitly enables it**. Reference: [`docs/cors.md`](cors.md). Not part of the attested `v0.1.0-beta.1` candidate; ships in the next release.
 
 ### Server-Sent Events
 

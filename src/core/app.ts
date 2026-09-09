@@ -12,6 +12,7 @@ import { compose, type Composition } from "../internal/compose";
 import { buildManifest, type LugasManifestV1 } from "../internal/manifest";
 import { prepareApp, type PreparedApp } from "../internal/prepared-app";
 import type { AssetsConfig } from "../internal/assets";
+import { compileCorsPolicy, type CompiledCorsPolicy, type CorsConfig } from "../internal/cors";
 import type { LugasApp, MergeModulesRoutes, ModuleDescriptor } from "./types";
 import { serveApp } from "../internal/serve";
 import { assertValidRoutePath } from "../internal/path";
@@ -33,11 +34,20 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
    * own `budget`; clamped by the serve-time `maxRequestBodySize` ceiling.
    */
   bodyBudget?: number;
+  /**
+   * First-party CORS policy (M8-001, ADR-0022): opt-in, app-level, fail-closed.
+   * When configured, every response carries `Vary: Origin`, allowed origins
+   * receive `Access-Control-*` headers, preflights are answered before
+   * application handlers, and pipeline-bypass route kinds (static `Response`,
+   * `Bun.file`, `{ dir }`, `assets`) are rejected at startup. Absent `cors`
+   * leaves every behavior unchanged.
+   */
+  cors?: CorsConfig;
   notFound?: (request: Request) => Response | Promise<Response>;
   onError?: (error: unknown, request: Request) => Response | Promise<Response>;
 };
 
-const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "notFound", "onError"]);
+const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "notFound", "onError"]);
 
 export type AppInternals<TServices = unknown> = {
   readonly composition: Composition;
@@ -84,7 +94,7 @@ export function defineApp<
   }
   for (const key of Object.keys(config)) {
     if (!APP_KEYS.has(key)) {
-      throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, assets, notFound, onError", context: { key } });
+      throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, assets, bodyBudget, cors, notFound, onError", context: { key } });
     }
   }
   if (config.bodyBudget !== undefined && (typeof config.bodyBudget !== "number" || !Number.isInteger(config.bodyBudget) || config.bodyBudget <= 0)) {
@@ -93,6 +103,9 @@ export function defineApp<
       context: { key: "bodyBudget" },
     });
   }
+  // M8-001 (ADR-0022): validate once here; preparation consumes the compiled
+  // policy and never re-reads user configuration.
+  const corsPolicy: CompiledCorsPolicy | undefined = config.cors !== undefined ? compileCorsPolicy(config.cors) : undefined;
   if (config.modules !== undefined) {
     if (!Array.isArray(config.modules)) throw diagnostic("LUGAS_APP_003", "defineApp(): 'modules' must be an array", { hint: "wrap modules: modules: [defineModule(...)]" });
     const names = new Set<string>();
@@ -131,6 +144,7 @@ export function defineApp<
     services: config.services as TServices,
     assets: config.assets,
     bodyBudget: config.bodyBudget,
+    cors: corsPolicy,
     notFound: config.notFound,
     onError: config.onError,
   });

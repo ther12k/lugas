@@ -26,6 +26,7 @@ export type DiagnosticCode =
   | "LUGAS_ROUTES_001" | "LUGAS_ROUTES_002" | "LUGAS_ROUTES_003" | "LUGAS_ROUTES_004"
   | "LUGAS_RESPONSE_001" | "LUGAS_RESPONSE_002" | "LUGAS_RESPONSE_003" | "LUGAS_RESPONSE_004" | "LUGAS_RESPONSE_005"
   | "LUGAS_BODY_001" | "LUGAS_BODY_002" | "LUGAS_BODY_003"
+  | "LUGAS_CORS_001" | "LUGAS_CORS_002" | "LUGAS_CORS_003" | "LUGAS_CORS_004"
   | "LUGAS_LIFECYCLE_001"
   | "LUGAS_TEST_001"
   | "LUGAS_CLI_001";
@@ -56,7 +57,7 @@ type CatalogEntry = {
 /** The authoritative catalog. Order is documentation order, not semantics. */
 export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_APP_001", thrownBy: "defineApp()", meaning: "config must be an object", hint: "pass defineApp({ routes }) with an object literal" },
-  { code: "LUGAS_APP_002", thrownBy: "defineApp()", meaning: "unknown config key", hint: "allowed keys: services, routes, modules, assets, notFound, onError" },
+  { code: "LUGAS_APP_002", thrownBy: "defineApp()", meaning: "unknown config key", hint: "allowed keys: services, routes, modules, assets, bodyBudget, cors, notFound, onError" },
   { code: "LUGAS_APP_003", thrownBy: "defineApp()", meaning: "'modules' must be an array", hint: "wrap modules: modules: [defineModule(...)]" },
   { code: "LUGAS_APP_004", thrownBy: "defineApp()", meaning: "modules entry is not a defineModule() descriptor", hint: "create modules with defineModule({ name, routes })" },
   { code: "LUGAS_APP_005", thrownBy: "defineApp()", meaning: "duplicate module name", hint: "module names must be unique within an app" },
@@ -68,6 +69,10 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_BODY_001", thrownBy: "defineApp() / route()", meaning: "invalid body budget configuration", hint: "budget must be a positive integer number of bytes" },
   { code: "LUGAS_BODY_002", thrownBy: "defineApp()", meaning: "body budget requires a declared framework-parsed body", hint: "declare a body schema on the route or remove the budget" },
   { code: "LUGAS_BODY_003", thrownBy: "serve()", meaning: "body budget above the configured server ceiling", hint: "an override relaxes the default, never the ceiling; lower the budget or raise maxRequestBodySize" },
+  { code: "LUGAS_CORS_001", thrownBy: "defineApp()", meaning: "invalid cors configuration", hint: "allowed keys: origin, methods, allowedHeaders, exposedHeaders, credentials, maxAge" },
+  { code: "LUGAS_CORS_002", thrownBy: "defineApp()", meaning: "invalid cors origin configuration", hint: "origin is a non-empty origin string, an allowlist without \"*\" mixing, \"*\" alone, or a function" },
+  { code: "LUGAS_CORS_003", thrownBy: "defineApp()", meaning: "cors credentials incompatible with wildcard origin", hint: "browsers reject credentialed wildcard responses; list concrete origins (or use a callback returning true)" },
+  { code: "LUGAS_CORS_004", thrownBy: "defineApp()", meaning: "cors combined with pipeline-bypass route kinds or assets", hint: "convert static values (Response, Bun.file, { dir }) to handlers or serve them from an app without cors" },
   { code: "LUGAS_LIFECYCLE_001", thrownBy: "service()", meaning: "invalid service lifecycle descriptor", hint: "use service({ name, value, init?, dispose? }) with a non-empty name" },
   { code: "LUGAS_MODULE_001", thrownBy: "defineModule()", meaning: "config must be an object", hint: "pass defineModule({ name, routes })" },
   { code: "LUGAS_MODULE_002", thrownBy: "defineModule()", meaning: "unknown config key", hint: "allowed keys: name, routes" },
