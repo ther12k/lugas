@@ -1,10 +1,10 @@
-# LugasJS v0.1.0-beta.1 Release Packet
+# LugasJS v0.1.0-beta.2 Release Packet
 
-**Candidate Version:** `0.1.0-beta.1`\
-**Package Source Commit:** `3edaae9cb817a201824920f2048e58a650f31e94`\
-**Attestation Commit:** `3edaae9cb817a201824920f2048e58a650f31e94` (`3edaae9`)
+**Candidate Version:** `0.1.0-beta.2`\
+**Package Source Commit:** `7f08b166b392b4e3b3f968f97d6d06fe1ce0eec9`\
+**Attestation Commit:** `7f08b166b392b4e3b3f968f97d6d06fe1ce0eec9` (`7f08b16`)
 
-**Generated:** 2026-09-09T07:26:14.748Z\
+**Generated:** 2026-09-09T08:47:42.470Z\
 **Runtime:** Bun 1.4.0 · TypeScript 7.0.2 · Linux x86-64 / macOS arm64 / Windows x64\
 **Package:** `lugas` (unscoped) · License: Apache-2.0 · Repo: `ther12k/lugas`
 
@@ -12,7 +12,7 @@
 
 ## 1. Executive Summary
 
-This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.1** release candidate. All milestones (M0–M8) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
+This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.2** release candidate. All milestones (M0–M8) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
 
 Publication remains strictly gated on owner approval in **M8-GATE**.
 
@@ -24,7 +24,7 @@ Publication remains strictly gated on owner approval in **M8-GATE**.
 |---|---|---|
 | Product Name | **LugasJS** (shortened to **Lugas**) | ADR-0001 |
 | Package Name | **`lugas`** (unscoped) | ODR-0001 (`docs/owner-decisions/naming-assets.md`) |
-| Version | **`0.1.0-beta.1`** | SemVer beta candidate |
+| Version | **`0.1.0-beta.2`** | SemVer beta candidate |
 | Repository | **`ther12k/lugas`** | GitHub |
 | License | **Apache-2.0** (full text in `LICENSE`) | ODR-0002, `NOTICE` |
 | Security Policy | GitHub Private Advisories (48h SLA) | `SECURITY.md` |
@@ -67,10 +67,10 @@ Publication remains strictly gated on owner approval in **M8-GATE**.
 
 | Scenario / Metric | Release Floor | Alert Floor | Target | Candidate Measured | Result |
 |---|---|---|---|---|---|
-| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **117,102 rps** (-12.8% vs raw Bun) | ✅ Exceeded |
-| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **97,218 rps** | ✅ Exceeded |
-| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **62,137 rps** | ✅ Exceeded (14.0% validated overhead vs raw Bun) |
-| Typecheck Duration | — | — | < 2,000ms | **1482ms** | ✅ Measured on candidate |
+| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **96,545 rps** (2.0% vs raw Bun) | ✅ Exceeded |
+| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **98,397 rps** | ✅ Exceeded |
+| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **60,223 rps** | ✅ Exceeded (20.7% validated overhead vs raw Bun) |
+| Typecheck Duration | — | — | < 2,000ms | **1474ms** | ✅ Measured on candidate |
 | Client Bundle Size | — | — | < 25,000 B | **14900 B** | ✅ Measured on candidate |
 
 ---
@@ -116,7 +116,7 @@ Publication remains strictly gated on owner approval in **M8-GATE**.
 To publish this release candidate to npm after M8-GATE approval:
 
 ```bash
-npm publish ./docs/releases/beta/lugas-0.1.0-beta.1.tgz --access public --tag beta
+npm publish ./docs/releases/beta/lugas-0.1.0-beta.2.tgz --access public --tag beta
 ```
 
 *Note: This command must only be executed upon formal owner sign-off.*

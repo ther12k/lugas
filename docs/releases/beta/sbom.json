@@ -1,8 +1,8 @@
 {
   "format": "lugas-sbom-v0",
-  "generatedAt": "2026-09-09T07:25:50.086Z",
+  "generatedAt": "2026-09-09T08:44:35.044Z",
   "packageName": "lugas",
-  "packageVersion": "0.1.0-beta.1",
+  "packageVersion": "0.1.0-beta.2",
   "derivation": "staged package.json dependencies/optionalDependencies/peerDependencies",
   "productionDependencies": [],
   "devDependencies": [

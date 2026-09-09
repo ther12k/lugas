@@ -1,7 +1,7 @@
 {
   "format": "lugas-package-inventory-v0",
   "packageName": "lugas",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "tarballEntries": 79,
   "files": [
     "AGENTS.md",
@@ -94,5 +94,5 @@
       "format": "esm"
     }
   ],
-  "generatedAt": "2026-09-09T07:25:50.086Z"
+  "generatedAt": "2026-09-09T08:44:35.044Z"
 }
