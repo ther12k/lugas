@@ -349,21 +349,21 @@ function main() {
   // 1. Assemble RELEASE_PACKET.md
   const releasePacket = `# LugasJS v${BETA_VERSION} Release Packet
 
-**Candidate Version:** \`${BETA_VERSION}\`  
-**Package Source Commit:** \`${PACKAGE_SOURCE_SHA}\`  
+**Candidate Version:** \`${BETA_VERSION}\`\\
+**Package Source Commit:** \`${PACKAGE_SOURCE_SHA}\`\\
 **Attestation Commit:** \`${attestationSha}\` (\`${attestationSha.slice(0, 7)}\`)
 
-**Generated:** ${timestamp}  
-**Runtime:** Bun ${bunVersion} · TypeScript 7.0.2 · Linux x86-64 / macOS arm64 / Windows x64  
+**Generated:** ${timestamp}\\
+**Runtime:** Bun ${bunVersion} · TypeScript 7.0.2 · Linux x86-64 / macOS arm64 / Windows x64\\
 **Package:** \`lugas\` (unscoped) · License: Apache-2.0 · Repo: \`ther12k/lugas\`
 
 ---
 
 ## 1. Executive Summary
 
-This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.1** release candidate. All milestones (M0–M6) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
+This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.1** release candidate. All milestones (M0–M8) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
 
-Publication remains strictly gated on owner approval in **M6-GATE**.
+Publication remains strictly gated on owner approval in **M8-GATE**.
 
 ---
 
@@ -452,7 +452,7 @@ ${gateFiles.map((f) => `- [\`docs/reports/gates/${f}\`](../../reports/gates/${f}
 
 ## 9. Publication Authorization (Owner Decision)
 
-To publish this release candidate to npm after M6-GATE approval:
+To publish this release candidate to npm after M8-GATE approval:
 
 \`\`\`bash
 npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag beta
@@ -492,7 +492,7 @@ npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag
 
 - [ ] **Compatibility Matrix:** CI \`.github/workflows/compatibility.yml\` green across all 6 OS/Bun cells on the artifact commit.
 - [ ] **No Open P0/P1:** issue tracker free of open P0/P1 defects at publication time.
-- [ ] **Owner Release Gate Sign-Off:** M6-GATE approval recorded in \`docs/reports/gates/M6.md\` (GO verdict + post-GATE addenda).
+- [ ] **Owner Release Gate Sign-Off:** M8-GATE approval recorded in \`docs/reports/gates/M8.md\` (GO verdict + post-GATE addenda).
 
 ---
 

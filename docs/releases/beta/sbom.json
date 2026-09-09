@@ -1,6 +1,6 @@
 {
   "format": "lugas-sbom-v0",
-  "generatedAt": "2026-09-08T20:38:36.636Z",
+  "generatedAt": "2026-09-09T07:25:50.086Z",
   "packageName": "lugas",
   "packageVersion": "0.1.0-beta.1",
   "derivation": "staged package.json dependencies/optionalDependencies/peerDependencies",
@@ -40,6 +40,6 @@
       "builtBy": "scripts/release/build-browser-client.ts (Bun 1.4.0, target=browser, format=esm)"
     }
   ],
-  "tarballEntryCount": 75,
+  "tarballEntryCount": 79,
   "zeroProductionRuntimeDependency": true
 }

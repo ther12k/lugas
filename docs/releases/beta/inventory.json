@@ -2,7 +2,7 @@
   "format": "lugas-package-inventory-v0",
   "packageName": "lugas",
   "version": "0.1.0-beta.1",
-  "tarballEntries": 75,
+  "tarballEntries": 79,
   "files": [
     "AGENTS.md",
     "LICENSE",
@@ -48,6 +48,7 @@
     "src/core/response.ts",
     "src/core/route.ts",
     "src/core/service.ts",
+    "src/core/sse.ts",
     "src/core/types.ts",
     "src/index.ts",
     "src/internal/assets.ts",
@@ -58,12 +59,15 @@
     "src/internal/compile-route.ts",
     "src/internal/compose.ts",
     "src/internal/context.ts",
+    "src/internal/cors.ts",
     "src/internal/decode-query.ts",
     "src/internal/diagnostics.ts",
     "src/internal/error-policy.ts",
     "src/internal/framework-version.ts",
     "src/internal/lifecycle.ts",
+    "src/internal/logging.ts",
     "src/internal/manifest.ts",
+    "src/internal/openapi.ts",
     "src/internal/parse-json-body.ts",
     "src/internal/path.ts",
     "src/internal/prepared-app.ts",
@@ -90,5 +94,5 @@
       "format": "esm"
     }
   ],
-  "generatedAt": "2026-09-08T20:38:36.636Z"
+  "generatedAt": "2026-09-09T07:25:50.086Z"
 }

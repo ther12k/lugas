@@ -2,8 +2,8 @@
 
 | Field | Value |
 |---|---|
-| Package Source Commit | `ae4e29f758fd49b045a03e0af1dbb2a8fb98e1cd` (tag must point here) |
-| Attestation Commit | `ae4e29f758fd49b045a03e0af1dbb2a8fb98e1cd` (checkout that ran the gate + builder) |
+| Package Source Commit | `3edaae9cb817a201824920f2048e58a650f31e94` (tag must point here) |
+| Attestation Commit | `3edaae9cb817a201824920f2048e58a650f31e94` (checkout that ran the gate + builder) |
 | Target Package | `lugas@0.1.0-beta.1` |
 | Registry Target | `https://registry.npmjs.org/` with tag `beta` |
 
@@ -25,7 +25,7 @@
 
 - [ ] **Compatibility Matrix:** CI `.github/workflows/compatibility.yml` green across all 6 OS/Bun cells on the artifact commit.
 - [ ] **No Open P0/P1:** issue tracker free of open P0/P1 defects at publication time.
-- [ ] **Owner Release Gate Sign-Off:** M6-GATE approval recorded in `docs/reports/gates/M6.md` (GO verdict + post-GATE addenda).
+- [ ] **Owner Release Gate Sign-Off:** M8-GATE approval recorded in `docs/reports/gates/M8.md` (GO verdict + post-GATE addenda).
 
 ---
 
@@ -43,7 +43,7 @@ if npm view lugas version >/dev/null 2>&1; then  # the name MUST still be unclai
 fi
 
 # 1. Pin the reviewed source BEFORE the irreversible registry action
-git tag -a "v0.1.0-beta.1" "ae4e29f758fd49b045a03e0af1dbb2a8fb98e1cd" -m "LugasJS v0.1.0-beta.1 release candidate"
+git tag -a "v0.1.0-beta.1" "3edaae9cb817a201824920f2048e58a650f31e94" -m "LugasJS v0.1.0-beta.1 release candidate"
 git push origin "v0.1.0-beta.1"
 
 # 2. Publish the exact attested tarball

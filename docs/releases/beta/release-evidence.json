@@ -1,17 +1,17 @@
 {
   "format": "lugas-release-evidence-v2",
-  "packageSourceCommit": "ae4e29f758fd49b045a03e0af1dbb2a8fb98e1cd",
-  "attestationCommit": "ae4e29f758fd49b045a03e0af1dbb2a8fb98e1cd",
-  "measuredAt": "2026-09-08T22:42:14.143Z",
+  "packageSourceCommit": "3edaae9cb817a201824920f2048e58a650f31e94",
+  "attestationCommit": "3edaae9cb817a201824920f2048e58a650f31e94",
+  "measuredAt": "2026-09-09T07:26:34.052Z",
   "bunVersion": "1.4.0",
-  "plainStaticRps": 120562,
-  "plainJsonRps": 95186,
-  "validatedPostRps": 57452,
-  "typecheckMs": 979,
+  "plainStaticRps": 117102,
+  "plainJsonRps": 97218,
+  "validatedPostRps": 62137,
+  "typecheckMs": 1482,
   "clientBundleBytes": 14900,
-  "tarballSha256": "0e54659ca23cd5d1e7d268c8fcf227a51f198d550b1d2338029eda3e163ab9a6",
-  "rawBunPlainStaticRps": 110977,
-  "rawBunValidatedPostRps": 66725,
+  "tarballSha256": "4ffadc34a75316a9a8d73baa841b6d7fb9cef5be3445288cde653d9187ab4afe",
+  "rawBunPlainStaticRps": 103790,
+  "rawBunValidatedPostRps": 72235,
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -20,14 +20,14 @@
   },
   "loadAverage": {
     "before": [
-      4.15,
+      2.73,
       3.29,
-      3.45
+      2.91
     ],
     "after": [
-      3.7,
-      3.28,
-      3.44
+      3.61,
+      3.43,
+      2.98
     ]
   },
   "blockingFailures": 0,
