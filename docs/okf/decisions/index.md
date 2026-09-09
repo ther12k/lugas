@@ -23,3 +23,5 @@
 21. [ADR-0021 — Prebuilt Browser-Executable Client Artifact](0021-prebuilt-browser-client-artifact.md)
 22. [ADR-0022 — First-Party CORS Policy Enforced at the Compile Boundary](0022-first-party-cors.md)
 23. [ADR-0023 — Server-Sent Events as a Native Response Helper](0023-server-sent-events-helper.md)
+24. [ADR-0024 — Structured Logging as a Small Contract with an Opt-In Access Facility](0024-structured-logging.md)
+25. [ADR-0025 — OpenAPI 3.1 Document Generation with an Opt-In Scalar Presentation Layer](0025-openapi-scalar.md)
