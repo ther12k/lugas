@@ -21,7 +21,7 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | Code | Thrown by | Meaning | Hint |
 |---|---|---|---|
 | LUGAS_APP_001 | defineApp() | config must be an object | pass defineApp({ routes }) with an object literal |
-| LUGAS_APP_002 | defineApp() | unknown config key | allowed keys: services, routes, modules, assets, bodyBudget, cors, notFound, onError |
+| LUGAS_APP_002 | defineApp() | unknown config key | allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, notFound, onError |
 | LUGAS_APP_003 | defineApp() | 'modules' must be an array | wrap modules: modules: [defineModule(...)] |
 | LUGAS_APP_004 | defineApp() | modules entry is not a descriptor | create modules with defineModule({ name, routes }) |
 | LUGAS_APP_005 | defineApp() | duplicate module name | module names must be unique within an app |
@@ -40,6 +40,7 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_CORS_004 | defineApp() | cors combined with pipeline-bypass route kinds or assets | convert static values (Response, Bun.file, { dir }) to handlers or serve them from an app without cors |
 | LUGAS_SSE_001 | sse() | invalid sse configuration | pass sse({ start(writer) { ... } }) with an optional positive heartbeatMs |
 | LUGAS_SSE_002 | sse() writer | invalid SSE event input or non-serializable data | data is a string, number, boolean, null, or a JSON-serializable object; event/id/comment values are single-line |
+| LUGAS_LOG_001 | defineApp() | invalid logging configuration | allowed keys: level, sink, requestIds, access; level is debug\|info\|warn\|error |
 | LUGAS_MODULE_001 | defineModule() | config must be an object | pass defineModule({ name, routes }) |
 | LUGAS_MODULE_002 | defineModule() | unknown config key | allowed keys: name, routes |
 | LUGAS_MODULE_003 | defineModule() | 'name' must be a non-empty string | module names appear in manifests; use stable names |

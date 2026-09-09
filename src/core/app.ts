@@ -13,6 +13,7 @@ import { buildManifest, type LugasManifestV1 } from "../internal/manifest";
 import { prepareApp, type PreparedApp } from "../internal/prepared-app";
 import type { AssetsConfig } from "../internal/assets";
 import { compileCorsPolicy, type CompiledCorsPolicy, type CorsConfig } from "../internal/cors";
+import { compileLogging, type CompiledLogging, type LoggingConfig } from "../internal/logging";
 import type { LugasApp, MergeModulesRoutes, ModuleDescriptor } from "./types";
 import { serveApp } from "../internal/serve";
 import { assertValidRoutePath } from "../internal/path";
@@ -43,11 +44,20 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
    * leaves every behavior unchanged.
    */
   cors?: CorsConfig;
+  /**
+   * Structured logging contract and access facility (M8-003, ADR-0024).
+   * App-level, opt-in: `level` (default "info"), `sink` (Pino/OTel integration
+   * point), `requestIds` (x-request-id response header + logged), and `access`
+   * (per-request entry with method, path, route, status, durationMs).
+   * Redaction by construction: scalar-only fields; headers/bodies/cookies
+   * are never logged by framework entries.
+   */
+  logging?: LoggingConfig;
   notFound?: (request: Request) => Response | Promise<Response>;
   onError?: (error: unknown, request: Request) => Response | Promise<Response>;
 };
 
-const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "notFound", "onError"]);
+const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "logging", "notFound", "onError"]);
 
 export type AppInternals<TServices = unknown> = {
   readonly composition: Composition;
@@ -94,7 +104,7 @@ export function defineApp<
   }
   for (const key of Object.keys(config)) {
     if (!APP_KEYS.has(key)) {
-      throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, assets, bodyBudget, cors, notFound, onError", context: { key } });
+      throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, notFound, onError", context: { key } });
     }
   }
   if (config.bodyBudget !== undefined && (typeof config.bodyBudget !== "number" || !Number.isInteger(config.bodyBudget) || config.bodyBudget <= 0)) {
@@ -106,6 +116,8 @@ export function defineApp<
   // M8-001 (ADR-0022): validate once here; preparation consumes the compiled
   // policy and never re-reads user configuration.
   const corsPolicy: CompiledCorsPolicy | undefined = config.cors !== undefined ? compileCorsPolicy(config.cors) : undefined;
+  // M8-003 (ADR-0024): validate logging once here; preparation wraps handlers.
+  const loggingConfig: CompiledLogging | undefined = config.logging !== undefined ? compileLogging(config.logging) : undefined;
   if (config.modules !== undefined) {
     if (!Array.isArray(config.modules)) throw diagnostic("LUGAS_APP_003", "defineApp(): 'modules' must be an array", { hint: "wrap modules: modules: [defineModule(...)]" });
     const names = new Set<string>();
@@ -145,6 +157,7 @@ export function defineApp<
     assets: config.assets,
     bodyBudget: config.bodyBudget,
     cors: corsPolicy,
+    logging: loggingConfig,
     notFound: config.notFound,
     onError: config.onError,
   });

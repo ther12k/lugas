@@ -2,6 +2,7 @@
 import { defaultNotFound } from "./error-policy";
 import { diagnostic } from "./diagnostics";
 import { corsWrapFallback } from "./cors";
+import { wrapLogFallback } from "./logging";
 import { startLifecycle, type LugasLifecycle, type ShutdownOptions } from "./lifecycle";
 import type { PreparedApp, SafeServeOptions } from "./prepared-app";
 
@@ -90,9 +91,12 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
   // unmatched paths AND method-mismatched requests (including preflights on
   // paths without a declared OPTIONS entry) arrive here through Bun's own
   // routing. A user-supplied fetch is wrapped with the same policy.
+  // M8-003 (ADR-0024): logging wraps inside CORS (outermost stays CORS so
+  // preflights are not access-logged) and outside the fallback logic.
   const baseFetch: (request: Request, server: Bun.Server<unknown>) => Response | Promise<Response> =
     userFetch ?? ((request: Request) => safeNotFound(prepared.notFound)(request));
-  const fetchHandler = prepared.cors !== undefined ? corsWrapFallback(prepared.cors, baseFetch) : baseFetch;
+  const loggedFetch = prepared.logging !== undefined ? wrapLogFallback(prepared.logging, baseFetch) : baseFetch;
+  const fetchHandler = prepared.cors !== undefined ? corsWrapFallback(prepared.cors, loggedFetch) : loggedFetch;
 
   const server = Bun.serve({
     ...options,

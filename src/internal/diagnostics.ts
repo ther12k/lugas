@@ -28,6 +28,7 @@ export type DiagnosticCode =
   | "LUGAS_BODY_001" | "LUGAS_BODY_002" | "LUGAS_BODY_003"
   | "LUGAS_CORS_001" | "LUGAS_CORS_002" | "LUGAS_CORS_003" | "LUGAS_CORS_004"
   | "LUGAS_SSE_001" | "LUGAS_SSE_002"
+  | "LUGAS_LOG_001"
   | "LUGAS_LIFECYCLE_001"
   | "LUGAS_TEST_001"
   | "LUGAS_CLI_001";
@@ -76,6 +77,7 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_CORS_004", thrownBy: "defineApp()", meaning: "cors combined with pipeline-bypass route kinds or assets", hint: "convert static values (Response, Bun.file, { dir }) to handlers or serve them from an app without cors" },
   { code: "LUGAS_SSE_001", thrownBy: "sse()", meaning: "invalid sse configuration", hint: "pass sse({ start(writer) { ... } }) with an optional positive heartbeatMs" },
   { code: "LUGAS_SSE_002", thrownBy: "sse() writer", meaning: "invalid SSE event input or non-serializable data", hint: "data is a string, number, boolean, null, or a JSON-serializable object; event/id/comment values are single-line" },
+  { code: "LUGAS_LOG_001", thrownBy: "defineApp()", meaning: "invalid logging configuration", hint: "allowed keys: level, sink, requestIds, access; level is debug|info|warn|error" },
   { code: "LUGAS_LIFECYCLE_001", thrownBy: "service()", meaning: "invalid service lifecycle descriptor", hint: "use service({ name, value, init?, dispose? }) with a non-empty name" },
   { code: "LUGAS_MODULE_001", thrownBy: "defineModule()", meaning: "config must be an object", hint: "pass defineModule({ name, routes })" },
   { code: "LUGAS_MODULE_002", thrownBy: "defineModule()", meaning: "unknown config key", hint: "allowed keys: name, routes" },
