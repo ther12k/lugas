@@ -189,7 +189,7 @@ console.log("TESTING-OK");`,
       const dir = installConsumer(stage, "t-freeze", tgzPath);
       const installedExports = JSON.parse(readFileSync(join(dir, "node_modules/lugas/package.json"), "utf8")) as { exports: Record<string, unknown>; version: string };
       expect(installedExports.version).toBe(BETA_VERSION);
-      expect(Object.keys(installedExports.exports).sort()).toEqual([".", "./client", "./client/browser", "./testing"]);
+      expect(Object.keys(installedExports.exports).sort()).toEqual([".", "./client", "./client/browser", "./drizzle", "./testing"]);
     } finally {
       rmSync(stage, { recursive: true, force: true });
     }

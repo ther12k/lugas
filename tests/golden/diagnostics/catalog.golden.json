@@ -132,6 +132,18 @@
     "hint": "openapi.path and openapi.ui.path must be disjoint from routes and assets"
   },
   {
+    "code": "LUGAS_DRIZZLE_001",
+    "thrownBy": "drizzleService()",
+    "meaning": "value is not a recognizable Drizzle instance",
+    "hint": "drizzleService({ db }) requires an object with select, insert, update, and delete functions; the adapter never imports drizzle-orm"
+  },
+  {
+    "code": "LUGAS_DRIZZLE_002",
+    "thrownBy": "drizzleService()",
+    "meaning": "invalid closeOnDispose option or no closable $client",
+    "hint": "closeOnDispose must be a boolean and requires db.$client.close to be a function; compose service() directly for clients that dispose differently"
+  },
+  {
     "code": "LUGAS_LIFECYCLE_001",
     "thrownBy": "service()",
     "meaning": "invalid service lifecycle descriptor",

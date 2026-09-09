@@ -2,7 +2,7 @@
   "name": "lugas",
   "private": true,
   "version": "0.0.0",
-  "description": "LugasJS \u2014 small, explicit, Bun-native TypeScript framework (pre-release workspace)",
+  "description": "LugasJS — small, explicit, Bun-native TypeScript framework (pre-release workspace)",
   "type": "module",
   "exports": {
     ".": {
@@ -15,6 +15,10 @@
     },
     "./client/browser": {
       "default": "./build/lugas-client.esm.js"
+    },
+    "./drizzle": {
+      "types": "./src/drizzle/index.ts",
+      "default": "./src/drizzle/index.ts"
     },
     "./testing": {
       "types": "./src/testing/index.ts",
@@ -42,6 +46,7 @@
   "devDependencies": {
     "@standard-schema/spec": "^1.1.0",
     "@types/bun": "1.4.0",
+    "drizzle-orm": "^0.45.2",
     "elysia": "2.0.0-beta.6",
     "typescript": "7.0.2",
     "valibot": "^1.4.2",

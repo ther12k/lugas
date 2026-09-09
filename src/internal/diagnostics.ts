@@ -30,6 +30,7 @@ export type DiagnosticCode =
   | "LUGAS_SSE_001" | "LUGAS_SSE_002"
   | "LUGAS_LOG_001"
   | "LUGAS_OPENAPI_001" | "LUGAS_OPENAPI_002"
+  | "LUGAS_DRIZZLE_001" | "LUGAS_DRIZZLE_002"
   | "LUGAS_LIFECYCLE_001"
   | "LUGAS_TEST_001"
   | "LUGAS_CLI_001";
@@ -81,6 +82,8 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_LOG_001", thrownBy: "defineApp()", meaning: "invalid logging configuration", hint: "allowed keys: level, sink, requestIds, access; level is debug|info|warn|error" },
   { code: "LUGAS_OPENAPI_001", thrownBy: "defineApp()", meaning: "invalid openapi configuration", hint: "document requires title and version; paths must start with '/'" },
   { code: "LUGAS_OPENAPI_002", thrownBy: "defineApp()", meaning: "openapi endpoint path collision with route or assets", hint: "openapi.path and openapi.ui.path must be disjoint from routes and assets" },
+  { code: "LUGAS_DRIZZLE_001", thrownBy: "drizzleService()", meaning: "value is not a recognizable Drizzle instance", hint: "drizzleService({ db }) requires an object with select, insert, update, and delete functions; the adapter never imports drizzle-orm" },
+  { code: "LUGAS_DRIZZLE_002", thrownBy: "drizzleService()", meaning: "invalid closeOnDispose option or no closable $client", hint: "closeOnDispose must be a boolean and requires db.$client.close to be a function; compose service() directly for clients that dispose differently" },
   { code: "LUGAS_LIFECYCLE_001", thrownBy: "service()", meaning: "invalid service lifecycle descriptor", hint: "use service({ name, value, init?, dispose? }) with a non-empty name" },
   { code: "LUGAS_MODULE_001", thrownBy: "defineModule()", meaning: "config must be an object", hint: "pass defineModule({ name, routes })" },
   { code: "LUGAS_MODULE_002", thrownBy: "defineModule()", meaning: "unknown config key", hint: "allowed keys: name, routes" },
