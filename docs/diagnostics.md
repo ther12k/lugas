@@ -21,7 +21,7 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | Code | Thrown by | Meaning | Hint |
 |---|---|---|---|
 | LUGAS_APP_001 | defineApp() | config must be an object | pass defineApp({ routes }) with an object literal |
-| LUGAS_APP_002 | defineApp() | unknown config key | allowed keys: services, routes, modules, assets, notFound, onError |
+| LUGAS_APP_002 | defineApp() | unknown config key | allowed keys: services, routes, modules, assets, bodyBudget, cors, notFound, onError |
 | LUGAS_APP_003 | defineApp() | 'modules' must be an array | wrap modules: modules: [defineModule(...)] |
 | LUGAS_APP_004 | defineApp() | modules entry is not a descriptor | create modules with defineModule({ name, routes }) |
 | LUGAS_APP_005 | defineApp() | duplicate module name | module names must be unique within an app |
@@ -34,6 +34,10 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_BODY_001 | defineApp() / route() | invalid body budget configuration | budget must be a positive integer number of bytes |
 | LUGAS_BODY_002 | defineApp() | body budget requires a declared framework-parsed body | declare a body schema on the route or remove the budget |
 | LUGAS_BODY_003 | serve() | body budget above the configured server ceiling | an override relaxes the default, never the ceiling; lower the budget or raise maxRequestBodySize |
+| LUGAS_CORS_001 | defineApp() | invalid cors configuration | allowed keys: origin, methods, allowedHeaders, exposedHeaders, credentials, maxAge |
+| LUGAS_CORS_002 | defineApp() | invalid cors origin configuration | origin is a non-empty origin string, an allowlist without "*" mixing, "*" alone, or a function |
+| LUGAS_CORS_003 | defineApp() | cors credentials incompatible with wildcard origin | browsers reject credentialed wildcard responses; list concrete origins (or use a callback returning true) |
+| LUGAS_CORS_004 | defineApp() | cors combined with pipeline-bypass route kinds or assets | convert static values (Response, Bun.file, { dir }) to handlers or serve them from an app without cors |
 | LUGAS_MODULE_001 | defineModule() | config must be an object | pass defineModule({ name, routes }) |
 | LUGAS_MODULE_002 | defineModule() | unknown config key | allowed keys: name, routes |
 | LUGAS_MODULE_003 | defineModule() | 'name' must be a non-empty string | module names appear in manifests; use stable names |

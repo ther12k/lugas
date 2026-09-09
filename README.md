@@ -144,7 +144,8 @@ Types describe the wire. A handler returning `json(200, { createdAt: new Date() 
 | Service lifecycle: init, drain-ordered shutdown, reverse disposal (`service()`) | Available |
 | Test-server helpers (`lugas/testing`) | Available |
 | Static route manifest + inspection CLI (`lugas-manifest-v1`) | Available |
-| OpenAPI 3.1, Scalar, CORS, SSE, structured logging, Drizzle | Planned — see [roadmap](#roadmap) |
+| First-party CORS (`defineApp({ cors })`, opt-in, fail-closed) | Available on `main` (post-beta, M8-001) |
+| OpenAPI 3.1, Scalar, SSE, structured logging, Drizzle | Planned — see [roadmap](#roadmap) |
 
 ## Examples
 
@@ -166,7 +167,7 @@ Known beta limitations: the server core and CLI are Bun-only (the client bundle 
 
 ## Roadmap
 
-Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). Planned first-party batteries — OpenAPI 3.1 generation, Scalar reference UI, CORS middleware, Server-Sent Events, structured logging, and an optional Drizzle adapter — are **not** part of `v0.1.0-beta.1`; each arrives only when a release documents it as available.
+Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). The remaining planned first-party batteries — OpenAPI 3.1 generation, Scalar reference UI, Server-Sent Events, structured logging, and an optional Drizzle adapter — are **not** part of `v0.1.0-beta.1`; each arrives only when a release documents it as available. First-party CORS ([`docs/cors.md`](docs/cors.md)) landed on `main` after the beta candidate was attested and ships in the next release.
 
 ## Documentation
 

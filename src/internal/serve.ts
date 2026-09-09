@@ -1,6 +1,7 @@
 /** Native Bun server assembly for `app.serve()` (M1-015, M4R1-001, M7-004). */
 import { defaultNotFound } from "./error-policy";
 import { diagnostic } from "./diagnostics";
+import { corsWrapFallback } from "./cors";
 import { startLifecycle, type LugasLifecycle, type ShutdownOptions } from "./lifecycle";
 import type { PreparedApp, SafeServeOptions } from "./prepared-app";
 
@@ -85,10 +86,18 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
     prepared.budgets.ceilingRef.current = ceiling;
   }
 
+  // M8-001 (ADR-0022): the CORS policy also covers the fetch fallback —
+  // unmatched paths AND method-mismatched requests (including preflights on
+  // paths without a declared OPTIONS entry) arrive here through Bun's own
+  // routing. A user-supplied fetch is wrapped with the same policy.
+  const baseFetch: (request: Request, server: Bun.Server<unknown>) => Response | Promise<Response> =
+    userFetch ?? ((request: Request) => safeNotFound(prepared.notFound)(request));
+  const fetchHandler = prepared.cors !== undefined ? corsWrapFallback(prepared.cors, baseFetch) : baseFetch;
+
   const server = Bun.serve({
     ...options,
     routes: prepared.bunRoutes,
-    fetch: userFetch ?? ((request: Request) => safeNotFound(prepared.notFound)(request)),
+    fetch: fetchHandler,
   } as Bun.Serve.Options<any>) as Bun.Server<unknown>;
   serverRef.current = server;
 

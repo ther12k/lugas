@@ -10,6 +10,7 @@ export type { GuardConfig } from "./core/guard";
 export { service } from "./core/service";
 export type { ServiceConfig, ServiceDescriptor } from "./core/service";
 export type { LugasLifecycle, ShutdownOutcome, ShutdownOptions } from "./internal/lifecycle";
+export type { CorsConfig, CorsOriginDecision, CorsOriginInput } from "./internal/cors";
 export { empty, json, problem, redirect, text } from "./core/response";
 export type { Jsonify, ProblemFields, RedirectStatus, TypedResponse } from "./core/response";
 export type {
