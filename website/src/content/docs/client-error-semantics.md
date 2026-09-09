@@ -2,9 +2,6 @@
 title: "Client error semantics"
 description: "Client error and redaction policy."
 ---
-
-# Client Error Semantics (frozen by M3-012)
-
 This document is the canonical description of how the Lugas typed client
 classifies wire responses. The runtime in `src/client/parse-response.ts` and
 `src/client/errors.ts` implements exactly this table.

@@ -2,9 +2,6 @@
 title: "Design principles"
 description: "Explicit HTTP, no code generation, no proxies, zero forced ecosystem."
 ---
-
-# Design principles
-
 ## Explicit HTTP over disguised RPC
 
 Methods, paths, statuses, headers, and transport failures remain visible. Native `Request` and `Response` stay available; the framework adds contracts around them rather than replacing them.

@@ -2,9 +2,6 @@
 title: "Examples"
 description: "Runnable single-concept example applications."
 ---
-
-# Lugas Examples
-
 Each example teaches exactly one concept using only public exports. The
 GitHub-facing index lives at [`examples/README.md`](https://github.com/ther12k/lugas/blob/main/examples/README.md).
 

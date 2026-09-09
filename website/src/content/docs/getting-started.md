@@ -2,9 +2,6 @@
 title: "Getting started"
 description: "Install Lugas and build your first typed Bun API."
 ---
-
-# Getting started
-
 ## Install
 
 ```bash
@@ -13,7 +10,7 @@ bun add lugas@beta
 
 Lugas requires [Bun](https://bun.sh) 1.4.x. TypeScript 7.0.2 is the verified toolchain for the full compile-time contract experience.
 
-> The `v0.1.0-beta.1` candidate is attested but **not yet published** — npm publication is an explicit owner action. Until it is announced, the package should not be assumed available.
+> The `v0.1.0-beta.2` candidate is published under npm `beta`; stable publication remains an explicit owner action.
 
 ## Hello world
 
@@ -148,8 +145,7 @@ Lugas exposes a browser-safe client through `lugas/client`.
 ```ts
 import type { AppContract } from "lugas";
 import { createClient } from "lugas/client";
-
-import app from "./app";
+import type app from "./app";
 
 type API = AppContract<typeof app>;
 
@@ -188,6 +184,47 @@ api.get("/users/:id", {
 ```
 
 No runtime `Proxy`, generated SDK, or object-tree RPC façade. How response types model serialization truth is covered in [wire-honest types](/lugas/wire-honest-types/).
+
+## Using the client without a build step
+
+The release package ships a prebuilt, browser-executable ESM artifact of the client, exposed as the `lugas/client/browser` subpath (file `build/lugas-client.esm.js`). The `.ts` sources remain the only type source of truth; the artifact is runtime JavaScript only. Three consumption arrangements:
+
+1. **Same-origin serving** (pairs with [public assets](#serving-public-assets)): serve the installed artifact from your application origin and import it by URL.
+
+   ```ts
+   import { defineApp } from "lugas";
+
+   export default defineApp({
+     assets: {
+       files: {
+         "/": "./public/index.html",
+         "/lugas-client.esm.js": "./node_modules/lugas/build/lugas-client.esm.js",
+       },
+     },
+   });
+   ```
+
+   ```html
+   <script type="module">
+     import { createClient } from "/lugas-client.esm.js";
+     const api = createClient({ baseUrl: window.location.origin });
+   </script>
+   ```
+
+2. **Import map**: keep bare-specifier imports in page code and map them to the artifact URL.
+
+   ```html
+   <script type="importmap">
+     { "imports": { "lugas/client": "/lugas-client.esm.js" } }
+   </script>
+   <script type="module">
+     import { createClient } from "lugas/client";
+   </script>
+   ```
+
+3. **Bundler**: keep importing `lugas/client` — the direct `.ts` sources remain shipped and bundle as before; nothing changes for bundler-based consumers.
+
+Plain-JavaScript pages need no TypeScript configuration and no bundler. Editors and frontends that want static checking can use `checkJs` with their own `tsconfig.json` against the installed package — no declarations fork ships with the artifact. The artifact lane is same-origin only; it makes no CORS claim.
 
 ## Testing
 
@@ -258,6 +295,34 @@ text(status, body);
 problem(status, problem);
 empty(status);
 ```
+
+## Serving public assets
+
+Opt-in, same-origin, no build step (ADR-0018):
+
+```ts
+import { defineApp, json, route } from "lugas";
+
+const app = defineApp({
+  routes: {
+    "/api/ping": {
+      GET: route({ handler: () => json(200, { pong: true }) }),
+    },
+  },
+  assets: {
+    files: { "/index.html": "./public/index.html" },
+    dirs: { "/assets/*": "./public/assets" },
+  },
+});
+```
+
+- File mappings are exact literal paths (`/robots.txt`); directory mounts are explicit prefixes ending in `/*` (root catch-alls are not supported).
+- Native directory mounts (`assets.dirs`) require Linux with `openat2(RESOLVE_IN_ROOT)` for symlink containment; on macOS and Windows, configuring directory mounts fails closed at startup (`LUGAS_ASSET_004`). Explicit file mappings (`assets.files`) are supported across all platforms.
+- Assets are served natively by Bun: correct MIME types, `ETag`/`Last-Modified` conditional requests, and range requests.
+- Methods: GET and HEAD serve assets. Other methods reach the app's not-found policy — a 405 is not promised.
+- Misses stay distinguishable: a missing file under `/assets/*` is a plain asset 404; an unknown API path gets your API's not-found response.
+- Ownership is validated at startup: an asset declaration that overlaps an API route (or another asset declaration) fails with `LUGAS_ASSET_002` instead of silently winning or losing by declaration order.
+- Keep protected files outside served directories; asset responses bypass guards and `onError` (they never enter the request pipeline).
 
 ## Next steps
 

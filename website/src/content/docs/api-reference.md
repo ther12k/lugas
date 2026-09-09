@@ -2,8 +2,6 @@
 title: "API reference"
 description: "Public API reference."
 ---
-# Lugas API Reference (v0.1.0-beta.1)
-
 ## Root subpath (`lugas`)
 
 | Export | Kind | Status |
@@ -12,13 +10,68 @@ description: "Public API reference."
 | `defineModule(config)` | function | stable |
 | `route(config)` | function | stable |
 | `guard(config)` | function | stable |
+| `service(config)` | function | stable (M7-004) |
+| `drizzleService(config)` | `lugas/drizzle` function | new (M9-001) |
+| `sse(config)` | function | new (M8-002) |
+| `formatSseEvent(input)` | function | new (M8-002) |
 | `json(status, data)` | function | stable |
 | `text(status, body)` | function | stable |
 | `empty()` | function | stable |
 | `problem(status, fields)` | function | stable |
 | `redirect(location)` | function | stable |
 
-Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
+Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `SseConfig`, `SseWriter`, `SseEventInput`, `LoggingConfig`, `LugasLogEntry`, `LugasLogFields`, `LugasLogLevel`, `LogSink`, `OpenApiConfig`, `OpenApiDocumentInfo`, `OpenApiRouteMetadata`, `OpenApiUiConfig`, `CompiledOpenApi`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
+
+`defineApp()` also accepts `assets` (opt-in, ADR-0018): `{ files: { "/robots.txt": "./public/robots.txt" }, dirs: { "/assets/*": "./public/assets" } }`. File mappings are literal exact paths; directory mounts are explicit prefixes ending in `/*`. Native directory mounts (`assets.dirs`) are supported on Linux only (relying on kernel `openat2(RESOLVE_IN_ROOT)` for symlink containment); configuring `dirs` on macOS or Windows fails closed before startup (`LUGAS_ASSET_004`). File mappings (`assets.files`) are supported across all platforms. Assets are served natively by Bun through GET/HEAD; other methods reach the app's not-found policy (no 405). Ownership conflicts with API routes are rejected at startup (`LUGAS_ASSET_002`). Asset routes are outside the manifest and the request pipeline (no guards, no `onError`).
+
+### Body budgets (ADR-0019)
+
+`defineApp({ bodyBudget })` sets an application default; `route({ budget })` sets a per-route override; both are byte counts clamped by `serve({ maxRequestBodySize })`. Budgets require a declared framework-parsed `body` (`LUGAS_BODY_002` otherwise) and above-ceiling configuration is rejected at `serve()` (`LUGAS_BODY_003`). Enforcement is bounded consumption ending in a `413` Problem Details response (`BODY_BUDGET_EXCEEDED`) before validation or handler execution; the transport ceiling's bare `413` is unchanged.
+
+### CORS (ADR-0022)
+
+`defineApp({ cors })` enables the first-party, opt-in, app-level CORS policy: `origin` (exact string, allowlist, `"*"`, or sync/async callback), `methods`, `allowedHeaders`, `exposedHeaders`, `credentials`, `maxAge`. When configured, every response carries `Vary: Origin`; allowed origins receive `Access-Control-Allow-Origin` (+ credentials/exposed headers as configured); preflights are answered `204` before application handlers (denied preflights get `204` with `Vary` only, so the browser fails them). Pipeline-bypass route kinds (static `Response`, `Bun.file`, `{ dir }`) and `assets` are rejected at startup when `cors` is configured (`LUGAS_CORS_004`). Absent `cors`, behavior is unchanged. Details: [`docs/cors.md`](/lugas/cors/).
+
+### Server-Sent Events (ADR-0023)
+
+`sse({ start, heartbeatMs? })` returns a streaming `text/event-stream; charset=utf-8` response (`Cache-Control: no-cache`). `start(writer)` runs synchronously and may return a cleanup function that runs **exactly once** when the stream ends — `writer.close()`, client disconnect, or server force-close. The writer offers `send({ data, event?, id?, retry? })` (JSON-serializable data; `false` after end), `comment`, `retry`, `close`, and a `desiredSize` backpressure readout. The frame serializer is exported as `formatSseEvent`. Throwing `start` surfaces as a redacted `500` problem; diagnostics `LUGAS_SSE_001`/`LUGAS_SSE_002`. No broker, fan-out, or replay; `last-event-id` is an application concern. Details: [`docs/sse.md`](/lugas/sse/).
+
+### Structured Logging (ADR-0024)
+
+`defineApp({ logging })` configures structured logging with an explicit sink contract: `level` (default "info"), `sink` (pluggable `(entry) => void`), `requestIds` (`x-request-id` header + correlated id), and `access` (per-request entry). Scalar-only fields ensure redaction by construction: bodies, headers, and cookies are never logged by the framework. Details: [`docs/logging.md`](/lugas/logging/).
+
+### OpenAPI 3.1 and Scalar (ADR-0025)
+
+`defineApp({ openapi })` generates a canonical OpenAPI 3.1 document from routing facts and declared schemas, served as JSON at `path` (default `/openapi.json`), with an optional zero-dependency Scalar CDN HTML shell at `ui.path` (default `/docs`). Standard JSON Schema is feature-detected (`~standard.jsonSchema`); validators without a representation document structure only (never guessed shapes). RFC 9457 Problem Details is documented as the standard error component. `route({ openapi })` adds per-route metadata (summary, tags, operationId, responses). Path collisions with routes or assets are rejected at startup (`LUGAS_OPENAPI_002`). Details: [`docs/openapi.md`](/lugas/openapi/).
+
+### Drizzle integration (ADR-0026, `lugas/drizzle`)
+
+`drizzleService({ db, name, closeOnDispose? })` declares an application-owned Drizzle instance as a Lugas service: structural startup validation (`LUGAS_DRIZZLE_001`), typed `ctx.services.<name>` access with the exact instance type, deterministic lifecycle participation, and opt-in dispose through the structural `$client.close()` (`LUGAS_DRIZZLE_002` when not closable). No implicit I/O, no migrations, no transaction wrapping; the adapter never imports drizzle-orm. Details: [`docs/drizzle.md`](/lugas/drizzle/).
+
+### Service lifecycle (ADR-0020)
+
+`service()` attaches lifecycle behavior to one entry of `defineApp({ services })`:
+
+```ts
+import { defineApp, service } from "lugas";
+
+defineApp({
+  services: {
+    db: service({
+      name: "db",
+      value: createDb(),
+      init: async (db) => { await db.connect(); },
+      dispose: async (db) => { await db.close(); },
+    }),
+  },
+});
+```
+
+- `init` runs at serve time in declaration order (the `services` object key order) and **no Lugas handler executes before every `init` has settled**; requests arriving early are held. A startup failure disposes already-initialized services in reverse and surfaces through `server.lugasLifecycle.ready` (rejection) plus a redacted `503` on held routes. Plain (non-`service()`) values keep today's live-reference behavior and are never initialized or disposed.
+- `server.lugasLifecycle.shutdown()` is idempotent and runs: stop accepting → drain in-flight requests **and** tasks registered through `track()` under a deadline (`serve({ shutdown: { drainDeadlineMs } })`, default 10s) → reverse-order disposal. Three outcomes are reported distinctly (`connectionsClosed`, `trackedWorkCompleted`, `disposalCompleted`) plus `disposalFailures`.
+- **Deadline invariant:** when the deadline expires with work remaining, the outcome is unsuccessful (`cooperated: false`, `deadlineExpired: true`); connections are force-closed but services possibly still in use are **not** disposed — continuing work observes an intact resource, never fabricated success. The guarantee covers tracked work only; detached work is the application's responsibility.
+- Signals are opt-in: `serve({ shutdown: { signals: true } })` handles SIGINT/SIGTERM through the same shutdown path. Importing Lugas installs no handlers and never exits the process.
+- Raw/native route values (plain functions, `Response`, `Bun.file`, `{ dir }`) and asset routes bypass the framework pipeline and are therefore not lifecycle-gated.
 
 ## Client subpath (`lugas/client`)
 

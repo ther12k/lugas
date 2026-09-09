@@ -1,0 +1,78 @@
+---
+title: Lugas
+description: Explicit, Bun-native typed HTTP APIs — without runtime proxies, code generation, or production dependencies.
+head:
+  - tag: title
+    content: Lugas — Explicit, Bun-native typed HTTP APIs
+template: splash
+hero:
+  title: Lugas
+  tagline: Explicit HTTP. Honest types.
+  actions:
+    # Site base is /lugas (GitHub Pages project site) — frontmatter links are not base-adjusted.
+    - text: Get Started
+      link: /lugas/getting-started/
+      icon: right-arrow
+    - text: GitHub
+      link: https://github.com/ther12k/lugas
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+export const base = import.meta.env.BASE_URL; // Starlight base-adjusts actions & Markdown links, not component props.
+
+```bash
+bun add lugas
+```
+
+A small, Bun-native TypeScript framework for building fast, wire-honest APIs with **zero production dependencies**. Routes stay ordinary HTTP — native `Request`, explicit statuses, real `fetch` underneath — while routes, validation, guards, responses, and the client stay aligned through one application type.
+
+<CardGrid>
+  <Card title="Bun-native">
+    Built directly on Bun's native router and `Bun.serve`. No middleware layers pretending HTTP is something else.
+  </Card>
+  <Card title="End-to-end typed">
+    Server and client stay aligned: route parameters, validation outputs, guard enrichment, and wire-honest response types — no code generation, no runtime `Proxy`.
+  </Card>
+  <Card title="Zero runtime deps">
+    Nothing to audit, nothing to break underneath you. The package ships source `.ts`, a typed client, and test helpers.
+  </Card>
+</CardGrid>
+
+<CardGrid>
+  <LinkCard title="Standard Schema" href={`${base}/getting-started/`} description="Zod, Valibot, or any v1 validator." />
+  <LinkCard title="CORS" href={`${base}/cors/`} description="Opt-in, fail-closed." />
+  <LinkCard title="Server-Sent Events" href={`${base}/sse/`} description="Deterministic cleanup." />
+  <LinkCard title="Structured Logging" href={`${base}/logging/`} description="Redaction by construction." />
+  <LinkCard title="OpenAPI 3.1 + Scalar" href={`${base}/openapi/`} description="Generated from your routes." />
+  <LinkCard title="Drizzle" href={`${base}/drizzle/`} description="Application-owned instance as a service." />
+</CardGrid>
+
+## Build an API
+
+```ts
+// app.ts
+import { defineApp, json, route } from "lugas";
+
+const app = defineApp({
+  routes: {
+    "/hello": {
+      GET: route({
+        handler: () => json(200, { message: "Hello from Lugas" }),
+      }),
+    },
+  },
+});
+
+export default app;
+```
+
+That is the whole server. Run it with `bun run server.ts`, call it with any HTTP client — or with Lugas' typed client, which knows `/hello` returns `{ message: string }`.
+
+[Read the Getting Started guide →](/lugas/getting-started/)
+
+<small>
+[Apache-2.0 license](https://github.com/ther12k/lugas/blob/main/LICENSE) · [npm](https://www.npmjs.com/package/lugas) · [Roadmap](/lugas/roadmap/) · [GitHub](https://github.com/ther12k/lugas)
+</small>

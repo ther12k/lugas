@@ -25,6 +25,11 @@ interface PageSpec {
 const PAGES: PageSpec[] = [
   { source: "docs/getting-started.md", slug: "getting-started", title: "Getting started", description: "Install Lugas and build your first typed Bun API." },
   { source: "docs/examples.md", slug: "examples", title: "Examples", description: "Runnable single-concept example applications." },
+  { source: "docs/cors.md", slug: "cors", title: "CORS", description: "Opt-in, fail-closed cross-origin resource sharing." },
+  { source: "docs/sse.md", slug: "sse", title: "Server-Sent Events", description: "Streaming responses with the sse() helper and deterministic cleanup." },
+  { source: "docs/logging.md", slug: "logging", title: "Structured logging", description: "A small sink contract with opt-in access logs and request IDs." },
+  { source: "docs/openapi.md", slug: "openapi", title: "OpenAPI and Scalar", description: "Generated OpenAPI 3.1 documents with an opt-in Scalar reference UI." },
+  { source: "docs/drizzle.md", slug: "drizzle", title: "Drizzle integration", description: "An application-owned Drizzle instance as a Lugas service." },
   { source: "docs/wire-honest-types.md", slug: "wire-honest-types", title: "Wire-honest types", description: "How Lugas response types model JSON serialization truth." },
   { source: "docs/design-principles.md", slug: "design-principles", title: "Design principles", description: "Explicit HTTP, no code generation, no proxies, zero forced ecosystem." },
   { source: "docs/choosing-lugas.md", slug: "choosing-lugas", title: "Choosing Lugas", description: "Where Lugas fits among raw Bun, Elysia, Hono, Fastify, and tRPC." },
@@ -44,6 +49,11 @@ function stripFrontmatter(content: string): string {
   const close = content.indexOf("\n---\n", 4);
   if (close === -1) return content;
   return content.slice(close + 5);
+}
+
+/** Drop the source doc's leading H1 — Starlight renders the frontmatter title itself. */
+function stripLeadingH1(body: string): string {
+  return body.replace(/^\s*# [^\n]*\n+/, "");
 }
 
 /** Resolve a Markdown link target relative to the source doc's repo directory. */
@@ -78,7 +88,7 @@ for (const page of PAGES) {
 
 for (const page of PAGES) {
   const source = join(ROOT, page.source);
-  const body = rewriteLinks(stripFrontmatter(readFileSync(source, "utf8")).trimEnd(), page.source);
+  const body = stripLeadingH1(rewriteLinks(stripFrontmatter(readFileSync(source, "utf8")).trimEnd(), page.source)).trimEnd();
   const frontmatter = [
     "---",
     `title: ${JSON.stringify(page.title)}`,

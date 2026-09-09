@@ -2,9 +2,6 @@
 title: "Compatibility"
 description: "Supported Bun, TypeScript, validator, and platform combinations."
 ---
-
-# Compatibility
-
 This table is generated from CI results (`compatibility.yml`) run against the
 beta candidate commit. Unsupported combinations are explicit; support is not
 implied by broad semver ranges.
@@ -47,8 +44,9 @@ on Linux CI.
 
 | Environment | Status |
 |---|---|
+| Prebuilt browser artifact (`lugas/client/browser` → `build/lugas-client.esm.js`) | ✅ shipped in the packed tarball; same-origin real-browser execution verified — see [`reports/issues/M7-005.md`](https://github.com/ther12k/lugas/blob/main/docs/reports/issues/M7-005.md) |
 | Bun.build browser target → standalone Node execution with fetch stub | ✅ (linux-x64 CI; no Bun global references permitted by graph check) |
-| Real browsers | ⚠️ not executed in CI — bundle-level proof only (source-graph browser-safety checks); no automation driver in beta scope |
+| Real browsers in the per-OS compatibility matrix | ⚠️ not part of the 6-cell matrix — the automation-driven same-origin lane (`tests/browser/`, zero-dependency CDP driver) executes in the Linux verify gate and skips cleanly where no browser binary exists |
 
 ## Explicit non-goals / unsupported
 
@@ -59,9 +57,16 @@ on Linux CI.
 ## How this was verified
 
 - Matrix: `.github/workflows/compatibility.yml` — 3 OS × 2 Bun = 6 cells,
-  all green. Authoritative merged-tree run (incl. this doc's verifier):
-  [33021193847](https://github.com/ther12k/lugas/actions/runs/33021193847) @ `d9cfd08`;
-  pre-PR candidate run: [33000006619](https://github.com/ther12k/lugas/actions/runs/33000006619) @ `5324aee`.
+  all green. Historical M6 evidence remains in
+  [`docs/reports/m6-compatibility.md`](https://github.com/ther12k/lugas/blob/main/docs/reports/m6-compatibility.md).
+  The later asset-security matrix run
+  [34087764865](https://github.com/ther12k/lugas/actions/runs/34087764865)
+  tested PR head `418aca29ce8984b7671795e68c9b9867cc543d89`; the landed merge
+  baseline is separately `6d335bfa5ffd572dfca15fb14947127d88d57d21`.
+  These are distinct provenance fields, and the asset run does not replace the
+  historical M6 matrix result.
+  Pre-PR M6 candidate evidence remains
+  [33000006619](https://github.com/ther12k/lugas/actions/runs/33000006619) @ `5324aee`.
 - Local deep verification (full `bun run verify`: typecheck, 605 tests incl.
   security/integration/conformance/docs/golden): linux-x64, Bun 1.4.0, TS 7.0.2.
 - Matrix cells run: `bun install --frozen-lockfile`, `bun run typecheck`,

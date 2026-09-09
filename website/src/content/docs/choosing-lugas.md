@@ -2,8 +2,6 @@
 title: "Choosing Lugas"
 description: "Where Lugas fits among raw Bun, Elysia, Hono, Fastify, and tRPC."
 ---
-# Choosing Lugas
-
 ## Choose Lugas if you want
 
 - Compile-time type safety between server and client
