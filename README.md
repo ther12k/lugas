@@ -144,10 +144,10 @@ Types describe the wire. A handler returning `json(200, { createdAt: new Date() 
 | Service lifecycle: init, drain-ordered shutdown, reverse disposal (`service()`) | Available |
 | Test-server helpers (`lugas/testing`) | Available |
 | Static route manifest + inspection CLI (`lugas-manifest-v1`) | Available |
-| First-party CORS (`defineApp({ cors })`, opt-in, fail-closed) | Available (attested beta candidate, M8-001) |
-| Server-Sent Events (`sse()` helper, deterministic cleanup) | Available (attested beta candidate, M8-002) |
-| Structured logging (`defineApp({ logging })`, sink contract) | Available (attested beta candidate, M8-003) |
-| OpenAPI 3.1 + Scalar reference UI (`defineApp({ openapi })`, zero-dependency) | Available (attested beta candidate, M8-004) |
+| First-party CORS (`defineApp({ cors })`, opt-in, fail-closed) | Available in `0.1.0-beta.2` (M8-001) |
+| Server-Sent Events (`sse()` helper, deterministic cleanup) | Available in `0.1.0-beta.2` (M8-002) |
+| Structured logging (`defineApp({ logging })`, sink contract) | Available in `0.1.0-beta.2` (M8-003) |
+| OpenAPI 3.1 + Scalar reference UI (`defineApp({ openapi })`, zero-dependency) | Available in `0.1.0-beta.2` (M8-004) |
 | Drizzle ORM adapter | Planned — see [roadmap](#roadmap) |
 
 ## Examples
@@ -170,7 +170,7 @@ Known beta limitations: the server core and CLI are Bun-only (the client bundle 
 
 ## Roadmap
 
-Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). The only remaining planned first-party battery is the optional Drizzle adapter — **not** part of the beta candidate; it arrives only when a release documents it as available. First-party CORS ([`docs/cors.md`](docs/cors.md)), Server-Sent Events ([`docs/sse.md`](docs/sse.md)), Structured Logging ([`docs/logging.md`](docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](docs/openapi.md)) are part of the freshly attested beta candidate (source commit `3edaae9`, M8-GATE). The `v0.1.0-beta.2` candidate is published under npm `beta`; stable publication remains an explicit owner action.
+Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). The only remaining planned first-party battery is the optional Drizzle adapter — **not** part of the beta candidate; it arrives only when a release documents it as available. First-party CORS ([`docs/cors.md`](docs/cors.md)), Server-Sent Events ([`docs/sse.md`](docs/sse.md)), Structured Logging ([`docs/logging.md`](docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](docs/openapi.md)) are published in `0.1.0-beta.2` (source commit `7f08b16`, M8-GATE). The `v0.1.0-beta.2` candidate is published under npm `beta`; stable publication remains an explicit owner action.
 
 ## Documentation
 
