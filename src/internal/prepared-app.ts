@@ -30,6 +30,7 @@ import { createBudgetsContext, type BudgetsContext } from "./body-budget";
 import { corsWrapHandler, type CompiledCorsPolicy } from "./cors";
 import { wrapLogHandler, type CompiledLogging } from "./logging";
 import { generateOpenApiDocument, createScalarHtml, type CompiledOpenApi } from "./openapi";
+import { applySecureHeaders, type CompiledHealth, type CompiledSecureHeaders } from "./production";
 import type { LifecycleService, ShutdownOptions } from "./lifecycle";
 import { createWebSocketHub, performUpgrade, type WebSocketHub, type WsRouteEntry } from "./websocket-hub";
 import type { PipelineContext } from "./compile-pipeline";
@@ -71,7 +72,7 @@ export type PreparedApp = {
   /** Live services view handlers close over; descriptor slots fill at serve time. */
   readonly serviceSlots: Record<string, unknown>;
   /** Serve-time gate: Lugas handlers execute only after `gate` settles. */
-  readonly trafficGate: { gate: Promise<void> };
+  readonly trafficGate: { gate: Promise<void>; settled: boolean };
   /** Body-budget context (M7-003): app default, route budgets, ceiling slot. */
   readonly budgets: BudgetsContext;
   /** Compiled CORS policy (M8-001, ADR-0022); undefined when not configured. */
@@ -80,6 +81,10 @@ export type PreparedApp = {
   readonly logging: CompiledLogging | undefined;
   /** WebSocket hub (M9-003, ADR-0028); null when the app declares no websocket routes. */
   readonly websocketHub: WebSocketHub | null;
+  /** Compiled secure-headers policy (M9-004, ADR-0029); undefined when not configured. */
+  readonly secureHeaders: CompiledSecureHeaders | undefined;
+  /** Compiled health endpoint paths (M9-004, ADR-0029); undefined when not configured. */
+  readonly health: CompiledHealth | undefined;
 };
 
 function freezeContainers(value: Record<string, unknown>): Record<string, unknown> {
@@ -116,6 +121,8 @@ export function prepareApp<TServices>(config: {
   cors?: CompiledCorsPolicy | undefined;
   logging?: CompiledLogging | undefined;
   openapi?: CompiledOpenApi | undefined;
+  secureHeaders?: CompiledSecureHeaders | undefined;
+  health?: CompiledHealth | undefined;
   notFound?: NotFoundPolicy | undefined;
   onError?: ErrorPolicy | undefined;
 }): PreparedApp {
@@ -143,7 +150,9 @@ export function prepareApp<TServices>(config: {
   // Traffic gate: replaced by serveApp() with the real init promise. Lugas
   // handlers await it, so no handler executes before initialization settles;
   // a startup failure answers held requests with a redacted 503 problem.
-  const trafficGate: { gate: Promise<void> } = { gate: Promise.resolve() };
+  // `settled` lets /ready answer synchronously (503) while init is pending —
+  // readiness must answer, never hang (ADR-0029).
+  const trafficGate: { gate: Promise<void>; settled: boolean } = { gate: Promise.resolve(), settled: true };
   const gateHandler = (
     handler: (request: Request) => Response | Promise<Response>,
   ): (request: Request) => Response | Promise<Response> => {
@@ -380,6 +389,38 @@ export function prepareApp<TServices>(config: {
   // routes are synthesized and no path matching is reimplemented: preflights
   // that match no declared OPTIONS/any-method entry reach the wrapped fetch
   // fallback through Bun's own routing.
+  // M9-004 (ADR-0029): secure-headers policy, fill-if-absent, applied to
+  // every compiled handler BEFORE the CORS pass (CORS stays outermost so
+  // preflights skip the policy). Static values (Response/Blob/{ dir }) and
+  // assets are not functions — they bypass the pipeline and carry no policy
+  // headers, same truth as CORS and guards.
+  if (config.secureHeaders !== undefined) {
+    const wrapHeaders = (handler: (request: Request) => Response | Promise<Response>): (request: Request) => Response | Promise<Response> => {
+      if (config.secureHeaders === undefined) return handler;
+      const policy = config.secureHeaders;
+      return async (request: Request) => {
+        const response = await handler(request);
+        return applySecureHeaders(policy, response);
+      };
+    };
+    for (const [path, value] of Object.entries(compiled)) {
+      if (typeof value === "function") {
+        compiled[path] = wrapHeaders(value as (request: Request) => Response | Promise<Response>);
+        continue;
+      }
+      if (typeof value !== "object" || value === null || value instanceof Response || value instanceof Blob) continue;
+      const record = value as Record<string, unknown>;
+      const keys = Object.keys(record);
+      if (keys.length === 1 && typeof record["dir"] === "string") continue;
+      const wrappedMap: Record<string, unknown> = {};
+      for (const [method, entry] of Object.entries(record)) {
+        if (typeof entry !== "function") continue;
+        wrappedMap[method] = wrapHeaders(entry as (request: Request) => Response | Promise<Response>);
+      }
+      compiled[path] = Object.freeze(wrappedMap);
+    }
+  }
+
   if (config.cors !== undefined) {
     const rejectStatic = (path: string, method: string | null, kind: string): never => {
       const at = method === null ? path : `${method} ${path}`;
@@ -470,6 +511,47 @@ export function prepareApp<TServices>(config: {
     }
   }
 
+  // M9-004 (ADR-0029): health endpoints mount as framework routes OUTSIDE
+  // the traffic gate — that boundary IS the liveness/readiness distinction.
+  // Liveness answers 200 whenever the server accepts connections (a booting
+  // process is alive); readiness awaits the gate (503 while held or after a
+  // startup failure). Collisions with declared routes/assets fail closed.
+  if (config.health !== undefined) {
+    const existingPaths = new Set(declarationsByPath.keys());
+    if (config.assets?.files) {
+      for (const f of Object.keys(config.assets.files)) existingPaths.add(f);
+    }
+    for (const [label, path] of [["liveness", config.health.livenessPath], ["readiness", config.health.readinessPath]] as const) {
+      if (existingPaths.has(path)) {
+        throw diagnostic("LUGAS_HEALTH_002", `defineApp(): health ${label} path '${path}' collides with an existing route or asset`, {
+          hint: "rename the health endpoint: health: { livenessPath: '/healthz' }",
+          context: { path },
+        });
+      }
+      existingPaths.add(path);
+    }
+    const healthJson = (code: number, status: string): Response =>
+      new Response(JSON.stringify({ status }), {
+        status: code,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    const livenessHandler = (): Response => healthJson(200, "ok");
+    const readinessHandler = (): Response =>
+      healthJson(trafficGate.settled ? 200 : 503, trafficGate.settled ? "ready" : "unavailable");
+    for (const [path, handler] of [[config.health.livenessPath, livenessHandler], [config.health.readinessPath, readinessHandler]] as const) {
+      let mounted: (request: Request) => Response | Promise<Response> = handler;
+      if (config.logging !== undefined) mounted = wrapLogHandler(config.logging, `GET ${path}`, mounted);
+      if (config.secureHeaders !== undefined) {
+        const policy = config.secureHeaders;
+        const inner = mounted;
+        mounted = async (request: Request) => applySecureHeaders(policy, await inner(request));
+      }
+      if (config.cors !== undefined) mounted = corsWrapHandler(config.cors, mounted);
+      compiled[path] = Object.freeze({ GET: mounted });
+      facts.push(makeFact({ method: "GET", path, module: null, kind: "native", native: "handler", validates: [], guards: [] }));
+    }
+  }
+
   return Object.freeze({
     bunRoutes: Object.freeze(freezeContainers(compiled)),
     notFound: config.notFound ?? defaultNotFound,
@@ -481,5 +563,7 @@ export function prepareApp<TServices>(config: {
     cors: config.cors,
     logging: config.logging,
     websocketHub: websocketHub.routes.size > 0 ? websocketHub : null,
+    secureHeaders: config.secureHeaders,
+    health: config.health,
   });
 }

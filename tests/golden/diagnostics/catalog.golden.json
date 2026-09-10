@@ -168,6 +168,24 @@
     "hint": "websocket routes are served by Lugas; remove the serve() websocket option"
   },
   {
+    "code": "LUGAS_HEADERS_001",
+    "thrownBy": "defineApp()",
+    "meaning": "invalid secureHeaders configuration",
+    "hint": "pass secureHeaders: true or { contentSecurityPolicy?: string, hstsMaxAge?: number }; CSP is strictly opt-in"
+  },
+  {
+    "code": "LUGAS_HEALTH_001",
+    "thrownBy": "defineApp()",
+    "meaning": "invalid health configuration",
+    "hint": "pass health: true or { livenessPath?: string, readinessPath?: string }; paths are concrete and must differ"
+  },
+  {
+    "code": "LUGAS_HEALTH_002",
+    "thrownBy": "defineApp()",
+    "meaning": "health endpoint path collision with a route or asset",
+    "hint": "rename the health endpoint: health: { livenessPath: '/healthz' }"
+  },
+  {
     "code": "LUGAS_LIFECYCLE_001",
     "thrownBy": "service()",
     "meaning": "invalid service lifecycle descriptor",

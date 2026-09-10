@@ -17,6 +17,7 @@ export { websocket } from "./core/websocket";
 export type { WebSocketConfig, WebSocketEventContext, WebSocketMessage, ServerWebSocketLike } from "./core/websocket";
 export type { LugasLifecycle, ShutdownOutcome, ShutdownOptions } from "./internal/lifecycle";
 export type { CorsConfig, CorsOriginDecision, CorsOriginInput } from "./internal/cors";
+export type { SecureHeadersConfig, HealthConfig } from "./internal/production";
 export type {
   CompiledLogging,
   LogSink,

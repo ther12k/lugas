@@ -4,6 +4,7 @@ import { diagnostic } from "./diagnostics";
 import { corsWrapFallback } from "./cors";
 import { wrapLogFallback } from "./logging";
 import { startLifecycle, type LugasLifecycle, type ShutdownOptions } from "./lifecycle";
+import { applySecureHeaders } from "./production";
 import type { PreparedApp, SafeServeOptions } from "./prepared-app";
 
 export type { SafeServeOptions } from "./prepared-app";
@@ -65,6 +66,15 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
   // Hold traffic until initialization settles; a startup failure answers
   // held requests with a redacted 503 problem (see prepareApp gateHandler).
   prepared.trafficGate.gate = lifecycle.ready;
+  prepared.trafficGate.settled = false;
+  void lifecycle.ready.then(
+    () => {
+      prepared.trafficGate.settled = true;
+    },
+    () => {
+      prepared.trafficGate.settled = false; // startup failure: readiness stays 503
+    },
+  );
 
   // M7-003: the ceiling is the explicitly configured serve-time
   // `maxRequestBodySize`. Above-ceiling budgets are rejected at startup;
@@ -93,8 +103,16 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
   // routing. A user-supplied fetch is wrapped with the same policy.
   // M8-003 (ADR-0024): logging wraps inside CORS (outermost stays CORS so
   // preflights are not access-logged) and outside the fallback logic.
+  // M9-004: the not-found fallback is a pipeline response, so the
+  // secure-headers policy covers it (fill-if-absent, ADR-0029).
+  const secureFallback = prepared.secureHeaders !== undefined && userFetch === undefined
+    ? (request: Request): Response | Promise<Response> => {
+        const out: Response | Promise<Response> = safeNotFound(prepared.notFound)(request);
+        return out instanceof Response ? applySecureHeaders(prepared.secureHeaders!, out) : Promise.resolve(out).then((r) => applySecureHeaders(prepared.secureHeaders!, r));
+      }
+    : undefined;
   const baseFetch: (request: Request, server: Bun.Server<unknown>) => Response | Promise<Response> =
-    userFetch ?? ((request: Request) => safeNotFound(prepared.notFound)(request));
+    userFetch ?? secureFallback ?? ((request: Request) => safeNotFound(prepared.notFound)(request));
   const loggedFetch = prepared.logging !== undefined ? wrapLogFallback(prepared.logging, baseFetch) : baseFetch;
   const fetchHandler = prepared.cors !== undefined ? corsWrapFallback(prepared.cors, loggedFetch) : loggedFetch;
 

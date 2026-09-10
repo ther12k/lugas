@@ -15,6 +15,7 @@ import type { AssetsConfig } from "../internal/assets";
 import { compileCorsPolicy, type CompiledCorsPolicy, type CorsConfig } from "../internal/cors";
 import { compileLogging, type CompiledLogging, type LoggingConfig } from "../internal/logging";
 import { compileOpenApiConfig, type CompiledOpenApi, type OpenApiConfig } from "../internal/openapi";
+import { compileHealthConfig, compileSecureHeaders, type HealthConfig, type SecureHeadersConfig } from "../internal/production";
 import type { LugasApp, MergeModulesRoutes, ModuleDescriptor } from "./types";
 import { serveApp } from "../internal/serve";
 import { assertValidRoutePath } from "../internal/path";
@@ -62,11 +63,27 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
    * (default `/docs`).
    */
   openapi?: OpenApiConfig;
+  /**
+   * Conservative security-header policy (M9-004, ADR-0029): opt-in,
+   * app-level, fill-if-absent on every pipeline response. Defaults when
+   * enabled: X-Content-Type-Options nosniff, X-Frame-Options DENY,
+   * Referrer-Policy strict-origin-when-cross-origin. CSP and HSTS are
+   * strictly opt-in; the framework never invents a Content-Security-Policy.
+   */
+  secureHeaders?: SecureHeadersConfig;
+  /**
+   * Lifecycle-aware health endpoints (M9-004, ADR-0029): opt-in GET
+   * liveness (`/health`, bypasses the traffic gate — a booting process is
+   * alive) and readiness (`/ready`, awaits the gate — 200 after init,
+   * 503 while held or after a startup failure). Paths are renamable;
+   * collisions with routes or assets fail closed at startup.
+   */
+  health?: HealthConfig;
   notFound?: (request: Request) => Response | Promise<Response>;
   onError?: (error: unknown, request: Request) => Response | Promise<Response>;
 };
 
-const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "logging", "openapi", "notFound", "onError"]);
+const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "logging", "openapi", "secureHeaders", "health", "notFound", "onError"]);
 
 export type AppInternals<TServices = unknown> = {
   readonly composition: Composition;
@@ -129,6 +146,10 @@ export function defineApp<
   const loggingConfig: CompiledLogging | undefined = config.logging !== undefined ? compileLogging(config.logging) : undefined;
   // M8-004 (ADR-0025): validate openapi config once here.
   const openApiConfig: CompiledOpenApi | undefined = config.openapi !== undefined ? compileOpenApiConfig(config.openapi) : undefined;
+  // M9-004 (ADR-0029): validate once here; preparation consumes the compiled
+  // policy and health paths, never re-reading user configuration.
+  const secureHeaders = config.secureHeaders !== undefined ? compileSecureHeaders(config.secureHeaders) : undefined;
+  const health = config.health !== undefined ? compileHealthConfig(config.health) : undefined;
   if (config.modules !== undefined) {
     if (!Array.isArray(config.modules)) throw diagnostic("LUGAS_APP_003", "defineApp(): 'modules' must be an array", { hint: "wrap modules: modules: [defineModule(...)]" });
     const names = new Set<string>();
@@ -170,6 +191,8 @@ export function defineApp<
     cors: corsPolicy,
     logging: loggingConfig,
     openapi: openApiConfig,
+    secureHeaders,
+    health,
     notFound: config.notFound,
     onError: config.onError,
   });

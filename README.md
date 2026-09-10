@@ -151,6 +151,7 @@ Types describe the wire. A handler returning `json(200, { createdAt: new Date() 
 | Drizzle ORM adapter (`lugas/drizzle`, application-owned instance) | Available in `0.1.0-beta.3` (M9-001) |
 | Cookie primitives (`parseCookies`/`cookie`, RFC 6265, auth-interop recipe) | Shipped on `main` (M9-002) |
 | WebSockets (`websocket()` routes, pre-upgrade guards, shutdown close-1001) | Shipped on `main` (M9-003) |
+| Secure headers + health/readiness (`secureHeaders`, `health`) | Shipped on `main` (M9-004) |
 
 ## Examples
 
@@ -196,6 +197,7 @@ Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). The Driz
 | [`docs/drizzle.md`](docs/drizzle.md) | Drizzle integration: application-owned instance as a service |
 | [`docs/cookies.md`](docs/cookies.md) | Cookie primitives and the Better Auth interop recipe |
 | [`docs/websockets.md`](docs/websockets.md) | WebSocket routes: pre-upgrade guards, native sockets, shutdown semantics |
+| [`docs/production.md`](docs/production.md) | Production hardening: secure headers and health/readiness |
 | [`docs/performance-gates.md`](docs/performance-gates.md) | Release performance budgets and evidence policy |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history |
 | [Release evidence](https://github.com/ther12k/lugas/blob/main/docs/releases/beta/RELEASE_PACKET.md) | Candidate evidence packet, provenance, and checksums (GitHub) |

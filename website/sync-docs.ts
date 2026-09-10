@@ -39,6 +39,7 @@ const PAGES: PageSpec[] = [
   { source: "docs/drizzle.md", slug: "drizzle", title: "Drizzle integration", description: "An application-owned Drizzle instance as a Lugas service." },
   { source: "docs/cookies.md", slug: "cookies", title: "Cookies and auth interop", description: "RFC 6265 primitives and the Better Auth guard recipe." },
   { source: "docs/websockets.md", slug: "websockets", title: "WebSockets", description: "Guard-gated upgrades on Bun native sockets with shutdown close-1001." },
+  { source: "docs/production.md", slug: "production", title: "Production hardening", description: "Conservative secure headers and lifecycle-aware health/readiness endpoints." },
   { source: "docs/wire-honest-types.md", slug: "wire-honest-types", title: "Wire-honest types", description: "How Lugas response types model JSON serialization truth." },
   { source: "docs/design-principles.md", slug: "design-principles", title: "Design principles", description: "Explicit HTTP, no code generation, no proxies, zero forced ecosystem." },
   { source: "docs/choosing-lugas.md", slug: "choosing-lugas", title: "Choosing Lugas", description: "Where Lugas fits among raw Bun, Elysia, Hono, Fastify, and tRPC." },
