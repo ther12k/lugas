@@ -5,6 +5,7 @@ import { corsWrapFallback } from "./cors";
 import { wrapLogFallback } from "./logging";
 import { startLifecycle, type LugasLifecycle, type ShutdownOptions } from "./lifecycle";
 import { applySecureHeaders } from "./production";
+import { telemetryTrackTask, wrapTelemetryFallback } from "./telemetry";
 import type { PreparedApp, SafeServeOptions } from "./prepared-app";
 
 export type { SafeServeOptions } from "./prepared-app";
@@ -111,8 +112,15 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
         return out instanceof Response ? applySecureHeaders(prepared.secureHeaders!, out) : Promise.resolve(out).then((r) => applySecureHeaders(prepared.secureHeaders!, r));
       }
     : undefined;
-  const baseFetch: (request: Request, server: Bun.Server<unknown>) => Response | Promise<Response> =
-    userFetch ?? secureFallback ?? ((request: Request) => safeNotFound(prepared.notFound)(request));
+  const plainFallback = secureFallback ?? ((request: Request) => safeNotFound(prepared.notFound)(request));
+  // M9-006 (ADR-0032): the not-found fallback reports telemetry too
+  // (route "-"); request ids reuse the logging pipeline's convention.
+  const baseFetchUnwrapped: (request: Request, server: Bun.Server<unknown>) => Response | Promise<Response> =
+    userFetch ?? plainFallback;
+  const baseFetch =
+    prepared.telemetry !== undefined && userFetch === undefined
+      ? wrapTelemetryFallback(prepared.telemetry, prepared.telemetryRegistry, undefined, baseFetchUnwrapped)
+      : baseFetchUnwrapped;
   const loggedFetch = prepared.logging !== undefined ? wrapLogFallback(prepared.logging, baseFetch) : baseFetch;
   const fetchHandler = prepared.cors !== undefined ? corsWrapFallback(prepared.cors, loggedFetch) : loggedFetch;
 
@@ -145,7 +153,15 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
       if (wsHub !== null) wsHub.closeAll(1001, "server shutting down");
       return lifecycle.shutdown(reason);
     },
-    track: (task: Promise<unknown>) => lifecycle.track(task),
+    // M9-006 (ADR-0032): track(task, request?) correlates detached work
+    // with the request's telemetry state — request.end waits for it. The
+    // drain still waits for every tracked task either way (ADR-0020).
+    track: (task: Promise<unknown>, request?: Request) => {
+      if (request !== undefined && prepared.telemetry !== undefined) {
+        telemetryTrackTask(prepared.telemetry, prepared.telemetryRegistry, request, task);
+      }
+      lifecycle.track(task);
+    },
   };
   const lugasServer = server as LugasServer;
   Object.defineProperty(lugasServer, "lugasLifecycle", {

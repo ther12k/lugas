@@ -20,6 +20,7 @@ export type { WebSocketConfig, WebSocketEventContext, WebSocketMessage, ServerWe
 export type { LugasLifecycle, ShutdownOutcome, ShutdownOptions } from "./internal/lifecycle";
 export type { CorsConfig, CorsOriginDecision, CorsOriginInput } from "./internal/cors";
 export type { SecureHeadersConfig, HealthConfig } from "./internal/production";
+export type { TelemetryConfig, TelemetryRequestStart, TelemetryRequestEnd, TelemetryErrorClass } from "./internal/telemetry";
 export type {
   CompiledLogging,
   LogSink,

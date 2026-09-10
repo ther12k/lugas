@@ -16,6 +16,7 @@ import { compileCorsPolicy, type CompiledCorsPolicy, type CorsConfig } from "../
 import { compileLogging, type CompiledLogging, type LoggingConfig } from "../internal/logging";
 import { compileOpenApiConfig, type CompiledOpenApi, type OpenApiConfig } from "../internal/openapi";
 import { compileHealthConfig, compileSecureHeaders, type HealthConfig, type SecureHeadersConfig } from "../internal/production";
+import { compileTelemetry, type TelemetryConfig } from "../internal/telemetry";
 import type { LugasApp, MergeModulesRoutes, ModuleDescriptor } from "./types";
 import { serveApp } from "../internal/serve";
 import { assertValidRoutePath } from "../internal/path";
@@ -79,11 +80,19 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
    * collisions with routes or assets fail closed at startup.
    */
   health?: HealthConfig;
+  /**
+   * Dependency-free telemetry hooks (M9-006, ADR-0032): opt-in
+   * `onRequestStart`/`onRequestEnd` callbacks receiving scalar-only events
+   * (method, path, route, requestId; end adds status, durationMs,
+   * errorClass). Request-end includes `track(task, request)`-correlated
+   * work. Span export is application-owned (docs/telemetry.md recipe).
+   */
+  telemetry?: TelemetryConfig;
   notFound?: (request: Request) => Response | Promise<Response>;
   onError?: (error: unknown, request: Request) => Response | Promise<Response>;
 };
 
-const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "logging", "openapi", "secureHeaders", "health", "notFound", "onError"]);
+const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "logging", "openapi", "secureHeaders", "health", "telemetry", "notFound", "onError"]);
 
 export type AppInternals<TServices = unknown> = {
   readonly composition: Composition;
@@ -150,6 +159,7 @@ export function defineApp<
   // policy and health paths, never re-reading user configuration.
   const secureHeaders = config.secureHeaders !== undefined ? compileSecureHeaders(config.secureHeaders) : undefined;
   const health = config.health !== undefined ? compileHealthConfig(config.health) : undefined;
+  const telemetry = config.telemetry !== undefined ? compileTelemetry(config.telemetry) : undefined;
   if (config.modules !== undefined) {
     if (!Array.isArray(config.modules)) throw diagnostic("LUGAS_APP_003", "defineApp(): 'modules' must be an array", { hint: "wrap modules: modules: [defineModule(...)]" });
     const names = new Set<string>();
@@ -193,6 +203,7 @@ export function defineApp<
     openapi: openApiConfig,
     secureHeaders,
     health,
+    telemetry,
     notFound: config.notFound,
     onError: config.onError,
   });

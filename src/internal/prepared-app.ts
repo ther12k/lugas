@@ -31,6 +31,7 @@ import { corsWrapHandler, type CompiledCorsPolicy } from "./cors";
 import { wrapLogHandler, type CompiledLogging } from "./logging";
 import { generateOpenApiDocument, createScalarHtml, type CompiledOpenApi } from "./openapi";
 import { applySecureHeaders, type CompiledHealth, type CompiledSecureHeaders } from "./production";
+import { createTelemetryRegistry, wrapTelemetryHandler, type CompiledTelemetry, type TelemetryRegistry } from "./telemetry";
 import type { LifecycleService, ShutdownOptions } from "./lifecycle";
 import { createWebSocketHub, performUpgrade, type WebSocketHub, type WsRouteEntry } from "./websocket-hub";
 import type { PipelineContext } from "./compile-pipeline";
@@ -85,6 +86,10 @@ export type PreparedApp = {
   readonly secureHeaders: CompiledSecureHeaders | undefined;
   /** Compiled health endpoint paths (M9-004, ADR-0029); undefined when not configured. */
   readonly health: CompiledHealth | undefined;
+  /** Compiled telemetry hooks (M9-006, ADR-0032); undefined when not configured. */
+  readonly telemetry: CompiledTelemetry | undefined;
+  /** Request→telemetry-state registry for track() correlation (M9-006). */
+  readonly telemetryRegistry: TelemetryRegistry;
 };
 
 function freezeContainers(value: Record<string, unknown>): Record<string, unknown> {
@@ -123,6 +128,7 @@ export function prepareApp<TServices>(config: {
   openapi?: CompiledOpenApi | undefined;
   secureHeaders?: CompiledSecureHeaders | undefined;
   health?: CompiledHealth | undefined;
+  telemetry?: CompiledTelemetry | undefined;
   notFound?: NotFoundPolicy | undefined;
   onError?: ErrorPolicy | undefined;
 }): PreparedApp {
@@ -164,11 +170,18 @@ export function prepareApp<TServices>(config: {
     };
   };
   const budgetsCtx = createBudgetsContext(config.bodyBudget);
+  const telemetryRegistry = createTelemetryRegistry();
   const compileLugasHandler = (routeId: string, descriptor: unknown): (request: Request) => Response | Promise<Response> => {
     const budget = (descriptor as { budget?: unknown }).budget;
     if (typeof budget === "number") budgetsCtx.routeBudgets.push(budget);
     const inner = gateHandler(withErrorPolicy(compileRoute(routeId, descriptor as never, serviceSlots, budgetsCtx).handler, onError, routeId));
-    return config.logging !== undefined ? wrapLogHandler(config.logging, routeId, inner) : inner;
+    // M9-006 (ADR-0032): telemetry wraps INSIDE logging — it mints the
+    // request id (when logging.requestIds is on) and stamps x-request-id on
+    // the response before the access log reads it: one identity source.
+    const observed = config.telemetry !== undefined
+      ? wrapTelemetryHandler(config.telemetry, telemetryRegistry, routeId, config.logging?.requestIds === true ? () => crypto.randomUUID() : undefined, inner)
+      : inner;
+    return config.logging !== undefined ? wrapLogHandler(config.logging, routeId, observed) : observed;
   };
 
   // M9-003 (ADR-0028): websocket descriptors compile through the same
@@ -565,5 +578,7 @@ export function prepareApp<TServices>(config: {
     websocketHub: websocketHub.routes.size > 0 ? websocketHub : null,
     secureHeaders: config.secureHeaders,
     health: config.health,
+    telemetry: config.telemetry,
+    telemetryRegistry,
   });
 }
