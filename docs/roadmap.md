@@ -59,7 +59,7 @@ Accepted as a structural, application-owned service adapter under the new `lugas
 After M9-001, the intended battery order is:
 
 1. **Cookie primitives + auth interoperability** — shipped on `main` (M9-002, [#362](https://github.com/ther12k/lugas/issues/362); [ADR-0027](okf/decisions/0027-cookies-auth-interop.md), ODR-0011): `parseCookies()` + `cookie()` with fail-closed serialization and the Better Auth guard recipe in [`docs/cookies.md`](cookies.md).
-2. **WebSockets** — typed upgrade guards and shutdown semantics on Bun's native `Bun.serve()` WebSockets; the bidirectional companion to SSE. **Dispatched** (M9-003, [#366](https://github.com/ther12k/lugas/issues/366); [ADR-0028](okf/decisions/0028-websockets.md), ODR-0012).
+2. **WebSockets** — shipped on `main` (M9-003, [#366](https://github.com/ther12k/lugas/issues/366); [ADR-0028](okf/decisions/0028-websockets.md), ODR-0012): `websocket()` routes with pre-upgrade guards and validation, native sockets, shutdown close-1001; [`docs/websockets.md`](websockets.md).
 3. **Production hardening** — secure headers (small, explicit, no invented strict CSP) and health/readiness helpers over the service lifecycle.
 4. **Observability and HTTP primitives** — multipart parsing with bounded consumption, OpenTelemetry integration hooks (no SDK dependency), compression/ETag, and a rate-limit *contract* whose storage stays application-owned.
 

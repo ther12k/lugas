@@ -38,6 +38,8 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_DRIZZLE_001 | drizzleService() | value is not a recognizable Drizzle instance | drizzleService({ db }) requires an object with select, insert, update, and delete functions; the adapter never imports drizzle-orm |
 | LUGAS_DRIZZLE_002 | drizzleService() | invalid closeOnDispose option or no closable $client | closeOnDispose must be a boolean and requires db.$client.close to be a function; compose service() directly for clients that dispose differently |
 | LUGAS_COOKIE_001 | cookie() | invalid cookie name or value token | names are RFC 6265 tokens; values exclude whitespace, DQUOTE, comma, semicolon, and backslash — encode other characters |
+| LUGAS_WS_001 | websocket() | invalid websocket configuration | allowed keys: before, params, query, headers, message, open, close, drain; message is required |
+| LUGAS_WS_002 | serve() | custom websocket option conflicts with declared websocket() routes | websocket routes are served by Lugas; remove the serve() websocket option |
 | LUGAS_COOKIE_002 | cookie() | invalid cookie attributes or attribute combination | sameSite "none" requires secure; path/domain are non-empty strings; maxAge is an integer; expires is a valid Date |
 | LUGAS_MODULE_001 | defineModule() | config must be an object | pass defineModule({ name, routes }) |
 | LUGAS_MODULE_002 | defineModule() | unknown config key | allowed keys: name, routes |

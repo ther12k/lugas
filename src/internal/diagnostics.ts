@@ -32,6 +32,7 @@ export type DiagnosticCode =
   | "LUGAS_OPENAPI_001" | "LUGAS_OPENAPI_002"
   | "LUGAS_DRIZZLE_001" | "LUGAS_DRIZZLE_002"
   | "LUGAS_COOKIE_001" | "LUGAS_COOKIE_002"
+  | "LUGAS_WS_001" | "LUGAS_WS_002"
   | "LUGAS_LIFECYCLE_001"
   | "LUGAS_TEST_001"
   | "LUGAS_CLI_001";
@@ -87,6 +88,8 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_DRIZZLE_002", thrownBy: "drizzleService()", meaning: "invalid closeOnDispose option or no closable $client", hint: "closeOnDispose must be a boolean and requires db.$client.close to be a function; compose service() directly for clients that dispose differently" },
   { code: "LUGAS_COOKIE_001", thrownBy: "cookie()", meaning: "invalid cookie name or value token", hint: "names are RFC 6265 tokens; values exclude whitespace, DQUOTE, comma, semicolon, and backslash — encode other characters" },
   { code: "LUGAS_COOKIE_002", thrownBy: "cookie()", meaning: "invalid cookie attributes or attribute combination", hint: 'sameSite "none" requires secure; path/domain are non-empty strings; maxAge is an integer; expires is a valid Date' },
+  { code: "LUGAS_WS_001", thrownBy: "websocket()", meaning: "invalid websocket configuration", hint: "allowed keys: before, params, query, headers, message, open, close, drain; message is required" },
+  { code: "LUGAS_WS_002", thrownBy: "serve()", meaning: "custom websocket option conflicts with declared websocket() routes", hint: "websocket routes are served by Lugas; remove the serve() websocket option" },
   { code: "LUGAS_LIFECYCLE_001", thrownBy: "service()", meaning: "invalid service lifecycle descriptor", hint: "use service({ name, value, init?, dispose? }) with a non-empty name" },
   { code: "LUGAS_MODULE_001", thrownBy: "defineModule()", meaning: "config must be an object", hint: "pass defineModule({ name, routes })" },
   { code: "LUGAS_MODULE_002", thrownBy: "defineModule()", meaning: "unknown config key", hint: "allowed keys: name, routes" },

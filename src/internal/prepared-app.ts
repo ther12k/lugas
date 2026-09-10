@@ -31,6 +31,8 @@ import { corsWrapHandler, type CompiledCorsPolicy } from "./cors";
 import { wrapLogHandler, type CompiledLogging } from "./logging";
 import { generateOpenApiDocument, createScalarHtml, type CompiledOpenApi } from "./openapi";
 import type { LifecycleService, ShutdownOptions } from "./lifecycle";
+import { createWebSocketHub, performUpgrade, type WebSocketHub, type WsRouteEntry } from "./websocket-hub";
+import type { PipelineContext } from "./compile-pipeline";
 import { problem } from "../core/response";
 import type { ModuleDescriptor } from "../core/types";
 
@@ -76,6 +78,8 @@ export type PreparedApp = {
   readonly cors: CompiledCorsPolicy | undefined;
   /** Compiled logging policy (M8-003, ADR-0024); undefined when not configured. */
   readonly logging: CompiledLogging | undefined;
+  /** WebSocket hub (M9-003, ADR-0028); null when the app declares no websocket routes. */
+  readonly websocketHub: WebSocketHub | null;
 };
 
 function freezeContainers(value: Record<string, unknown>): Record<string, unknown> {
@@ -158,6 +162,32 @@ export function prepareApp<TServices>(config: {
     return config.logging !== undefined ? wrapLogHandler(config.logging, routeId, inner) : inner;
   };
 
+  // M9-003 (ADR-0028): websocket descriptors compile through the same
+  // pipeline — the synthetic route handler IS the upgrade decision, so
+  // guards, schema slots, the traffic gate, and the error policy all apply
+  // before the handshake. Raw event handlers register once per routeId.
+  const websocketHub: WebSocketHub = createWebSocketHub();
+  const compileWebSocketHandler = (routeId: string, descriptor: Record<string, unknown>): ((request: Request) => Response | Promise<Response>) => {
+    const message = descriptor.message as WsRouteEntry["message"];
+    const open = descriptor.open as WsRouteEntry["open"] | undefined;
+    const close = descriptor.close as WsRouteEntry["close"] | undefined;
+    const drain = descriptor.drain as WsRouteEntry["drain"] | undefined;
+    websocketHub.routes.set(routeId, {
+      message,
+      ...(open !== undefined ? { open } : {}),
+      ...(close !== undefined ? { close } : {}),
+      ...(drain !== undefined ? { drain } : {}),
+    });
+    const synthetic = {
+      before: descriptor.before,
+      params: descriptor.params,
+      query: descriptor.query,
+      headers: descriptor.headers,
+      handler: (context: PipelineContext): Response => performUpgrade(websocketHub, routeId, context),
+    };
+    return compileLugasHandler(routeId, synthetic);
+  };
+
   // Collect declarations per path, in declaration order (root first, then
   // modules in order). Ownership is tracked per method for diagnostics.
   const declarationsByPath = new Map<string, Declaration[]>();
@@ -185,6 +215,10 @@ export function prepareApp<TServices>(config: {
       const declared = descriptorFacts(kind.descriptor as unknown as Record<string, unknown>);
       facts.push(makeFact({ method, path, module: moduleName, kind: "lugas", ...declared }));
       rawDescriptors.set(`${method} ${path}`, kind.descriptor);
+    } else if (kind.kind === "lugas-websocket") {
+      // ADR-0028: manifest vocabulary is unchanged — the route exists at its
+      // path/method; the transport kind is not manifest records.
+      facts.push(makeFact({ method, path, module: moduleName, kind: "lugas", ...descriptorFacts(kind.descriptor as Record<string, unknown>) }));
     } else if (kind.kind === "native-handler") {
       facts.push(makeFact({ method, path, module: moduleName, kind: "native", native: "handler", validates: [], guards: [] }));
     } else if (kind.kind === "native-response" || kind.kind === "native-file") {
@@ -198,6 +232,9 @@ export function prepareApp<TServices>(config: {
     if (kind.kind === "lugas-descriptor") {
       const routeId = `${method} ${path}`;
       return compileLugasHandler(routeId, kind.descriptor);
+    }
+    if (kind.kind === "lugas-websocket") {
+      return compileWebSocketHandler(`${method} ${path}`, kind.descriptor);
     }
     if (kind.kind === "unsupported") {
       throw diagnostic("LUGAS_ROUTES_002", `unsupported route entry at ${method} ${path}`, {
@@ -287,6 +324,8 @@ export function prepareApp<TServices>(config: {
         const declared = descriptorFacts(kind.descriptor as unknown as Record<string, unknown>);
         facts.push(makeFact({ method: "*", path, module: moduleName, kind: "lugas", ...declared }));
         rawDescriptors.set(`* ${path}`, kind.descriptor);
+      } else if (kind.kind === "lugas-websocket") {
+        facts.push(makeFact({ method: "*", path, module: moduleName, kind: "lugas", ...descriptorFacts(kind.descriptor as Record<string, unknown>) }));
       } else if (kind.kind === "native-response" || kind.kind === "native-file") {
         facts.push(makeFact({ method: "*", path, module: moduleName, kind: "native", native: "static", validates: [], guards: [] }));
       } else if (kind.kind === "native-dir") {
@@ -295,6 +334,8 @@ export function prepareApp<TServices>(config: {
       if (kind.kind === "lugas-descriptor") {
         const routeId = `* ${path}`;
         compiled[path] = compileLugasHandler(routeId, kind.descriptor);
+      } else if (kind.kind === "lugas-websocket") {
+        compiled[path] = compileWebSocketHandler(`* ${path}`, kind.descriptor);
       } else if (kind.kind === "unsupported") {
         throw diagnostic("LUGAS_ROUTES_003", `unsupported route entry at ${path}`, {
           context: { path },
@@ -439,5 +480,6 @@ export function prepareApp<TServices>(config: {
     budgets: budgetsCtx,
     cors: config.cors,
     logging: config.logging,
+    websocketHub: websocketHub.routes.size > 0 ? websocketHub : null,
   });
 }

@@ -13,6 +13,8 @@ export { sse, formatSseEvent } from "./core/sse";
 export type { SseConfig, SseEventInput, SseWriter } from "./core/sse";
 export { cookie, parseCookies } from "./core/cookies";
 export type { CookieAttrs } from "./core/cookies";
+export { websocket } from "./core/websocket";
+export type { WebSocketConfig, WebSocketEventContext, WebSocketMessage, ServerWebSocketLike } from "./core/websocket";
 export type { LugasLifecycle, ShutdownOutcome, ShutdownOptions } from "./internal/lifecycle";
 export type { CorsConfig, CorsOriginDecision, CorsOriginInput } from "./internal/cors";
 export type {
