@@ -10,7 +10,7 @@ The philosophy (ADR-0026): Lugas does not become an ORM framework. Schema design
 
 ```bash
 bun add drizzle-orm        # the application's own dependency
-bun add lugas@beta
+bun add lugas@beta  # 0.1.0-beta.3+
 ```
 
 ## Declare the service
