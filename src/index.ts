@@ -12,6 +12,14 @@ export type { ServiceConfig, ServiceDescriptor } from "./core/service";
 export { sse, formatSseEvent } from "./core/sse";
 export type { SseConfig, SseEventInput, SseWriter } from "./core/sse";
 export { cookie, parseCookies } from "./core/cookies";
+export { rateLimit, createMemoryRateLimitStore, RATE_LIMIT_PROBLEM_TYPE } from "./core/rate-limit";
+export type {
+  RateLimitConfig,
+  RateLimitInfo,
+  RateLimitKeyContext,
+  RateLimitSnapshot,
+  RateLimitStore,
+} from "./core/rate-limit";
 export { form } from "./core/form";
 export type { FormConfig, FormDescriptor, MultipartBody } from "./core/form";
 export type { CookieAttrs } from "./core/cookies";

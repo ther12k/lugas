@@ -36,6 +36,7 @@ export type DiagnosticCode =
   | "LUGAS_FORM_001"
   | "LUGAS_TELEMETRY_001"
   | "LUGAS_COMPRESSION_001" | "LUGAS_ETAG_001"
+  | "LUGAS_RATE_LIMIT_001"
   | "LUGAS_HEADERS_001"
   | "LUGAS_HEALTH_001" | "LUGAS_HEALTH_002"
   | "LUGAS_LIFECYCLE_001"
@@ -99,6 +100,7 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_TELEMETRY_001", thrownBy: "defineApp()", meaning: "invalid telemetry configuration", hint: "allowed keys: onRequestStart, onRequestEnd; both are functions" },
   { code: "LUGAS_COMPRESSION_001", thrownBy: "defineApp()", meaning: "invalid compression configuration", hint: "pass compression: true or { encodings?: [\"gzip\",\"deflate\"], minSize?, types? }" },
   { code: "LUGAS_ETAG_001", thrownBy: "defineApp()", meaning: "invalid etag configuration", hint: "pass etag: true or { weak?: boolean }" },
+  { code: "LUGAS_RATE_LIMIT_001", thrownBy: "rateLimit()", meaning: "invalid rate-limit configuration", hint: "allowed keys: limit, windowMs, store, key, keyPrefix, message; limit/windowMs are positive integers and store implements get()/increment()" },
   { code: "LUGAS_HEADERS_001", thrownBy: "defineApp()", meaning: "invalid secureHeaders configuration", hint: "pass secureHeaders: true or { contentSecurityPolicy?: string, hstsMaxAge?: number }; CSP is strictly opt-in" },
   { code: "LUGAS_HEALTH_001", thrownBy: "defineApp()", meaning: "invalid health configuration", hint: "pass health: true or { livenessPath?: string, readinessPath?: string }; paths are concrete and must differ" },
   { code: "LUGAS_HEALTH_002", thrownBy: "defineApp()", meaning: "health endpoint path collision with a route or asset", hint: "rename the health endpoint: health: { livenessPath: '/healthz' }" },
