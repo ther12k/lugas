@@ -45,6 +45,8 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_OPENAPI_002 | defineApp() | openapi endpoint path collision with route or assets | openapi.path and openapi.ui.path must be disjoint from routes and assets |
 | LUGAS_DRIZZLE_001 | drizzleService() | value is not a recognizable Drizzle instance | drizzleService({ db }) requires an object with select, insert, update, and delete functions; the adapter never imports drizzle-orm |
 | LUGAS_DRIZZLE_002 | drizzleService() | invalid closeOnDispose option or no closable $client | closeOnDispose must be a boolean and requires db.$client.close to be a function; compose service() directly for clients that dispose differently |
+| LUGAS_COOKIE_001 | cookie() | invalid cookie name or value token | names are RFC 6265 tokens; values exclude whitespace, DQUOTE, comma, semicolon, and backslash — encode other characters |
+| LUGAS_COOKIE_002 | cookie() | invalid cookie attributes or attribute combination | sameSite "none" requires secure; path/domain are non-empty strings; maxAge is an integer; expires is a valid Date |
 | LUGAS_MODULE_001 | defineModule() | config must be an object | pass defineModule({ name, routes }) |
 | LUGAS_MODULE_002 | defineModule() | unknown config key | allowed keys: name, routes |
 | LUGAS_MODULE_003 | defineModule() | 'name' must be a non-empty string | module names appear in manifests; use stable names |
