@@ -39,6 +39,14 @@ export function findBrowserExecutable(): string | null {
 
 type Pending = { resolve: (value: unknown) => void; reject: (reason: unknown) => void };
 
+/**
+ * Capability wait for the browser's DevTools WebSocket, not a test
+ * assertion: cold starts on loaded CI runners have been observed exceeding
+ * the historical 15s (beta.4 PR #387 failed at ~17s, passed on rerun), so
+ * this stays generous. Test timeouts remain the real bound.
+ */
+const LAUNCH_TIMEOUT_MS = 60_000;
+
 export class CdpBrowser {
   private ws: WebSocket | undefined;
   private nextId = 1;
@@ -84,12 +92,12 @@ export class CdpBrowser {
         }
       }
     })();
-    const deadline = Date.now() + 15_000;
+    const deadline = Date.now() + LAUNCH_TIMEOUT_MS;
     while (wsUrl === null && Date.now() < deadline) await Bun.sleep(25);
     if (wsUrl === null) {
       proc.kill();
       rmSync(userDataDir, { recursive: true, force: true });
-      throw new Error("browser did not report a DevTools WebSocket within 15s");
+      throw new Error(`browser did not report a DevTools WebSocket within ${LAUNCH_TIMEOUT_MS / 1000}s`);
     }
     const browser = new CdpBrowser(proc, userDataDir, stderrText);
     await browser.connect(wsUrl);
@@ -130,7 +138,7 @@ export class CdpBrowser {
   }
 
   /** Opens one page, waits for load, evaluates one async expression, closes the page. */
-  async evaluateInNewPage(url: string, expression: string, timeoutMs = 20_000): Promise<string> {
+  async evaluateInNewPage(url: string, expression: string, timeoutMs = 30_000): Promise<string> {
     const { targetId } = (await this.send("Target.createTarget", { url: "about:blank" })) as { targetId: string };
     const { sessionId } = (await this.send("Target.attachToTarget", { targetId, flatten: true })) as { sessionId: string };
     await this.send("Page.enable", undefined, sessionId);
