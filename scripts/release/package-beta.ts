@@ -36,7 +36,7 @@ import { join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const OUT_DIR = resolve(ROOT, "docs", "releases", "beta");
-const BETA_VERSION = "0.1.0-beta.3"
+const BETA_VERSION = "0.1.0-beta.4"
 
 type CheckResult = { name: string; ok: boolean; detail: string };
 const results: CheckResult[] = [];

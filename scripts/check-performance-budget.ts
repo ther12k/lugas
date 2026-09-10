@@ -385,7 +385,7 @@ function main() {
   // success — the packet builder fails closed without it.
   if (RELEASE_MODE) {
     let tarballHash: string | null = null;
-    const tgz = resolve(ROOT, "docs", "releases", "beta", "lugas-0.1.0-beta.3.tgz");
+    const tgz = resolve(ROOT, "docs", "releases", "beta", "lugas-0.1.0-beta.4.tgz");
     if (existsSync(tgz)) {
       const { createHash } = require("node:crypto") as typeof import("node:crypto");
       tarballHash = createHash("sha256").update(readFileSync(tgz)).digest("hex");
