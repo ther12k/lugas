@@ -155,6 +155,7 @@ Types describe the wire. A handler returning `json(200, { createdAt: new Date() 
 | Multipart uploads (`form()` body codec, budget-bounded) | Shipped on `main` (M9-005) |
 | Telemetry hooks (`onRequestStart`/`onRequestEnd`, OTel recipe) | Shipped on `main` (M9-006) |
 | Compression + ETag (`compression`, `etag`; native gzip/deflate, 304) | Shipped on `main` (M9-007) |
+| Rate limiting (`rateLimit()` guard, application-owned storage, 429 + Retry-After) | Shipped on `main` (M9-008) |
 
 ## Examples
 
@@ -204,6 +205,7 @@ Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). The Driz
 | [`docs/uploads.md`](docs/uploads.md) | Bounded multipart uploads: `form()` body codec |
 | [`docs/telemetry.md`](docs/telemetry.md) | Dependency-free telemetry hooks and the OpenTelemetry recipe |
 | [`docs/compression.md`](docs/compression.md) | Response compression (gzip/deflate) and ETag/304 conditional requests |
+| [`docs/rate-limit.md`](docs/rate-limit.md) | Rate limiting: fixed-window guard semantics over application-owned storage |
 | [`docs/ai-agents.md`](docs/ai-agents.md) | Agent-readable surfaces (manifest, OpenAPI), LLM streaming recipe, MCP proposal |
 | [`docs/performance-gates.md`](docs/performance-gates.md) | Release performance budgets and evidence policy |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history |

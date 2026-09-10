@@ -192,6 +192,12 @@
     "hint": "pass etag: true or { weak?: boolean }"
   },
   {
+    "code": "LUGAS_RATE_LIMIT_001",
+    "thrownBy": "rateLimit()",
+    "meaning": "invalid rate-limit configuration",
+    "hint": "allowed keys: limit, windowMs, store, key, keyPrefix, message; limit/windowMs are positive integers and store implements get()/increment()"
+  },
+  {
     "code": "LUGAS_HEADERS_001",
     "thrownBy": "defineApp()",
     "meaning": "invalid secureHeaders configuration",

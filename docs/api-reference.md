@@ -17,6 +17,7 @@
 | `form(config)` | body codec function | new (M9-005) |
 | `telemetry` (`onRequestStart`/`onRequestEnd`) | `defineApp()` config | new (M9-006) |
 | `compression` / `etag` | `defineApp()` config | new (M9-007) |
+| `rateLimit(config)` / `createMemoryRateLimitStore()` | guard factory functions | new (M9-008) |
 | `sse(config)` | function | new (M8-002) |
 | `formatSseEvent(input)` | function | new (M8-002) |
 | `json(status, data)` | function | stable |
@@ -48,6 +49,8 @@ Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardCon
 ### Compression and ETag (ADR-0033)
 
 `defineApp({ compression })` negotiates gzip/deflate (native codecs; no brotli — dependency rule) with q-values, structural skips (SSE, pre-encoded, ranged, tiny, non-compressible), and `Vary: Accept-Encoding` on compressible responses. `defineApp({ etag })` computes strong-by-default SHA-1 validators over uncompressed GET/HEAD bodies; matching `If-None-Match` (tokens, lists, `*`) answers `304` before compression runs. Application-set etags win; skipped responses are byte-identical. Details: [`docs/compression.md`](compression.md).
+
+`rateLimit({ limit, windowMs, store, key?, keyPrefix?, message? })` is a first-party guard factory: under the limit it enriches the context with `{ rateLimit: { limit, remaining, resetAt } }`; at limit+1 it short-circuits `429` with `Retry-After`, `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`, and an RFC 9457 body. Storage is application-owned behind a structural two-method interface — no store client is imported or bundled; `createMemoryRateLimitStore()` is a non-durable single-process reference for tests and examples. Details: [`docs/rate-limit.md`](rate-limit.md).
 
 ### Telemetry hooks (ADR-0032)
 

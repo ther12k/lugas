@@ -44,6 +44,7 @@ const PAGES: PageSpec[] = [
   { source: "docs/uploads.md", slug: "uploads", title: "File uploads", description: "Bounded multipart parsing with native File values." },
   { source: "docs/telemetry.md", slug: "telemetry", title: "Telemetry", description: "Dependency-free request events and the OpenTelemetry span recipe." },
   { source: "docs/compression.md", slug: "compression", title: "Compression and ETag", description: "Native gzip/deflate negotiation and 304 conditional requests." },
+  { source: "docs/rate-limit.md", slug: "rate-limit", title: "Rate limiting", description: "Fixed-window guard semantics over application-owned storage." },
   { source: "docs/wire-honest-types.md", slug: "wire-honest-types", title: "Wire-honest types", description: "How Lugas response types model JSON serialization truth." },
   { source: "docs/design-principles.md", slug: "design-principles", title: "Design principles", description: "Explicit HTTP, no code generation, no proxies, zero forced ecosystem." },
   { source: "docs/choosing-lugas.md", slug: "choosing-lugas", title: "Choosing Lugas", description: "Where Lugas fits among raw Bun, Elysia, Hono, Fastify, and tRPC." },
