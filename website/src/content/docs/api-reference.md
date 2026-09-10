@@ -15,6 +15,7 @@ description: "Public API reference."
 | `parseCookies(request)` | function | new (M9-002) |
 | `cookie(name, value, attrs?)` | function | new (M9-002) |
 | `websocket(config)` | function | new (M9-003) |
+| `secureHeaders` / `health` | `defineApp()` config | new (M9-004) |
 | `sse(config)` | function | new (M8-002) |
 | `formatSseEvent(input)` | function | new (M8-002) |
 | `json(status, data)` | function | stable |
@@ -23,7 +24,7 @@ description: "Public API reference."
 | `problem(status, fields)` | function | stable |
 | `redirect(location)` | function | stable |
 
-Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `SseConfig`, `SseWriter`, `SseEventInput`, `CookieAttrs`, `WebSocketConfig`, `WebSocketEventContext`, `WebSocketMessage`, `ServerWebSocketLike`, `LoggingConfig`, `LugasLogEntry`, `LugasLogFields`, `LugasLogLevel`, `LogSink`, `OpenApiConfig`, `OpenApiDocumentInfo`, `OpenApiRouteMetadata`, `OpenApiUiConfig`, `CompiledOpenApi`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
+Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `SseConfig`, `SseWriter`, `SseEventInput`, `CookieAttrs`, `WebSocketConfig`, `WebSocketEventContext`, `WebSocketMessage`, `ServerWebSocketLike`, `SecureHeadersConfig`, `HealthConfig`, `LoggingConfig`, `LugasLogEntry`, `LugasLogFields`, `LugasLogLevel`, `LogSink`, `OpenApiConfig`, `OpenApiDocumentInfo`, `OpenApiRouteMetadata`, `OpenApiUiConfig`, `CompiledOpenApi`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
 
 `defineApp()` also accepts `assets` (opt-in, ADR-0018): `{ files: { "/robots.txt": "./public/robots.txt" }, dirs: { "/assets/*": "./public/assets" } }`. File mappings are literal exact paths; directory mounts are explicit prefixes ending in `/*`. Native directory mounts (`assets.dirs`) are supported on Linux only (relying on kernel `openat2(RESOLVE_IN_ROOT)` for symlink containment); configuring `dirs` on macOS or Windows fails closed before startup (`LUGAS_ASSET_004`). File mappings (`assets.files`) are supported across all platforms. Assets are served natively by Bun through GET/HEAD; other methods reach the app's not-found policy (no 405). Ownership conflicts with API routes are rejected at startup (`LUGAS_ASSET_002`). Asset routes are outside the manifest and the request pipeline (no guards, no `onError`).
 
@@ -42,6 +43,10 @@ Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardCon
 ### WebSockets (ADR-0028)
 
 `websocket({ before?, params?, query?, headers?, message, open?, close?, drain? })` declares a WebSocket route whose upgrade decision runs through the ordinary compiled pipeline: guards short-circuit the handshake with real HTTP responses, schema slots validate before the upgrade, and the ADR-0020 traffic gate holds upgrades during service init. Handlers receive Bun's native `ServerWebSocket` unwrapped plus the descriptor-derived context (`message` required). Non-upgrade requests get `426` Problem Details; `lugasLifecycle.shutdown()` closes open sockets with `1001 Going Away` before the drain; a custom `serve()` websocket option conflicts with declared routes (`LUGAS_WS_002`). Details: [`docs/websockets.md`](/lugas/websockets/).
+
+### Production hardening (ADR-0029)
+
+`defineApp({ secureHeaders })` applies a conservative, fill-if-absent security-header policy to every pipeline response — defaults `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`; `contentSecurityPolicy` (explicit string) and `hstsMaxAge` are strictly opt-in, never defaulted. `defineApp({ health })` mounts `GET /health` (liveness — bypasses the traffic gate, answers 200 from boot onward) and `GET /ready` (readiness — 503 while init is pending or after startup failure, 200 once every service init settles); paths renamable, collisions fail closed (`LUGAS_HEALTH_002`). Details: [`docs/production.md`](/lugas/production/).
 
 ### Server-Sent Events (ADR-0023)
 

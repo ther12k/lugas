@@ -10,6 +10,7 @@ Each example teaches exactly one concept using only public exports. Run any serv
 | [`client`](./client/) | Typed client round-trip (success, guard, empty, not-found, redacted 500) | `bun examples/client/smoke.ts` |
 | [`proof-api`](./proof-api/) | Realistic CRUD API combining validation, guards, and error statuses | `bun run examples/proof-api/app.ts` |
 | [`cookies`](./cookies/) | Cookie primitives: set/read/expire a session cookie through a guard (`parseCookies`/`cookie`) | `bun run examples/cookies/server.ts` |
+| [`production`](./production/) | Secure-header policy and lifecycle-aware `/health` + `/ready` endpoints | `bun run examples/production/server.ts` |
 | [`websockets`](./websockets/) | WebSocket routes: guard-gated upgrade, echo context, close-1001 shutdown | `bun run examples/websockets/server.ts` |
 | [`drizzle`](./drizzle/) | Application-owned Drizzle instance as a service (`lugas/drizzle`) | `bun run examples/drizzle/server.ts` |
 
