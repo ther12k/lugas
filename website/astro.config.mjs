@@ -19,7 +19,7 @@ export default defineConfig({
       },
       sidebar: [
         { label: "Start", items: ["getting-started", "examples"] },
-        { label: "Guides", items: ["routing", "validation", "guards", "responses", "services", "client", "testing"] },
+        { label: "Guides", items: ["routing", "validation", "guards", "responses", "services", "client", "testing", "ai-agents"] },
         { label: "Features", items: ["cors", "sse", "websockets", "cookies", "logging", "openapi", "drizzle", "production", "uploads"] },
         { label: "Concepts", items: ["wire-honest-types", "design-principles", "choosing-lugas"] },
         { label: "Reference", items: ["api-reference", "diagnostics", "manifest-v1", "client-error-semantics", "compatibility"] },
