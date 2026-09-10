@@ -46,6 +46,7 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_DRIZZLE_001 | drizzleService() | value is not a recognizable Drizzle instance | drizzleService({ db }) requires an object with select, insert, update, and delete functions; the adapter never imports drizzle-orm |
 | LUGAS_DRIZZLE_002 | drizzleService() | invalid closeOnDispose option or no closable $client | closeOnDispose must be a boolean and requires db.$client.close to be a function; compose service() directly for clients that dispose differently |
 | LUGAS_COOKIE_001 | cookie() | invalid cookie name or value token | names are RFC 6265 tokens; values exclude whitespace, DQUOTE, comma, semicolon, and backslash — encode other characters |
+| LUGAS_TELEMETRY_001 | defineApp() | invalid telemetry configuration | allowed keys: onRequestStart, onRequestEnd; both are functions |
 | LUGAS_FORM_001 | form() | invalid form limits configuration | allowed keys: maxFields, maxFiles, maxFileSize; limits are positive integers |
 | LUGAS_HEADERS_001 | defineApp() | invalid secureHeaders configuration | pass secureHeaders: true or { contentSecurityPolicy?: string, hstsMaxAge?: number }; CSP is strictly opt-in |
 | LUGAS_HEALTH_001 | defineApp() | invalid health configuration | pass health: true or { livenessPath?: string, readinessPath?: string }; paths are concrete and must differ |

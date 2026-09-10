@@ -44,6 +44,7 @@
     "verify:compatibility-report": "bun run scripts/verify-compatibility-report.ts"
   },
   "devDependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@standard-schema/spec": "^1.1.0",
     "@types/bun": "1.4.0",
     "drizzle-orm": "^0.45.2",

@@ -116,8 +116,7 @@ export function wrapLogHandler(
   if (!logging.access && !logging.requestIds) return handler;
   return (request: Request): Response | Promise<Response> => {
     const started = performance.now();
-    const requestId = logging.requestIds ? crypto.randomUUID() : undefined;
-    const finish = (status: number): void => {
+    const finish = (status: number, requestId: string | undefined): void => {
       if (!logging.access) return;
       emit(logging, "info", "request", {
         method: request.method,
@@ -130,7 +129,11 @@ export function wrapLogHandler(
     };
     return Promise.resolve(handler(request)).then((response) => {
       if (response instanceof Response) {
-        if (requestId !== undefined) {
+        // One identity source (ADR-0032): reuse an id a wrapper closer to
+        // the handler already stamped (telemetry), else mint one here.
+        let requestId = logging.requestIds ? response.headers.get("x-request-id") ?? undefined : undefined;
+        if (logging.requestIds && requestId === undefined) {
+          requestId = crypto.randomUUID();
           try {
             response.headers.set("x-request-id", requestId);
           } catch {
@@ -138,9 +141,9 @@ export function wrapLogHandler(
             // still appears in the access entry.
           }
         }
-        finish(response.status);
+        finish(response.status, requestId);
       } else {
-        finish(500);
+        finish(500, undefined);
       }
       return response;
     });

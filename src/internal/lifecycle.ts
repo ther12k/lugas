@@ -39,7 +39,8 @@ export type LugasLifecycle = {
   /** Idempotent: every call resolves with the SAME outcome object. */
   readonly shutdown: (reason?: string) => Promise<ShutdownOutcome>;
   /** Registers application work the drain must wait for. */
-  readonly track: (task: Promise<unknown>) => void;
+  /** The drain waits for every tracked task (ADR-0020); passing the request (M9-006, ADR-0032) additionally correlates it with that request's telemetry end event. */
+  readonly track: (task: Promise<unknown>, request?: Request) => void;
 };
 
 export type ShutdownOptions = {
