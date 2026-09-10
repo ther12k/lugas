@@ -149,13 +149,13 @@ Types describe the wire. A handler returning `json(200, { createdAt: new Date() 
 | Structured logging (`defineApp({ logging })`, sink contract) | Available in `0.1.0-beta.2` (M8-003) |
 | OpenAPI 3.1 + Scalar reference UI (`defineApp({ openapi })`, zero-dependency) | Available in `0.1.0-beta.2` (M8-004) |
 | Drizzle ORM adapter (`lugas/drizzle`, application-owned instance) | Available in `0.1.0-beta.3` (M9-001) |
-| Cookie primitives (`parseCookies`/`cookie`, RFC 6265, auth-interop recipe) | Shipped on `main` (M9-002) |
-| WebSockets (`websocket()` routes, pre-upgrade guards, shutdown close-1001) | Shipped on `main` (M9-003) |
-| Secure headers + health/readiness (`secureHeaders`, `health`) | Shipped on `main` (M9-004) |
-| Multipart uploads (`form()` body codec, budget-bounded) | Shipped on `main` (M9-005) |
-| Telemetry hooks (`onRequestStart`/`onRequestEnd`, OTel recipe) | Shipped on `main` (M9-006) |
-| Compression + ETag (`compression`, `etag`; native gzip/deflate, 304) | Shipped on `main` (M9-007) |
-| Rate limiting (`rateLimit()` guard, application-owned storage, 429 + Retry-After) | Shipped on `main` (M9-008) |
+| Cookie primitives (`parseCookies`/`cookie`, RFC 6265, auth-interop recipe) | Available in `0.1.0-beta.4` (M9-002) |
+| WebSockets (`websocket()` routes, pre-upgrade guards, shutdown close-1001) | Available in `0.1.0-beta.4` (M9-003) |
+| Secure headers + health/readiness (`secureHeaders`, `health`) | Available in `0.1.0-beta.4` (M9-004) |
+| Multipart uploads (`form()` body codec, budget-bounded) | Available in `0.1.0-beta.4` (M9-005) |
+| Telemetry hooks (`onRequestStart`/`onRequestEnd`, OTel recipe) | Available in `0.1.0-beta.4` (M9-006) |
+| Compression + ETag (`compression`, `etag`; native gzip/deflate, 304) | Available in `0.1.0-beta.4` (M9-007) |
+| Rate limiting (`rateLimit()` guard, application-owned storage, 429 + Retry-After) | Available in `0.1.0-beta.4` (M9-008) |
 
 ## Examples
 
@@ -177,7 +177,7 @@ Known beta limitations: the server core and CLI are Bun-only (the client bundle 
 
 ## Roadmap
 
-Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). The Drizzle adapter ([`docs/drizzle.md`](docs/drizzle.md)) ships in `lugas@0.1.0-beta.3` (published under npm `beta`, source commit `f3c72e6`, M9-001). First-party CORS ([`docs/cors.md`](docs/cors.md)), Server-Sent Events ([`docs/sse.md`](docs/sse.md)), Structured Logging ([`docs/logging.md`](docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](docs/openapi.md)) ship in `0.1.0-beta.2`+; `latest` points at `0.1.0-beta.2`.
+Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). `lugas@0.1.0-beta.4` (cookies, WebSockets, secure headers/health, multipart, telemetry, compression/ETag, rate limiting; source commit `373418f`) and the Drizzle adapter ([`docs/drizzle.md`](docs/drizzle.md), `0.1.0-beta.3`) are published under npm `beta`; First-party CORS ([`docs/cors.md`](docs/cors.md)), Server-Sent Events ([`docs/sse.md`](docs/sse.md)), Structured Logging ([`docs/logging.md`](docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](docs/openapi.md)) ship in `0.1.0-beta.2`+; `latest` points at `0.1.0-beta.2`.
 
 ## Documentation
 

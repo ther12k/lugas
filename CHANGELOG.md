@@ -12,6 +12,25 @@ All notable changes to Lugas are documented here. The project is pre-1.0 and the
 
 - Community files: issue templates, `CODE_OF_CONDUCT.md`, `SUPPORT.md`, this changelog; expanded `CONTRIBUTING.md`; `examples/README.md` index and `examples/client/README.md`; project logo.
 
+## [0.1.0-beta.4] — published 2026-09-11
+
+Attested release candidate completing the ODR-0010 battery sequence, frozen at `373418fffe3ebb42bbe39f56e0c3c95e4f06dd00` (tarball sha256 `6c31b498…`; evidence: [`docs/releases/beta/RELEASE_PACKET.md`](docs/releases/beta/RELEASE_PACKET.md)); published to npm under the `beta` dist-tag on 2026-09-11 and verified byte-identical to the attested tarball.
+
+### Added
+
+- Cookie primitives (`parseCookies()`/`cookie()`) — lenient RFC 6265 reading, fail-closed strict `Set-Cookie` serialization, auth-interop recipe (ADR-0027).
+- WebSockets (`websocket()` routes) — pre-upgrade guards and schema validation through the compiled pipeline, native `ServerWebSocket` unwrapped, shutdown close-1001 (ADR-0028).
+- Production hardening (`secureHeaders`, `health`) — conservative secure-header defaults with strictly opt-in CSP, lifecycle-aware `/health` and `/ready` (ADR-0029).
+- Multipart uploads (`form()` body codec) — bounded stream consumption with field/file/size limits and native `File` values (ADR-0030).
+- Telemetry hooks (`defineApp({ telemetry })`) — dependency-free `onRequestStart`/`onRequestEnd` events with task correlation and the OpenTelemetry recipe (ADR-0032).
+- Compression + ETag (`defineApp({ compression })`, `defineApp({ etag })`) — native gzip/deflate negotiation with structural skips and `Vary: Accept-Encoding`; strong SHA-1 validators with `If-None-Match` → 304 (ADR-0033).
+- Rate limiting (`rateLimit()` guard) — fixed-window semantics over application-owned structural storage, 429 with `Retry-After`/`RateLimit-*` fields and an RFC 9457 body (ADR-0034).
+- Agent-facing docs (`docs/ai-agents.md`) — agent surfaces table, LLM streaming recipe; proposed MCP adapter ADR parked pending owner decision (ADR-0031).
+
+### Changed
+
+- Typecheck performance budget recalibrated 2000→2500 ms (baseline v2) — measured scope growth across M6–M9, not a regression; throughput thresholds and client-bundle cap unchanged.
+
 ## [0.1.0-beta.3] — published 2026-09-10
 
 Attested release candidate, frozen at `f3c72e6031dff07746b746e8b815400f270d39e1` (tarball sha256 `11d7033e…`; evidence: [`docs/releases/beta/RELEASE_PACKET.md`](docs/releases/beta/RELEASE_PACKET.md)); published to npm under the `beta` dist-tag on 2026-09-10.
@@ -49,7 +68,8 @@ Attested release candidate, frozen at `2ed954deb648cdb8e40d7b05e6c0cb0d116f050b`
 - End-to-end typed client (`lugas/client`) — explicit calls over `fetch`, no Proxy, no code generation, browser-safe bundle.
 - Test-server helpers (`lugas/testing`) and a route-inspection CLI emitting `lugas-manifest-v1`.
 
-[Unreleased]: https://github.com/ther12k/lugas/compare/v0.1.0-beta.3...HEAD
+[Unreleased]: https://github.com/ther12k/lugas/compare/v0.1.0-beta.4...HEAD
+[0.1.0-beta.4]: https://www.npmjs.com/package/lugas/v/0.1.0-beta.4
 [0.1.0-beta.3]: https://www.npmjs.com/package/lugas/v/0.1.0-beta.3
 [0.1.0-beta.2]: https://www.npmjs.com/package/lugas/v/0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/ther12k/lugas/releases/tag/v0.1.0-beta.1

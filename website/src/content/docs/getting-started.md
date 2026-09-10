@@ -10,7 +10,7 @@ bun add lugas@beta
 
 Lugas requires [Bun](https://bun.sh) 1.4.x. TypeScript 7.0.2 is the verified toolchain for the full compile-time contract experience.
 
-> `lugas@0.1.0-beta.3` is published under npm `beta`; `latest` points at `0.1.0-beta.2`.
+> `lugas@0.1.0-beta.4` is published under npm `beta`; `latest` points at `0.1.0-beta.2`.
 
 ## Hello world
 
