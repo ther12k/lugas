@@ -1,10 +1,10 @@
-# LugasJS v0.1.0-beta.3 Pre-Publication Checklist
+# LugasJS v0.1.0-beta.4 Pre-Publication Checklist
 
 | Field | Value |
 |---|---|
-| Package Source Commit | `f3c72e6031dff07746b746e8b815400f270d39e1` (tag must point here) |
-| Attestation Commit | `f3c72e6031dff07746b746e8b815400f270d39e1` (checkout that ran the gate + builder) |
-| Target Package | `lugas@0.1.0-beta.3` |
+| Package Source Commit | `373418fffe3ebb42bbe39f56e0c3c95e4f06dd00` (tag must point here) |
+| Attestation Commit | `373418fffe3ebb42bbe39f56e0c3c95e4f06dd00` (checkout that ran the gate + builder) |
+| Target Package | `lugas@0.1.0-beta.4` |
 | Registry Target | `https://registry.npmjs.org/` with tag `beta` |
 
 ---
@@ -19,7 +19,7 @@
 - [x] **Owner Decisions Recorded:** `docs/owner-decisions/naming-assets.md` (ODR-0001), `docs/owner-decisions/license-governance.md` (ODR-0002) — presence checked by the builder.
 - [x] **Legal & Attribution:** `LICENSE` (full Apache-2.0), `NOTICE`, `SECURITY.md`, `GOVERNANCE.md` — presence checked by the builder.
 - [x] **Two-Identity Attestation:** `release-evidence.json` (`lugas-release-evidence-v2`) binds `packageSourceCommit` and `attestationCommit`; the builder re-proved both bindings and the tarball hash at assembly time.
-- [x] **Exact Tarball Preserved:** `lugas-0.1.0-beta.3.tgz` hash triple-checked (gate evidence = rehearsal result = actual bytes) and covered by `SHA256SUMS`.
+- [x] **Exact Tarball Preserved:** `lugas-0.1.0-beta.4.tgz` hash triple-checked (gate evidence = rehearsal result = actual bytes) and covered by `SHA256SUMS`.
 
 ## Owner Checks (not provable offline by the builder — verify before publishing)
 
@@ -43,18 +43,18 @@ if npm view lugas version >/dev/null 2>&1; then  # the name MUST still be unclai
 fi
 
 # 1. Pin the reviewed source BEFORE the irreversible registry action
-git tag -a "v0.1.0-beta.3" "f3c72e6031dff07746b746e8b815400f270d39e1" -m "LugasJS v0.1.0-beta.3 release candidate"
-git push origin "v0.1.0-beta.3"
+git tag -a "v0.1.0-beta.4" "373418fffe3ebb42bbe39f56e0c3c95e4f06dd00" -m "LugasJS v0.1.0-beta.4 release candidate"
+git push origin "v0.1.0-beta.4"
 
 # 2. Publish the exact attested tarball
-npm publish ./docs/releases/beta/lugas-0.1.0-beta.3.tgz --access public --tag beta
+npm publish ./docs/releases/beta/lugas-0.1.0-beta.4.tgz --access public --tag beta
 
 # 3. Post-publication verification
-npm view lugas@0.1.0-beta.3 version dist.integrity dist.tarball
-npm dist-tag ls lugas                        # beta -> 0.1.0-beta.3 (NOT latest)
+npm view lugas@0.1.0-beta.4 version dist.integrity dist.tarball
+npm dist-tag ls lugas                        # beta -> 0.1.0-beta.4 (NOT latest)
 
 # 4. GitHub release with the attested artifacts
-gh release create "v0.1.0-beta.3"   ./docs/releases/beta/lugas-0.1.0-beta.3.tgz   ./docs/releases/beta/SHA256SUMS   ./docs/releases/beta/provenance.json   ./docs/releases/beta/sbom.json   --title "v0.1.0-beta.3"   --notes-file ./docs/releases/beta/RELEASE_PACKET.md   --prerelease
+gh release create "v0.1.0-beta.4"   ./docs/releases/beta/lugas-0.1.0-beta.4.tgz   ./docs/releases/beta/SHA256SUMS   ./docs/releases/beta/provenance.json   ./docs/releases/beta/sbom.json   --title "v0.1.0-beta.4"   --notes-file ./docs/releases/beta/RELEASE_PACKET.md   --prerelease
 ```
 
 *Note: The namespace check in step 0 is not a reservation — re-verify immediately before step 2.*

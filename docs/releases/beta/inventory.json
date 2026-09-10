@@ -1,8 +1,8 @@
 {
   "format": "lugas-package-inventory-v0",
   "packageName": "lugas",
-  "version": "0.1.0-beta.3",
-  "tarballEntries": 80,
+  "version": "0.1.0-beta.4",
+  "tarballEntries": 89,
   "files": [
     "AGENTS.md",
     "LICENSE",
@@ -43,13 +43,17 @@
     "src/client/types.ts",
     "src/core/app.ts",
     "src/core/contract.ts",
+    "src/core/cookies.ts",
+    "src/core/form.ts",
     "src/core/guard.ts",
     "src/core/module.ts",
+    "src/core/rate-limit.ts",
     "src/core/response.ts",
     "src/core/route.ts",
     "src/core/service.ts",
     "src/core/sse.ts",
     "src/core/types.ts",
+    "src/core/websocket.ts",
     "src/drizzle/index.ts",
     "src/index.ts",
     "src/internal/assets.ts",
@@ -59,6 +63,7 @@
     "src/internal/compile-pipeline.ts",
     "src/internal/compile-route.ts",
     "src/internal/compose.ts",
+    "src/internal/compression.ts",
     "src/internal/context.ts",
     "src/internal/cors.ts",
     "src/internal/decode-query.ts",
@@ -69,19 +74,23 @@
     "src/internal/logging.ts",
     "src/internal/manifest.ts",
     "src/internal/openapi.ts",
+    "src/internal/parse-form-body.ts",
     "src/internal/parse-json-body.ts",
     "src/internal/path.ts",
     "src/internal/prepared-app.ts",
+    "src/internal/production.ts",
     "src/internal/route-fact.ts",
     "src/internal/run-guards.ts",
     "src/internal/serve.ts",
     "src/internal/standard-schema.ts",
+    "src/internal/telemetry.ts",
     "src/internal/validate-body.ts",
     "src/internal/validate-headers.ts",
     "src/internal/validate-params.ts",
     "src/internal/validate-query.ts",
     "src/internal/validation-issues.ts",
     "src/internal/validation-problem.ts",
+    "src/internal/websocket-hub.ts",
     "src/testing/index.ts",
     "src/testing/test-server.ts"
   ],
@@ -95,5 +104,5 @@
       "format": "esm"
     }
   ],
-  "generatedAt": "2026-09-10T04:36:56.733Z"
+  "generatedAt": "2026-09-10T19:34:36.129Z"
 }

@@ -1,11 +1,15 @@
 {
   "format": "lugas-sbom-v0",
-  "generatedAt": "2026-09-10T04:36:56.733Z",
+  "generatedAt": "2026-09-10T19:34:36.129Z",
   "packageName": "lugas",
-  "packageVersion": "0.1.0-beta.3",
+  "packageVersion": "0.1.0-beta.4",
   "derivation": "staged package.json dependencies/optionalDependencies/peerDependencies",
   "productionDependencies": [],
   "devDependencies": [
+    {
+      "name": "@opentelemetry/api",
+      "scope": "dev"
+    },
     {
       "name": "@standard-schema/spec",
       "scope": "dev"
@@ -44,6 +48,6 @@
       "builtBy": "scripts/release/build-browser-client.ts (Bun 1.4.0, target=browser, format=esm)"
     }
   ],
-  "tarballEntryCount": 80,
+  "tarballEntryCount": 89,
   "zeroProductionRuntimeDependency": true
 }
