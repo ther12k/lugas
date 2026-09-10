@@ -1,10 +1,10 @@
-# LugasJS v0.1.0-beta.3 Release Packet
+# LugasJS v0.1.0-beta.4 Release Packet
 
-**Candidate Version:** `0.1.0-beta.3`\
-**Package Source Commit:** `f3c72e6031dff07746b746e8b815400f270d39e1`\
-**Attestation Commit:** `f3c72e6031dff07746b746e8b815400f270d39e1` (`f3c72e6`)
+**Candidate Version:** `0.1.0-beta.4`\
+**Package Source Commit:** `373418fffe3ebb42bbe39f56e0c3c95e4f06dd00`\
+**Attestation Commit:** `373418fffe3ebb42bbe39f56e0c3c95e4f06dd00` (`373418f`)
 
-**Generated:** 2026-09-10T04:39:39.325Z\
+**Generated:** 2026-09-10T19:35:17.113Z\
 **Runtime:** Bun 1.4.0 · TypeScript 7.0.2 · Linux x86-64 / macOS arm64 / Windows x64\
 **Package:** `lugas` (unscoped) · License: Apache-2.0 · Repo: `ther12k/lugas`
 
@@ -12,7 +12,7 @@
 
 ## 1. Executive Summary
 
-This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.3** release candidate. All milestones (M0–M8 plus the M9-001 Drizzle battery) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
+This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.4** release candidate. All milestones (M0–M9, the complete ODR-0010 battery sequence) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
 
 Publication remains strictly gated on owner approval in **M8-GATE**.
 
@@ -24,7 +24,7 @@ Publication remains strictly gated on owner approval in **M8-GATE**.
 |---|---|---|
 | Product Name | **LugasJS** (shortened to **Lugas**) | ADR-0001 |
 | Package Name | **`lugas`** (unscoped) | ODR-0001 (`docs/owner-decisions/naming-assets.md`) |
-| Version | **`0.1.0-beta.3`** | SemVer beta candidate |
+| Version | **`0.1.0-beta.4`** | SemVer beta candidate |
 | Repository | **`ther12k/lugas`** | GitHub |
 | License | **Apache-2.0** (full text in `LICENSE`) | ODR-0002, `NOTICE` |
 | Security Policy | GitHub Private Advisories (48h SLA) | `SECURITY.md` |
@@ -67,10 +67,10 @@ Publication remains strictly gated on owner approval in **M8-GATE**.
 
 | Scenario / Metric | Release Floor | Alert Floor | Target | Candidate Measured | Result |
 |---|---|---|---|---|---|
-| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **83,119 rps** (-36.0% vs raw Bun) | ✅ Exceeded |
-| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **57,592 rps** | ✅ Exceeded |
-| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **36,664 rps** | ✅ Exceeded (-10.0% validated overhead vs raw Bun) |
-| Typecheck Duration | — | — | < 2,000ms | **1444ms** | ✅ Measured on candidate |
+| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **69,538 rps** (17.1% vs raw Bun) | ✅ Exceeded |
+| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **61,621 rps** | ✅ Exceeded |
+| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **47,639 rps** | ✅ Exceeded (5.6% validated overhead vs raw Bun) |
+| Typecheck Duration | — | — | < 2,000ms | **1703ms** | ✅ Measured on candidate |
 | Client Bundle Size | — | — | < 25,000 B | **14900 B** | ✅ Measured on candidate |
 
 ---
@@ -97,7 +97,7 @@ Publication remains strictly gated on owner approval in **M8-GATE**.
 ## 7. Supply Chain & Package Verification
 
 - **Production Dependencies:** **0** (zero runtime dependencies).
-- **Tarball Entry Count:** **80** files (strict whitelist; no tests/benchmarks/worktrees).
+- **Tarball Entry Count:** **89** files (strict whitelist; no tests/benchmarks/worktrees).
 - **Publication Dry-Run:** Validated via `npm publish --dry-run --access public --tag beta`.
 - **Artifact Manifest:** Checksums and provenance recorded in `docs/releases/beta/SHA256SUMS`.
 
@@ -116,7 +116,7 @@ Publication remains strictly gated on owner approval in **M8-GATE**.
 To publish this release candidate to npm after M8-GATE approval:
 
 ```bash
-npm publish ./docs/releases/beta/lugas-0.1.0-beta.3.tgz --access public --tag beta
+npm publish ./docs/releases/beta/lugas-0.1.0-beta.4.tgz --access public --tag beta
 ```
 
 *Note: This command must only be executed upon formal owner sign-off.*
