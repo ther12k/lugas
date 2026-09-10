@@ -70,6 +70,13 @@ Stable codes `LUGAS_CLIENT_001`–`LUGAS_CLIENT_010` for client errors,
 `LUGAS_RESPONSE_001`–`LUGAS_RESPONSE_005` for typed response helpers.
 See docs/diagnostics.md.
 
+## AI agent integration
+
+- Machine-readable route surface: `bunx lugas inspect ./app.ts` (lugas-manifest-v1) or `app.manifest`.
+- Tool-schema surface: enable `defineApp({ openapi })` and consume `GET /openapi.json` (OpenAPI 3.1, Standard JSON Schema when the validator exposes it).
+- LLM token streaming: `sse()` routes forward model deltas; recipe in docs/ai-agents.md.
+- Optional MCP adapter: proposed (ADR-0031), not implemented — integrate via openapi.json until accepted.
+
 ## Key files
 
 - docs/getting-started.md — install, first app, validation, guards, client, testing, CLI

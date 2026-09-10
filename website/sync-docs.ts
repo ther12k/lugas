@@ -31,6 +31,7 @@ const PAGES: PageSpec[] = [
   { source: "docs/services.md", slug: "services", title: "Services and lifecycle", description: "Named dependencies, the init traffic gate, and drain-ordered shutdown." },
   { source: "docs/client.md", slug: "client", title: "Typed client", description: "Browser-safe end-to-end typed calls with per-status results." },
   { source: "docs/testing.md", slug: "testing", title: "Testing", description: "Real pipeline tests with createTestServer and the bound typed client." },
+  { source: "docs/ai-agents.md", slug: "ai-agents", title: "Lugas for AI agents", description: "Agent-readable surfaces, LLM streaming recipe, MCP proposal." },
   { source: "docs/examples.md", slug: "examples", title: "Examples", description: "Runnable single-concept example applications." },
   { source: "docs/cors.md", slug: "cors", title: "CORS", description: "Opt-in, fail-closed cross-origin resource sharing." },
   { source: "docs/sse.md", slug: "sse", title: "Server-Sent Events", description: "Streaming responses with the sse() helper and deterministic cleanup." },
