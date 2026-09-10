@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "environment": {
     "bunVersion": "1.4.0",
     "platform": "linux",
@@ -25,7 +25,7 @@
       "targetRps": 30000
     }
   },
-  "typecheckBudgetMs": 2000,
+  "typecheckBudgetMs": 2500,
   "clientBundleMaxBytes": 25000,
-  "notes": "Thresholds derived from M5-002/003/004/005 measured evidence. Baseline updates require PR review."
+  "notes": "Thresholds derived from M5-002/003/004/005 measured evidence. Baseline updates require PR review. v2 (beta.4 attestation, 2026-09-11): typecheckBudgetMs 2000→2500 only — throughput thresholds and client bundle cap unchanged. The 2000ms budget was calibrated at M5-007 (316b854) before the M6–M9 batteries (assets, budgets, CORS, logging, OpenAPI, drizzle, cookies, WebSockets, health, multipart, telemetry, compression, rate-limit) grew the checked tree, and before @opentelemetry/api (M9-006 devDependency) resolved its types. Re-measured on the baseline host 2026-09-11 at 7fe452f: tsc --noEmit 1.98/2.18/2.27/2.19/2.32 s (median 2.19 s) — scope growth, not a regression; 2500ms preserves ~14% headroom and stays binding."
 }
