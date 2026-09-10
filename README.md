@@ -177,6 +177,13 @@ Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). The Driz
 | Document | Contents |
 |---|---|
 | [`docs/getting-started.md`](docs/getting-started.md) | Install, first app, validation, guards, client, testing, CLI |
+| [`docs/routing.md`](docs/routing.md) | Route maps, path syntax, modules, native values, the derived handler context |
+| [`docs/validation.md`](docs/validation.md) | Standard Schema slots, coercion, body parsing, the `422` failure contract |
+| [`docs/guards.md`](docs/guards.md) | Ordered guards, typed context enrichment, short-circuits, composition patterns |
+| [`docs/responses.md`](docs/responses.md) | Typed response helpers, Problem Details, `notFound`/`onError`, redaction |
+| [`docs/services.md`](docs/services.md) | Named dependencies, `service()` lifecycle, the init traffic gate, drain shutdown |
+| [`docs/client.md`](docs/client.md) | The end-to-end typed client: calls, per-status results, error classes |
+| [`docs/testing.md`](docs/testing.md) | `createTestServer`, the bound typed client, lifecycle and error-contract tests |
 | [`docs/wire-honest-types.md`](docs/wire-honest-types.md) | How response types model JSON serialization truth |
 | [`docs/design-principles.md`](docs/design-principles.md) | Explicit HTTP, no codegen, no proxies, zero forced ecosystem |
 | [`docs/choosing-lugas.md`](docs/choosing-lugas.md) | Fit and comparison with raw Bun, Elysia, Hono, Fastify, tRPC |

@@ -24,6 +24,13 @@ interface PageSpec {
 
 const PAGES: PageSpec[] = [
   { source: "docs/getting-started.md", slug: "getting-started", title: "Getting started", description: "Install Lugas and build your first typed Bun API." },
+  { source: "docs/routing.md", slug: "routing", title: "Routing and handlers", description: "Route maps, path syntax, modules, and the derived handler context." },
+  { source: "docs/validation.md", slug: "validation", title: "Validation", description: "Standard Schema slots, coercion, and the 422 failure contract." },
+  { source: "docs/guards.md", slug: "guards", title: "Guards", description: "Ordered guards with typed context enrichment and short-circuits." },
+  { source: "docs/responses.md", slug: "responses", title: "Responses and errors", description: "Typed response helpers, wire-honest bodies, RFC 9457 errors, notFound/onError." },
+  { source: "docs/services.md", slug: "services", title: "Services and lifecycle", description: "Named dependencies, the init traffic gate, and drain-ordered shutdown." },
+  { source: "docs/client.md", slug: "client", title: "Typed client", description: "Browser-safe end-to-end typed calls with per-status results." },
+  { source: "docs/testing.md", slug: "testing", title: "Testing", description: "Real pipeline tests with createTestServer and the bound typed client." },
   { source: "docs/examples.md", slug: "examples", title: "Examples", description: "Runnable single-concept example applications." },
   { source: "docs/cors.md", slug: "cors", title: "CORS", description: "Opt-in, fail-closed cross-origin resource sharing." },
   { source: "docs/sse.md", slug: "sse", title: "Server-Sent Events", description: "Streaming responses with the sse() helper and deterministic cleanup." },
