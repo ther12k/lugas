@@ -16,6 +16,7 @@ description: "Public API reference."
 | `cookie(name, value, attrs?)` | function | new (M9-002) |
 | `websocket(config)` | function | new (M9-003) |
 | `secureHeaders` / `health` | `defineApp()` config | new (M9-004) |
+| `form(config)` | body codec function | new (M9-005) |
 | `sse(config)` | function | new (M8-002) |
 | `formatSseEvent(input)` | function | new (M8-002) |
 | `json(status, data)` | function | stable |
@@ -24,7 +25,7 @@ description: "Public API reference."
 | `problem(status, fields)` | function | stable |
 | `redirect(location)` | function | stable |
 
-Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `SseConfig`, `SseWriter`, `SseEventInput`, `CookieAttrs`, `WebSocketConfig`, `WebSocketEventContext`, `WebSocketMessage`, `ServerWebSocketLike`, `SecureHeadersConfig`, `HealthConfig`, `LoggingConfig`, `LugasLogEntry`, `LugasLogFields`, `LugasLogLevel`, `LogSink`, `OpenApiConfig`, `OpenApiDocumentInfo`, `OpenApiRouteMetadata`, `OpenApiUiConfig`, `CompiledOpenApi`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
+Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `SseConfig`, `SseWriter`, `SseEventInput`, `CookieAttrs`, `WebSocketConfig`, `WebSocketEventContext`, `WebSocketMessage`, `ServerWebSocketLike`, `SecureHeadersConfig`, `HealthConfig`, `FormConfig`, `FormDescriptor`, `MultipartBody`, `LoggingConfig`, `LugasLogEntry`, `LugasLogFields`, `LugasLogLevel`, `LogSink`, `OpenApiConfig`, `OpenApiDocumentInfo`, `OpenApiRouteMetadata`, `OpenApiUiConfig`, `CompiledOpenApi`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
 
 `defineApp()` also accepts `assets` (opt-in, ADR-0018): `{ files: { "/robots.txt": "./public/robots.txt" }, dirs: { "/assets/*": "./public/assets" } }`. File mappings are literal exact paths; directory mounts are explicit prefixes ending in `/*`. Native directory mounts (`assets.dirs`) are supported on Linux only (relying on kernel `openat2(RESOLVE_IN_ROOT)` for symlink containment); configuring `dirs` on macOS or Windows fails closed before startup (`LUGAS_ASSET_004`). File mappings (`assets.files`) are supported across all platforms. Assets are served natively by Bun through GET/HEAD; other methods reach the app's not-found policy (no 405). Ownership conflicts with API routes are rejected at startup (`LUGAS_ASSET_002`). Asset routes are outside the manifest and the request pipeline (no guards, no `onError`).
 
@@ -43,6 +44,10 @@ Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardCon
 ### WebSockets (ADR-0028)
 
 `websocket({ before?, params?, query?, headers?, message, open?, close?, drain? })` declares a WebSocket route whose upgrade decision runs through the ordinary compiled pipeline: guards short-circuit the handshake with real HTTP responses, schema slots validate before the upgrade, and the ADR-0020 traffic gate holds upgrades during service init. Handlers receive Bun's native `ServerWebSocket` unwrapped plus the descriptor-derived context (`message` required). Non-upgrade requests get `426` Problem Details; `lugasLifecycle.shutdown()` closes open sockets with `1001 Going Away` before the drain; a custom `serve()` websocket option conflicts with declared routes (`LUGAS_WS_002`). Details: [`docs/websockets.md`](/lugas/websockets/).
+
+### Multipart forms (ADR-0030)
+
+`body: form(config?)` is a bounded multipart body codec for the existing body slot: the raw body is read stream-wise up to the effective body budget (Content-Length refused pre-read; overrun aborted at the cap — `413 BODY_BUDGET_EXCEEDED`), then parsed by the platform `FormData` implementation over the buffered bytes. `ctx.body = { fields, files }` with native `File` values, repeated names last-wins. Limits `maxFields`/`maxFiles`/`maxFileSize` reject with `413 FORM_LIMIT_EXCEEDED`; unparseable bodies with `400 MALFORMED_MULTIPART`; wrong media type with `415`. Invalid limits fail closed (`LUGAS_FORM_001`). Details: [`docs/uploads.md`](/lugas/uploads/).
 
 ### Production hardening (ADR-0029)
 

@@ -12,6 +12,8 @@ import type { StandardSchema } from "./standard-schema";
 import { executeStandardSchema } from "./standard-schema";
 import type { NormalizedValidationIssue } from "./validation-issues";
 import { normalizeValidationIssues } from "./validation-issues";
+import { isFormDescriptor } from "../core/form";
+import { parseFormBody } from "./parse-form-body";
 
 export type ValidateBodySuccess<T> = {
   readonly ok: true;
@@ -64,6 +66,12 @@ export async function validateBody<
       ok: true,
       data: undefined,
     } as any;
+  }
+
+  // M9-005 (ADR-0030): a form() descriptor is a multipart body codec, not a
+  // Standard Schema — bounded read + platform parse instead of JSON + validation.
+  if (isFormDescriptor(schema)) {
+    return (await parseFormBody(request, schema, budget)) as any;
   }
 
   const parsed = await parseJsonBody(request, budget);
