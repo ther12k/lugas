@@ -17,6 +17,8 @@ export const VALIDATION_PROBLEM_URI = "https://lugasjs.dev/problems/validation";
 export const UNSUPPORTED_MEDIA_TYPE_URI = "https://lugasjs.dev/problems/unsupported-media-type";
 export const MALFORMED_JSON_URI = "https://lugasjs.dev/problems/malformed-json";
 export const BODY_BUDGET_URI = "https://lugasjs.dev/problems/body-budget";
+export const MALFORMED_MULTIPART_URI = "https://lugasjs.dev/problems/malformed-multipart";
+export const FORM_LIMIT_URI = "https://lugasjs.dev/problems/form-limit";
 
 export type ValidationProblemFields = {
   type: string;
@@ -76,6 +78,32 @@ export function createMalformedJsonProblem(
  * status 413 — deliberately distinct from the bare transport-level `413`
  * that Bun emits for the server ceiling (M7-002 pin).
  */
+export function createMalformedMultipartProblem(
+  detail: string = "Request body could not be parsed as multipart/form-data",
+): Response {
+  return problem(400, {
+    type: MALFORMED_MULTIPART_URI,
+    title: "Malformed Multipart Body",
+    status: 400,
+    code: "MALFORMED_MULTIPART",
+    source: "body",
+    detail,
+  });
+}
+
+export function createFormLimitProblem(
+  detail: string,
+): Response {
+  return problem(413, {
+    type: FORM_LIMIT_URI,
+    title: "Payload Too Large",
+    status: 413,
+    code: "FORM_LIMIT_EXCEEDED",
+    source: "body",
+    detail,
+  });
+}
+
 export function createBodyBudgetProblem(
   detail: string = "Request body exceeds the configured body budget",
 ): Response {

@@ -168,6 +168,12 @@
     "hint": "websocket routes are served by Lugas; remove the serve() websocket option"
   },
   {
+    "code": "LUGAS_FORM_001",
+    "thrownBy": "form()",
+    "meaning": "invalid form limits configuration",
+    "hint": "allowed keys: maxFields, maxFiles, maxFileSize; limits are positive integers"
+  },
+  {
     "code": "LUGAS_HEADERS_001",
     "thrownBy": "defineApp()",
     "meaning": "invalid secureHeaders configuration",
