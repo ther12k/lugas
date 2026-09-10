@@ -37,6 +37,7 @@ const PAGES: PageSpec[] = [
   { source: "docs/logging.md", slug: "logging", title: "Structured logging", description: "A small sink contract with opt-in access logs and request IDs." },
   { source: "docs/openapi.md", slug: "openapi", title: "OpenAPI and Scalar", description: "Generated OpenAPI 3.1 documents with an opt-in Scalar reference UI." },
   { source: "docs/drizzle.md", slug: "drizzle", title: "Drizzle integration", description: "An application-owned Drizzle instance as a Lugas service." },
+  { source: "docs/cookies.md", slug: "cookies", title: "Cookies and auth interop", description: "RFC 6265 primitives and the Better Auth guard recipe." },
   { source: "docs/wire-honest-types.md", slug: "wire-honest-types", title: "Wire-honest types", description: "How Lugas response types model JSON serialization truth." },
   { source: "docs/design-principles.md", slug: "design-principles", title: "Design principles", description: "Explicit HTTP, no code generation, no proxies, zero forced ecosystem." },
   { source: "docs/choosing-lugas.md", slug: "choosing-lugas", title: "Choosing Lugas", description: "Where Lugas fits among raw Bun, Elysia, Hono, Fastify, and tRPC." },
