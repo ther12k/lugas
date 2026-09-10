@@ -148,7 +148,7 @@ Types describe the wire. A handler returning `json(200, { createdAt: new Date() 
 | Server-Sent Events (`sse()` helper, deterministic cleanup) | Available in `0.1.0-beta.2` (M8-002) |
 | Structured logging (`defineApp({ logging })`, sink contract) | Available in `0.1.0-beta.2` (M8-003) |
 | OpenAPI 3.1 + Scalar reference UI (`defineApp({ openapi })`, zero-dependency) | Available in `0.1.0-beta.2` (M8-004) |
-| Drizzle ORM adapter (`lugas/drizzle`, application-owned instance) | Available on `main` (M9-001) |
+| Drizzle ORM adapter (`lugas/drizzle`, application-owned instance) | Attested in the `0.1.0-beta.3` candidate (M9-001); ships on publication |
 
 ## Examples
 
@@ -170,7 +170,7 @@ Known beta limitations: the server core and CLI are Bun-only (the client bundle 
 
 ## Roadmap
 
-Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). The Drizzle adapter ([`docs/drizzle.md`](docs/drizzle.md)) is available on `main` (M9-001) and ships in the next release candidate. First-party CORS ([`docs/cors.md`](docs/cors.md)), Server-Sent Events ([`docs/sse.md`](docs/sse.md)), Structured Logging ([`docs/logging.md`](docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](docs/openapi.md)) are published in `0.1.0-beta.2` (source commit `7f08b16`, M8-GATE). The `v0.1.0-beta.2` candidate is published under npm `beta`; stable publication remains an explicit owner action.
+Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). The Drizzle adapter ([`docs/drizzle.md`](docs/drizzle.md)) is complete on `main` (M9-001) and attested in the `0.1.0-beta.3` candidate (source commit `f3c72e6`, tarball `11d7033e…`) pending owner publication. First-party CORS ([`docs/cors.md`](docs/cors.md)), Server-Sent Events ([`docs/sse.md`](docs/sse.md)), Structured Logging ([`docs/logging.md`](docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](docs/openapi.md)) are published in `0.1.0-beta.2`; stable publication remains an explicit owner action.
 
 ## Documentation
 

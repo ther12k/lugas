@@ -1,8 +1,8 @@
 {
   "format": "lugas-sbom-v0",
-  "generatedAt": "2026-09-09T08:44:35.044Z",
+  "generatedAt": "2026-09-10T04:36:56.733Z",
   "packageName": "lugas",
-  "packageVersion": "0.1.0-beta.2",
+  "packageVersion": "0.1.0-beta.3",
   "derivation": "staged package.json dependencies/optionalDependencies/peerDependencies",
   "productionDependencies": [],
   "devDependencies": [
@@ -12,6 +12,10 @@
     },
     {
       "name": "@types/bun",
+      "scope": "dev"
+    },
+    {
+      "name": "drizzle-orm",
       "scope": "dev"
     },
     {
@@ -40,6 +44,6 @@
       "builtBy": "scripts/release/build-browser-client.ts (Bun 1.4.0, target=browser, format=esm)"
     }
   ],
-  "tarballEntryCount": 79,
+  "tarballEntryCount": 80,
   "zeroProductionRuntimeDependency": true
 }

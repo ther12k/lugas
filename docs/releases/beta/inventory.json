@@ -1,8 +1,8 @@
 {
   "format": "lugas-package-inventory-v0",
   "packageName": "lugas",
-  "version": "0.1.0-beta.2",
-  "tarballEntries": 79,
+  "version": "0.1.0-beta.3",
+  "tarballEntries": 80,
   "files": [
     "AGENTS.md",
     "LICENSE",
@@ -50,6 +50,7 @@
     "src/core/service.ts",
     "src/core/sse.ts",
     "src/core/types.ts",
+    "src/drizzle/index.ts",
     "src/index.ts",
     "src/internal/assets.ts",
     "src/internal/body-budget.ts",
@@ -94,5 +95,5 @@
       "format": "esm"
     }
   ],
-  "generatedAt": "2026-09-09T08:44:35.044Z"
+  "generatedAt": "2026-09-10T04:36:56.733Z"
 }
