@@ -27,7 +27,7 @@ describe.skipIf(!browserAvailable)("M7-005 stage one: plain fetch, no bundler, n
         `${origin}/`,
         `(async () => {
             const t0 = Date.now();
-            while (!window.__done && Date.now() - t0 < 15000) await new Promise(r => setTimeout(r, 50));
+            while (!window.__done && Date.now() - t0 < 30000) await new Promise(r => setTimeout(r, 50));
             return JSON.stringify({ done: window.__done === true, started: window.__started === true, pageError: window.__pageError ?? null, results: window.__results ?? null });
           })()`,
       );

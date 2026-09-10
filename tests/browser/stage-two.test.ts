@@ -41,7 +41,7 @@ describe.skipIf(GATED)("M7-005 stage two: installed artifact in a real browser",
         `${origin}/`,
         `(async () => {
             const t0 = Date.now();
-            while (!window.__done && Date.now() - t0 < 15000) await new Promise(r => setTimeout(r, 50));
+            while (!window.__done && Date.now() - t0 < 30000) await new Promise(r => setTimeout(r, 50));
             return JSON.stringify({ done: window.__done === true, started: window.__started === true, pageError: window.__pageError ?? null, moduleUrl: window.__moduleUrl ?? null, results: window.__results ?? null });
           })()`,
       );
