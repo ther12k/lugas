@@ -17,6 +17,7 @@ import { compileLogging, type CompiledLogging, type LoggingConfig } from "../int
 import { compileOpenApiConfig, type CompiledOpenApi, type OpenApiConfig } from "../internal/openapi";
 import { compileHealthConfig, compileSecureHeaders, type HealthConfig, type SecureHeadersConfig } from "../internal/production";
 import { compileTelemetry, type TelemetryConfig } from "../internal/telemetry";
+import { compileCompression, compileEtag, type CompressionConfig, type EtagConfig } from "../internal/compression";
 import type { LugasApp, MergeModulesRoutes, ModuleDescriptor } from "./types";
 import { serveApp } from "../internal/serve";
 import { assertValidRoutePath } from "../internal/path";
@@ -88,11 +89,24 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
    * work. Span export is application-owned (docs/telemetry.md recipe).
    */
   telemetry?: TelemetryConfig;
+  /**
+   * Response compression (M9-007, ADR-0033): opt-in gzip/deflate negotiation
+   * (native codecs only) with structural skips (SSE, pre-encoded, ranged,
+   * tiny, non-compressible) and `Vary: Accept-Encoding` on compressible
+   * responses. Skipped responses pass through byte-identical.
+   */
+  compression?: CompressionConfig;
+  /**
+   * Content validators and the 304 short-circuit (M9-007, ADR-0033):
+   * strong-by-default SHA-1 etags over uncompressed GET/HEAD bodies;
+   * matching `If-None-Match` answers 304. Application-set etags win.
+   */
+  etag?: EtagConfig;
   notFound?: (request: Request) => Response | Promise<Response>;
   onError?: (error: unknown, request: Request) => Response | Promise<Response>;
 };
 
-const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "logging", "openapi", "secureHeaders", "health", "telemetry", "notFound", "onError"]);
+const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "logging", "openapi", "secureHeaders", "health", "telemetry", "compression", "etag", "notFound", "onError"]);
 
 export type AppInternals<TServices = unknown> = {
   readonly composition: Composition;
@@ -160,6 +174,8 @@ export function defineApp<
   const secureHeaders = config.secureHeaders !== undefined ? compileSecureHeaders(config.secureHeaders) : undefined;
   const health = config.health !== undefined ? compileHealthConfig(config.health) : undefined;
   const telemetry = config.telemetry !== undefined ? compileTelemetry(config.telemetry) : undefined;
+  const compression = config.compression !== undefined ? compileCompression(config.compression) : undefined;
+  const etag = config.etag !== undefined ? compileEtag(config.etag) : undefined;
   if (config.modules !== undefined) {
     if (!Array.isArray(config.modules)) throw diagnostic("LUGAS_APP_003", "defineApp(): 'modules' must be an array", { hint: "wrap modules: modules: [defineModule(...)]" });
     const names = new Set<string>();
@@ -204,6 +220,8 @@ export function defineApp<
     secureHeaders,
     health,
     telemetry,
+    compression,
+    etag,
     notFound: config.notFound,
     onError: config.onError,
   });

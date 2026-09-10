@@ -11,6 +11,7 @@ Each example teaches exactly one concept using only public exports. Run any serv
 | [`proof-api`](./proof-api/) | Realistic CRUD API combining validation, guards, and error statuses | `bun run examples/proof-api/app.ts` |
 | [`cookies`](./cookies/) | Cookie primitives: set/read/expire a session cookie through a guard (`parseCookies`/`cookie`) | `bun run examples/cookies/server.ts` |
 | [`uploads`](./uploads/) | Bounded multipart uploads: `form()` limits and 413 paths | `bun run examples/uploads/server.ts` |
+| [`compression`](./compression/) | gzip negotiation (3.5KB → ~100B) and If-None-Match 304 | `bun run examples/compression/server.ts` |
 | [`telemetry`](./telemetry/) | Request events via telemetry callbacks; errorClass on a redacted 500 | `bun run examples/telemetry/server.ts` |
 | [`production`](./production/) | Secure-header policy and lifecycle-aware `/health` + `/ready` endpoints | `bun run examples/production/server.ts` |
 | [`websockets`](./websockets/) | WebSocket routes: guard-gated upgrade, echo context, close-1001 shutdown | `bun run examples/websockets/server.ts` |

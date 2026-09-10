@@ -21,6 +21,7 @@ export type { LugasLifecycle, ShutdownOutcome, ShutdownOptions } from "./interna
 export type { CorsConfig, CorsOriginDecision, CorsOriginInput } from "./internal/cors";
 export type { SecureHeadersConfig, HealthConfig } from "./internal/production";
 export type { TelemetryConfig, TelemetryRequestStart, TelemetryRequestEnd, TelemetryErrorClass } from "./internal/telemetry";
+export type { CompressionConfig, CompressionEncoding, EtagConfig } from "./internal/compression";
 export type {
   CompiledLogging,
   LogSink,
