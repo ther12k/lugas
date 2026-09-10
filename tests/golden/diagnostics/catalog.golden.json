@@ -180,6 +180,18 @@
     "hint": "allowed keys: onRequestStart, onRequestEnd; both are functions"
   },
   {
+    "code": "LUGAS_COMPRESSION_001",
+    "thrownBy": "defineApp()",
+    "meaning": "invalid compression configuration",
+    "hint": "pass compression: true or { encodings?: [\"gzip\",\"deflate\"], minSize?, types? }"
+  },
+  {
+    "code": "LUGAS_ETAG_001",
+    "thrownBy": "defineApp()",
+    "meaning": "invalid etag configuration",
+    "hint": "pass etag: true or { weak?: boolean }"
+  },
+  {
     "code": "LUGAS_HEADERS_001",
     "thrownBy": "defineApp()",
     "meaning": "invalid secureHeaders configuration",
