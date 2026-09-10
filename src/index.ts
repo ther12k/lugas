@@ -11,6 +11,8 @@ export { service } from "./core/service";
 export type { ServiceConfig, ServiceDescriptor } from "./core/service";
 export { sse, formatSseEvent } from "./core/sse";
 export type { SseConfig, SseEventInput, SseWriter } from "./core/sse";
+export { cookie, parseCookies } from "./core/cookies";
+export type { CookieAttrs } from "./core/cookies";
 export type { LugasLifecycle, ShutdownOutcome, ShutdownOptions } from "./internal/lifecycle";
 export type { CorsConfig, CorsOriginDecision, CorsOriginInput } from "./internal/cors";
 export type {
