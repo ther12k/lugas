@@ -333,6 +333,13 @@ const app = defineApp({
 
 ## Next steps
 
+- [`routing.md`](./routing.md) — route maps, modules, and the derived handler context.
+- [`validation.md`](./validation.md) — schema slots, coercion, and the `422` contract.
+- [`guards.md`](./guards.md) — ordered guards and typed context enrichment.
+- [`responses.md`](./responses.md) — typed responses and the error policy.
+- [`services.md`](./services.md) — dependency wiring, init gate, graceful shutdown.
+- [`client.md`](./client.md) — the typed client in depth.
+- [`testing.md`](./testing.md) — real-pipeline tests with the bound typed client.
 - [`examples/`](../examples/README.md) — runnable single-concept applications.
 - [`wire-honest-types.md`](./wire-honest-types.md) — what the client type really says about your JSON.
 - [`choosing-lugas.md`](./choosing-lugas.md) — where Lugas fits.

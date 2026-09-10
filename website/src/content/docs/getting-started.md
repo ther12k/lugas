@@ -326,6 +326,13 @@ const app = defineApp({
 
 ## Next steps
 
+- [`routing.md`](/lugas/routing/) — route maps, modules, and the derived handler context.
+- [`validation.md`](/lugas/validation/) — schema slots, coercion, and the `422` contract.
+- [`guards.md`](/lugas/guards/) — ordered guards and typed context enrichment.
+- [`responses.md`](/lugas/responses/) — typed responses and the error policy.
+- [`services.md`](/lugas/services/) — dependency wiring, init gate, graceful shutdown.
+- [`client.md`](/lugas/client/) — the typed client in depth.
+- [`testing.md`](/lugas/testing/) — real-pipeline tests with the bound typed client.
 - [`examples/`](https://github.com/ther12k/lugas/blob/main/examples/README.md) — runnable single-concept applications.
 - [`wire-honest-types.md`](/lugas/wire-honest-types/) — what the client type really says about your JSON.
 - [`choosing-lugas.md`](/lugas/choosing-lugas/) — where Lugas fits.
