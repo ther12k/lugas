@@ -16,6 +16,7 @@ export type RouteEntry =
   | { kind: "native-dir"; path: string }
   | { kind: "native-handler"; handler: (request: Request) => Response | Promise<Response> }
   | { kind: "native-method-map"; map: Record<string, unknown> }
+  | { kind: "lugas-websocket"; descriptor: Record<string, unknown> }
   | { kind: "unsupported"; entry: unknown };
 
 const HTTP_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
@@ -36,6 +37,12 @@ export function classifyRoute(entry: unknown): RouteEntry {
     Array.isArray(record.before)
   ) {
     return { kind: "lugas-descriptor", descriptor: entry as unknown as RouteDescriptor<never> };
+  }
+  // websocket() descriptors (M9-003, ADR-0028): the required `message`
+  // function identifies them; checked before the method-map fallback so
+  // `GET: websocket(...)` and path-level declarations classify uniformly.
+  if (typeof record.message === "function" && !("handler" in record) && !("dir" in record)) {
+    return { kind: "lugas-websocket", descriptor: record };
   }
   if (typeof record.dir === "string" && Object.keys(record).length === 1) {
     return { kind: "native-dir", path: record.dir };

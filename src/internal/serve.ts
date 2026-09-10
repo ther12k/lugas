@@ -98,16 +98,35 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
   const loggedFetch = prepared.logging !== undefined ? wrapLogFallback(prepared.logging, baseFetch) : baseFetch;
   const fetchHandler = prepared.cors !== undefined ? corsWrapFallback(prepared.cors, loggedFetch) : loggedFetch;
 
+  // M9-003 (ADR-0028): one Bun websocket handler multiplexes every websocket
+  // route through the upgrade data key. An application-supplied `websocket`
+  // option would shadow the compiled routes, so the conflict fails closed.
+  const wsHub = prepared.websocketHub;
+  if (wsHub !== null && options.websocket !== undefined) {
+    throw diagnostic("LUGAS_WS_002", "serve(): custom 'websocket' option conflicts with declared websocket() routes", {
+      hint: "websocket routes are served by Lugas; handle sockets in the route's message/open/close/drain handlers",
+      context: { routes: wsHub.routes.size },
+    });
+  }
+
   const server = Bun.serve({
     ...options,
     routes: prepared.bunRoutes,
     fetch: fetchHandler,
+    ...(wsHub !== null ? { websocket: wsHub.bunHandler() } : {}),
   } as Bun.Serve.Options<any>) as Bun.Server<unknown>;
+  if (wsHub !== null) wsHub.serverRef.current = server;
   serverRef.current = server;
 
   const lifecycleHandle: LugasLifecycle = {
     ready: lifecycle.ready,
-    shutdown: (reason?: string) => lifecycle.shutdown(reason),
+    shutdown: (reason?: string) => {
+      // ADR-0028 shutdown semantics: open sockets never "finish", so the
+      // drain contract for WebSockets is close-with-reason (1001 Going Away)
+      // before the deadline window; route close handlers run via Bun.
+      if (wsHub !== null) wsHub.closeAll(1001, "server shutting down");
+      return lifecycle.shutdown(reason);
+    },
     track: (task: Promise<unknown>) => lifecycle.track(task),
   };
   const lugasServer = server as LugasServer;
