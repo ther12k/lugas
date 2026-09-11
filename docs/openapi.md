@@ -31,9 +31,8 @@ const app = defineApp({
       description: "E-commerce product catalog and orders",
     },
     path: "/openapi.json",    // default: "/openapi.json"
-    ui: {
-      path: "/docs",          // default: "/docs" (or `ui: true`)
-    },
+    ui: true,                 // opt-in Scalar shell, served at /docs
+                              // (custom path: ui: { path: "/docs" })
   },
   routes: {
     "/products/:id": {

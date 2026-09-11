@@ -9,6 +9,7 @@ Each example teaches exactly one concept using only public exports. Run any serv
 | [`auth`](./auth/) | Ordered guards: 401/403 short-circuits, context enrichment chaining | `bun run examples/auth/server.ts` |
 | [`client`](./client/) | Typed client round-trip (success, guard, empty, not-found, redacted 500) | `bun examples/client/smoke.ts` |
 | [`proof-api`](./proof-api/) | Realistic CRUD API combining validation, guards, and error statuses | `bun run examples/proof-api/app.ts` |
+| [`realworld`](./realworld/) | **Every shipped capability composed**: Drizzle, validation, cookie sessions, SSE, WebSocket presence, uploads, logging, health, OpenAPI+Scalar, typed client | `bun run examples/realworld/server.ts` |
 | [`cookies`](./cookies/) | Cookie primitives: set/read/expire a session cookie through a guard (`parseCookies`/`cookie`) | `bun run examples/cookies/server.ts` |
 | [`uploads`](./uploads/) | Bounded multipart uploads: `form()` limits and 413 paths | `bun run examples/uploads/server.ts` |
 | [`compression`](./compression/) | gzip negotiation (3.5KB → ~100B) and If-None-Match 304 | `bun run examples/compression/server.ts` |
@@ -20,4 +21,4 @@ Each example teaches exactly one concept using only public exports. Run any serv
 
 The client example runs as a self-contained smoke check that prints `EXAMPLE-SMOKE-OK` on success and is covered by `bun test tests/integration/server-client/`.
 
-`proof-api` is additionally exercised end-to-end by `bun test tests/integration/proof-api.test.ts`.
+`proof-api` and `realworld` are exercised end-to-end by `bun test tests/integration/proof-api.test.ts` and `bun test tests/integration/realworld.test.ts`; `realworld` also ships a typed-client smoke (`bun run examples/realworld/client.ts` → `REALWORLD-CLIENT-OK`).
