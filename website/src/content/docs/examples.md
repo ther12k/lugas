@@ -56,3 +56,19 @@ abort testing.
 bun run examples/proof-api/app.ts
 bun test tests/integration/proof-api.test.ts
 ```
+
+## Realworld — every shipped capability composed
+
+`examples/realworld/` is the opposite of the single-concept examples: one
+application combining Drizzle (Bun SQLite), validation on all four slots,
+cookie sessions behind guards, SSE notifications, WebSocket presence,
+bounded multipart uploads, structured logging, health/readiness, secure
+headers, OpenAPI + Scalar, and the typed client — using only public exports
+as documented. The friction found building it is recorded in
+[`docs/reports/dogfood-realworld-findings.md`](https://github.com/ther12k/lugas/blob/main/docs/reports/dogfood-realworld-findings.md).
+
+```bash
+bun run examples/realworld/server.ts
+bun run examples/realworld/client.ts   # REALWORLD-CLIENT-OK
+bun test tests/integration/realworld.test.ts
+```

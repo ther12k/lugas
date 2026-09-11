@@ -9,6 +9,7 @@ description: "Where Lugas fits among raw Bun, Elysia, Hono, Fastify, and tRPC."
 - Deterministic runtime manifests for inspection
 - A small explicit API surface
 - Zero production runtime dependencies
+- First-party WebSocket, SSE, and generated OpenAPI without plugins
 
 ## Choose raw Bun if you want
 
@@ -18,10 +19,8 @@ description: "Where Lugas fits among raw Bun, Elysia, Hono, Fastify, and tRPC."
 
 ## Choose Elysia if you want
 
-- WebSocket support
-- Rich plugin ecosystem
-- OpenAPI generation from schemas
-- Lifecycle hooks at the framework level
+- A large, mature plugin ecosystem
+- Runtime portability beyond Bun (Lugas is Bun-only through 1.x)
 
 ## Performance
 
