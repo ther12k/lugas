@@ -177,7 +177,7 @@ Known beta limitations: the server core and CLI are Bun-only (the client bundle 
 
 ## Roadmap
 
-Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). `lugas@0.1.0-beta.4` (cookies, WebSockets, secure headers/health, multipart, telemetry, compression/ETag, rate limiting; source commit `373418f`) and the Drizzle adapter ([`docs/drizzle.md`](docs/drizzle.md), `0.1.0-beta.3`) are published under npm `beta`; First-party CORS ([`docs/cors.md`](docs/cors.md)), Server-Sent Events ([`docs/sse.md`](docs/sse.md)), Structured Logging ([`docs/logging.md`](docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](docs/openapi.md)) ship in `0.1.0-beta.2`+; `latest` points at `0.1.0-beta.2`.
+Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). `lugas@0.1.0-beta.4` (cookies, WebSockets, secure headers/health, multipart, telemetry, compression/ETag, rate limiting; source commit `373418f`) and the Drizzle adapter ([`docs/drizzle.md`](docs/drizzle.md), `0.1.0-beta.3`) are published under npm `beta`; First-party CORS ([`docs/cors.md`](docs/cors.md)), Server-Sent Events ([`docs/sse.md`](docs/sse.md)), Structured Logging ([`docs/logging.md`](docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](docs/openapi.md)) ship in `0.1.0-beta.2`+; `latest` and `beta` both point at `0.1.0-beta.4`.
 
 ## Documentation
 
