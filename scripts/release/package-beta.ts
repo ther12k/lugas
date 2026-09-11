@@ -113,6 +113,29 @@ async function main(): Promise<void> {
   (pkg as StagedPkg & { bin?: Record<string, string> }).bin = { lugas: "./src/cli/main.ts" };
   writeFileSync(pkgJsonPath, JSON.stringify(pkg, null, 2) + "\n");
 
+  // Stage 1a: framework-version stamping. The repo keeps package.json at
+  // 0.0.0 by convention (the real version exists only in the staged copy),
+  // and src/internal/framework-version.ts is a generated constant synced
+  // from package.json by scripts/sync-version.ts — which the repo never
+  // needs to run. Without this rewrite every published tarball ships
+  // FRAMEWORK_VERSION "0.0.0" and consumers' manifests/CLI misreport the
+  // framework version (consumer-smoke finding CF-1, 2026-09-12).
+  const stagedVersionPath = join(stagePkg, "src", "internal", "framework-version.ts");
+  const stagedVersionContents =
+    `/** Generated build constant — synced from package.json by scripts/sync-version.ts. Do not edit by hand. */\n` +
+    `export const FRAMEWORK_VERSION = ${JSON.stringify(BETA_VERSION)};\n`;
+  writeFileSync(stagedVersionPath, stagedVersionContents);
+  const stagedConstant = /export const FRAMEWORK_VERSION = "([^"]+)"/.exec(
+    readFileSync(stagedVersionPath, "utf8"),
+  )?.[1];
+  check(
+    "staged framework-version stamped to BETA_VERSION",
+    stagedConstant === BETA_VERSION,
+    stagedConstant === BETA_VERSION
+      ? `FRAMEWORK_VERSION = ${stagedConstant} (was 0.0.0 in the committed tree)`
+      : `expected ${BETA_VERSION}, staged constant is ${stagedConstant ?? "missing"}`,
+  );
+
   // ------------------------------------------------------------------
   // Stage 1b: browser-executable client artifact (M7-005 / ADR-0021).
   // Built from the same committed sources into the staged copy so the
@@ -152,18 +175,21 @@ async function main(): Promise<void> {
     return dir;
   }
 
-  // Consumer A: server app.
+  // Consumer A: server app. Also proves the staged framework-version stamp
+  // survived into the packed tarball (CF-1): the installed package's
+  // manifest must report the BETA_VERSION, never the committed 0.0.0.
   const serverConsumer = makeConsumer("consumer-server");
   writeFileSync(
     join(serverConsumer, "app.ts"),
     `import { defineApp, route, json } from "lugas";
-const app = defineApp({ routes: { "/ping": { GET: route({ handler: () => json(200, { pong: true }) }) } } });
-console.log("SERVER-CONSUMER-OK format=" + app.manifest.format);`,
+const app = defineApp({ routes: { "/ping": { GET: route({ handler: () => json(200, { pong: true }) } ) } } });
+console.log("SERVER-CONSUMER-OK format=" + app.manifest.format + " fw=" + app.manifest.frameworkVersion);`,
   );
   const serverRun = run("bun run app.ts", serverConsumer);
   check(
     "server consumer runs from tarball",
-    serverRun.code === 0 && serverRun.stdout.includes(`SERVER-CONSUMER-OK format=lugas-manifest-v1`),
+    serverRun.code === 0 &&
+      serverRun.stdout.includes(`SERVER-CONSUMER-OK format=lugas-manifest-v1 fw=${BETA_VERSION}`),
     serverRun.code === 0 ? serverRun.stdout.trim() : serverRun.stderr.slice(0, 200),
   );
 
