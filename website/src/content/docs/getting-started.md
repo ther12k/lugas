@@ -12,6 +12,33 @@ Lugas requires [Bun](https://bun.sh) 1.4.x. TypeScript 7.0.2 is the verified too
 
 > `lugas@0.1.0-beta.4` is published under npm `beta` and `latest`.
 
+## Type checking
+
+Bun runs the `.ts` sources directly — a typechecker is optional but recommended, since the whole point of Lugas is the compile-time contract. Two settings are load-bearing:
+
+```bash
+bun add -d typescript @types/bun
+```
+
+```jsonc
+// tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["@types/bun"],   // Bun globals, bun:sqlite, process — not node's
+    "lib": ["esnext"],         // NO "dom": @types/bun provides the web types;
+                               // lib.dom's HeadersInit/BodyInit conflict with them
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  }
+}
+```
+
+Then `bunx tsc --noEmit`. Omitting either setting fails *inside the installed Lugas sources* (e.g. `Bun.HeadersInit` vs the DOM `HeadersInit`, `Uint8Array` vs `BodyInit`) — that is a lib conflict, not a bug in your app. Verified with `@types/bun` 1.4.x.
+
 ## Hello world
 
 Create an application:

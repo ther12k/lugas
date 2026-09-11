@@ -6,7 +6,7 @@ description: "Named dependencies, the init traffic gate, and drain-ordered shutd
 
 ## Plain services
 
-Any value in the map is available as-is. The full services shape is inferred by `defineApp` and flows into every handler context:
+Any value in the map is available as-is. Handler access to `ctx.services` is typed explicitly: pass a services type parameter to `route()` (`route<{ db: typeof db }>({ … })`) when the route declares nothing else, or use a narrow local cast when the route also declares schemas — schema slots occupy `route()`'s other type parameters (tracked as dogfood finding RF-1, `docs/reports/dogfood-realworld-findings.md`):
 
 ```ts
 import { defineApp, route, json } from "lugas";
@@ -14,13 +14,16 @@ import { defineApp, route, json } from "lugas";
 const db = createDb();                 // your construction, your version
 const mailer = createMailer(process.env.SMTP_URL);
 
+type Services = { db: typeof db; mailer: ReturnType<typeof createMailer> };
+
 export default defineApp({
   services: { db, mailer },
   routes: {
     "/users/:id": {
       GET: route({
         handler: async (ctx) => {
-          const user = await ctx.services.db.users.find(ctx.params.id);
+          const { db } = ctx.services as Services;
+          const user = await db.users.find(ctx.params.id);
           return user ? json(200, user) : json(404, { error: "not found" });
         },
       }),
