@@ -118,6 +118,10 @@ Two `rateLimit()` guards on the same route collide on the `rateLimit` enrichment
 
 This battery ships fixed-window semantics: a window starting at the first hit, hard reset at `resetAt`. Clients can observe a 2× burst across a window boundary (limit at the end of one window + limit at the start of the next). The store contract is deliberately algorithm-agnostic; sliding windows or token buckets would be a store-side or future-ADR concern, not an interface change smuggled in.
 
+## Typed client and OpenAPI
+
+The 429 short-circuit is built with the typed response helpers, so the [typed client](/lugas/client/) discriminates it precisely: a rate-limited call yields `{ ok: false, status: 429, error }` in the outcome union — no `{ status: number }` widening. For generated documents, declare the response in the route's `openapi` metadata (see [`docs/openapi.md`](/lugas/openapi/)) so consumers see the 429 contract; how the client classifies the body is specified in [`docs/client-error-semantics.md`](/lugas/client-error-semantics/).
+
 ## Diagnostics
 
 | Code | Meaning |
