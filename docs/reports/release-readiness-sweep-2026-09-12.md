@@ -32,33 +32,42 @@ engineering and documentation.
 - `bun run typecheck` clean; `bun run verify:docs` pass; full `bun run verify` green in the worktree.
 - The staged-metadata and stamping changes are exercised by `bun run release:package:rehearse` at the next packet build (it self-checks `engines.bun` and `frameworkVersion` from the installed tarball; previous run's evidence in `docs/reports/consumer-smoke-2026-09-12.md`).
 
-## beta.5 owner checklist (in execution order)
+## beta.5 owner checklist (full release chain, revised 2026-09-12)
 
-Ordering note (candidate-prep review, 2026-09-12): the rehearsal refuses a
-dirty working tree and stages from `git archive HEAD` — so **input changes
-are committed before the rehearsal runs**, and the rehearsal's provenance
-keeps the identity of that true source commit. The later commit that stores
-the attested packet is a separate commit; never substitute its hash into
-provenance to make the two look identical.
+Two structural corrections from the candidate-prep review: the candidate
+version is now **single-sourced** in
+`scripts/release/candidate-version.ts` (imported by the packager, the
+packet builder, and the release-mode performance gate — three independent
+literals previously could, and did, diverge), and **quiet-host benchmark
+evidence is required before packet attestation**, because the packet
+builder consumes `release-evidence.json` (written only by release-mode
+verify, which hashes the final tarball) and refuses to assemble without
+it. A dev-mode verify with perf SKIP is not release verification.
 
-1. **Finalize package inputs.** The tarball README is final before packing:
-   it is evergreen as of this sweep (no "beta.N is current" claims; the
-   capability table carries durable first-shipped milestones only). After
-   attestation, tarball contents must not change — any edit means a new
-   candidate rebuilt and re-verified, and npm forbids re-publishing an
-   already-used name+version pair. The `docs/` tree (not shipped) keeps
-   accurate for beta.4 until beta.5 is actually published.
-2. **Bump `BETA_VERSION`** to `0.1.0-beta.5` in
-   `scripts/release/package-beta.ts` and **commit** — working tree clean.
-3. **Run `bun run release:package:rehearse`** from that source commit. It
-   stamps `frameworkVersion` and the consumer metadata (version, engines,
-   repository, bugs, homepage, keywords) with fail-closed checks at staging
-   and again from the installed tarball's `package.json`.
-4. **Review** the rehearsal output: checksums, provenance (bound to the
-   source commit), machine-readable rehearsal result.
-5. **Commit the attested packet** (`docs/releases/beta/` artifacts) per the
-   repo's attestation flow.
-6. **Publish — owner action, owner-authenticated** (no credentials in chat):
+1. **Candidate inputs committed.** Version is already single-sourced at
+   `0.1.0-beta.5`; the tarball README is evergreen (no publication-state
+   claims); working tree clean before anything runs.
+2. **Quiet-host benchmark, bound to the candidate source commit** (the
+   measurement-conditions record, PR #395, governs: idle host, no
+   concurrent load). The soak window must be over. Loaded-machine numbers
+   are never recorded as PASS and never rebaselined.
+3. **`bun run release:package:rehearse`** — final tarball (stamps
+   `frameworkVersion`, version, engines, and consumer metadata; verifies
+   staging AND the installed tarball). Partial evidence on its own.
+4. **`LUGAS_PERF_RELEASE=1 bun run verify`** — release-mode verification
+   against the rehearsed tarball; writes `release-evidence.json`
+   (including the tarball sha256). This step actually running is the
+   acceptance criterion — a perf SKIP on a clean checkout is not it.
+5. **`bun run scripts/release/build-beta-packet.ts --package-source-sha <sha>`**
+   — assembles the packet (requires the benchmark archives, zero
+   failures/alerts, and the release evidence; re-executes verification).
+   The generated CHECKLIST.md preflight now handles successor releases:
+   it asserts the candidate *version* is unpublished and treats
+   indeterminate registry answers (network/auth) as aborts.
+6. **Commit the attested packet**; provenance keeps the true source-commit
+   identity (the packet-storage commit's hash is never substituted).
+7. **Publish — owner action, owner-authenticated** (no credentials in
+   chat), only after the packet is valid:
 
    ```bash
    npm publish ./docs/releases/beta/lugas-0.1.0-beta.5.tgz \
@@ -68,27 +77,31 @@ provenance to make the two look identical.
 
    Explicit tarball path and explicit `--tag beta` (npm's default tag is
    `latest`). `latest` does not move without a separate owner decision.
-7. **Post-publish acceptance battery** — install the exact version in a
+8. **Post-publish acceptance battery** — install the exact version in a
    clean directory (`bun add lugas@0.1.0-beta.5`), then verify:
    - sha256 of the registry tarball == sha256 of the attested candidate;
    - `package.version === "0.1.0-beta.5"`;
    - `manifest.frameworkVersion === "0.1.0-beta.5"` (the CF-1 assertion);
    - `bunx --bun lugas routes` banner reports beta.5;
-   - metadata + all five exports resolve as expected;
+   - metadata (exact values, keywords included) + all five exports;
    - full consumer battery PASS (protocol:
      `docs/reports/consumer-smoke-2026-09-12.md`).
-   Dist-tags are verified separately from the battery: `beta` →
-   `0.1.0-beta.5`, `latest` unchanged unless the owner moves it — this
-   distinguishes "beta.5 works" from "the beta channel points at the right
-   version".
-8. Record the results in `docs/releases/beta/` evidence and update
-   `docs/roadmap.md` release status and the `docs/` version claims (which
-   correctly still say beta.4 until this point).
+   Dist-tags verified separately: `beta` → `0.1.0-beta.5`, `latest`
+   unchanged unless the owner moves it.
+9. Record results in `docs/releases/beta/` evidence, `docs/roadmap.md`
+   release status, and the `docs/` version claims (accurately beta.4 until
+   this point).
+
+**Candidate acceptance invariants:** packager version == packet-builder
+version == hashed-tarball version; actual tarball sha256 == the hash in
+`package-rehearsal.json` == the hash in `release-evidence.json`;
+release-mode verification actually executed (never a perf SKIP standing in
+for it).
 
 ## Performance evidence status
 
 Pending — deliberately not run under load (owner soak active, load average
 ~27 at sweep time). Per the measurement-conditions record (PR #395): a
 loaded-machine result is not quiet-host evidence and must not be recorded
-as PASS; the 0.1.0 gate requires a quiet-host run, and no threshold
-re-baselining from loaded numbers.
+as PASS; the beta.5 packet attestation itself now requires it (step 2 of
+the chain above), and no threshold re-baselining from loaded numbers.

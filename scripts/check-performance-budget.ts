@@ -20,6 +20,7 @@
  * - PASS is printed only when every scenario was actually compared (release
  *   mode) or compared with zero failures otherwise.
  */
+import { CANDIDATE_VERSION } from "./release/candidate-version";
 import { execSync } from "node:child_process";
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -385,7 +386,7 @@ function main() {
   // success — the packet builder fails closed without it.
   if (RELEASE_MODE) {
     let tarballHash: string | null = null;
-    const tgz = resolve(ROOT, "docs", "releases", "beta", "lugas-0.1.0-beta.4.tgz");
+    const tgz = resolve(ROOT, "docs", "releases", "beta", `lugas-${CANDIDATE_VERSION}.tgz`);
     if (existsSync(tgz)) {
       const { createHash } = require("node:crypto") as typeof import("node:crypto");
       tarballHash = createHash("sha256").update(readFileSync(tgz)).digest("hex");
