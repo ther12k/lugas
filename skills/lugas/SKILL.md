@@ -69,6 +69,9 @@ See `docs/diagnostics.md` for the complete catalog.
 
 - `docs/examples.md` — links to runnable examples
 - `docs/client-error-semantics.md` — error/redaction policy
+- `docs/cookies.md`, `docs/websockets.md`, `docs/production.md`, `docs/uploads.md`
+- `docs/telemetry.md`, `docs/compression.md`, `docs/rate-limit.md`
+- `docs/cors.md`, `docs/sse.md`, `docs/logging.md`, `docs/openapi.md`, `docs/drizzle.md`
 - `examples/basic/` — minimal app
 - `examples/validation/` — schema usage
 - `examples/auth/` — guards with enrichment

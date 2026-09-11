@@ -10,8 +10,12 @@
 import { defineApp } from "../../src/core/app";
 import { rateLimit } from "../../src/core/rate-limit";
 import { route } from "../../src/core/route";
+import { json } from "../../src/core/response";
+import type { ProblemFields } from "../../src/core/response";
 import type { RouteContext } from "../../src/internal/context";
 import { createMemoryRateLimitStore } from "../../src/core/rate-limit";
+import type { AppContract } from "../../src/core/contract";
+import type { ClientOutcomesFor } from "../../src/client/types";
 
 type Expect<T extends true> = T;
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
@@ -60,4 +64,22 @@ rateLimit({
   key: (ctx) => `${ctx.request.headers.get("x-api-key") ?? "anon"}`,
 });
 
-export { app, limiter, type AppRoutes };
+// 5. The 429 short-circuit is a TYPED response (M10-001): the client outcome
+//    union carries { status: 429 } precisely — not { status: number } as the
+//    pre-M10-001 bare-Response construction degraded it to.
+const app429 = defineApp({
+  routes: {
+    "/limited": {
+      GET: route({ before: [limiter], handler: () => json(200, { ok: true }) }),
+    },
+  },
+});
+type OutcomeLimited = ClientOutcomesFor<AppContract<typeof app429>, "/limited", "GET">;
+type _t5 = Expect<
+  Equal<
+    Exclude<OutcomeLimited, { status: 200 }>,
+    { readonly status: 429; readonly body: string } | { readonly status: 429; readonly body: ProblemFields }
+  >
+>;
+
+export { app, limiter, app429, type AppRoutes };

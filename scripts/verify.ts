@@ -53,6 +53,20 @@ async function main(): Promise<number> {
   results.push(diff);
   console.log(`== diff ==\n${diff.status}: ${diff.output || "(no output)"}`);
 
+  // Agent-facing docs freshness (M10-001): llms.txt and llms-full.txt/SKILL.md
+  // are generated artifacts whose generators self-check. A stale agent surface
+  // fails the gate — the beta.4 release shipped a stale llms.txt unnoticed
+  // because these checks were wired nowhere.
+  const agentDocChecks = [
+    ["agent-docs-llms", ["bun", "run", `${import.meta.dir}/generate-llms.ts`, "--check"]],
+    ["agent-docs-full", ["bun", "run", `${import.meta.dir}/generate-agent-docs.ts`, "--check"]],
+  ] as const;
+  for (const [name, command] of agentDocChecks) {
+    const result = await run(name, command);
+    results.push(result);
+    console.log(`== ${name} ==\n${result.status}: ${result.output || "(no output)"}`);
+  }
+
   // Performance gate (M6R1-001): runs when benchmark results archive is present.
   // SKIP on a clean checkout (no benchmarks run yet); FAIL when archive present but gate fails.
   const perfGatePath = `${import.meta.dir}/check-performance-budget.ts`;

@@ -45,6 +45,17 @@ keyed by 500.
 The declared content type is authoritative for the parse choice; a server
 sending JSON under `text/plain` yields a string.
 
+### Guard-originated 429 (rate limiting)
+
+The first-party `rateLimit()` guard short-circuits with a **typed** `429`
+(M10-001), so the client's outcome union carries it precisely:
+`{ ok: false, status: 429, error }` where `error` is the RFC 9457 problem
+body (`type`, `title`, `status`, `detail`) or the configured `message`
+string. The response also carries `Retry-After`, `RateLimit-Limit`,
+`RateLimit-Remaining`, and `RateLimit-Reset` headers — read them via
+`result.response.headers` when implementing back-off. See
+[`docs/rate-limit.md`](rate-limit.md).
+
 ## Decode-failure policy (frozen)
 
 When a recognized JSON body cannot be parsed, the call throws:

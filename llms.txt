@@ -9,24 +9,18 @@ ordered guards, wire-honest JSON response types, and a typed client.
 - No Eden or Elysia dependency.
 - Runtime facts and compile-time contract are separate systems.
 - Public API is small, explicit, object-based, and statically searchable.
+- Zero production dependencies.
 
 ## Canonical server API
 
 ```ts
 import { defineApp } from "lugas";
-import { guard } from "lugas";
+import { route, json } from "lugas";
 
 const app = defineApp({
   routes: {
     "/users/:id": {
-      GET: route({
-        params: z.object({ id: z.string() }),
-        query: z.object({ verbose: z.boolean().optional() }),
-        handler: ({ params, query }) => json(200, { id: params.id }),
-      }),
-    },
-    "/admin": {
-      GET: route({ before: [authGuard], handler: () => json(200, { ok: true }) }),
+      GET: route({ params: z.object({ id: z.string() }), handler: ({ params }) => json(200, { id: params.id }) }),
     },
   },
 });
@@ -36,16 +30,9 @@ const app = defineApp({
 
 ```ts
 import { createClient } from "lugas/client";
-import type { AppContract } from "lugas";
 
-type API = AppContract<typeof app>;
-const client = createClient<API>({ baseUrl: "http://localhost:3000" });
-
-// Typed call with path restrictions and schema-derived input slots
-const result = await client.get("/users/:id", {
-  params: { id: "42" },
-  query: { verbose: true },
-});
+const client = createClient<AppContract<typeof app>>({ baseUrl: "http://localhost:3000" });
+const result = await client.get("/users/:id", { params: { id: "42" } });
 // result.ok === true → result.data is { id: string } (schema output)
 ```
 
@@ -54,36 +41,78 @@ const result = await client.get("/users/:id", {
 ```ts
 const authGuard = guard({
   name: "auth",
-  handler: ({ request }) => {
-    if (!request.headers.get("authorization")) {
-      return json(401, { error: "unauthorized" });
-    }
-    return {}; // pass-through enrichment
-  },
+  handler: ({ request }) => (request.headers.get("authorization") ? {} : json(401, { error: "unauthorized" })),
 });
 ```
+
+## Feature surface (shipped)
+
+Standard Schema validation (Zod/Valibot); ordered guards with typed
+enrichment; cookies (parseCookies/cookie); WebSockets (websocket()); secure
+headers + health/ready; multipart uploads (form()); telemetry hooks;
+compression/ETag (gzip/deflate, 304); rate limiting (rateLimit(), 429 +
+Retry-After, application-owned store); CORS; SSE; structured logging;
+OpenAPI 3.1 + Scalar; Drizzle adapter. Typed client outcome unions include
+guard short-circuits (401/403, 429).
+
+## Agent surfaces
+
+- Machine-readable route surface: `bunx lugas inspect ./app.ts` (lugas-manifest-v1) or `app.manifest`.
+- Tool-schema surface: enable `defineApp({ openapi })` and consume `GET /openapi.json` (OpenAPI 3.1, Standard JSON Schema when the validator exposes it).
+- LLM token streaming: `sse()` routes forward model deltas; recipe in docs/ai-agents.md.
+- Optional MCP adapter: proposed (ADR-0031), parked for 0.1.0 — integrate via openapi.json until accepted.
 
 ## Diagnostic codes
 
 Stable codes `LUGAS_CLIENT_001`–`LUGAS_CLIENT_010` for client errors,
 `LUGAS_APP_001`–`LUGAS_ROUTES_004` for startup/config errors,
-`LUGAS_RESPONSE_001`–`LUGAS_RESPONSE_005` for typed response helpers.
+`LUGAS_RESPONSE_001`–`LUGAS_RESPONSE_005` for typed response helpers, plus
+per-feature codes (`LUGAS_CORS_001`–`004`, `LUGAS_COOKIE_001`–`002`,
+`LUGAS_WS_001`–`002`, `LUGAS_FORM_001`, `LUGAS_TELEMETRY_001`,
+`LUGAS_COMPRESSION_001`, `LUGAS_ETAG_001`, `LUGAS_RATE_LIMIT_001`, ...).
 See docs/diagnostics.md.
 
-## AI agent integration
+## Documentation
 
-- Machine-readable route surface: `bunx lugas inspect ./app.ts` (lugas-manifest-v1) or `app.manifest`.
-- Tool-schema surface: enable `defineApp({ openapi })` and consume `GET /openapi.json` (OpenAPI 3.1, Standard JSON Schema when the validator exposes it).
-- LLM token streaming: `sse()` routes forward model deltas; recipe in docs/ai-agents.md.
-- Optional MCP adapter: proposed (ADR-0031), not implemented — integrate via openapi.json until accepted.
-
-## Key files
-
-- docs/getting-started.md — install, first app, validation, guards, client, testing, CLI
-- docs/wire-honest-types.md — how response types model JSON serialization truth
-- docs/roadmap.md — shipped beta surface and planned first-party batteries
-- docs/choosing-lugas.md — positioning and framework comparisons
-- docs/manifest-v1.md — frozen manifest schema
-- docs/client-error-semantics.md — error/redaction policy
-- docs/diagnostics.md — full diagnostic catalog
+- docs/agent-workflow.md — repository agent operating standard
+- docs/ai-agents.md — agent surfaces, LLM recipes
+- docs/api-reference.md — public API reference
+- docs/beta-compatibility-policy.md — pre-1.0 compatibility promises
+- docs/body-limits.md — body budget and server ceiling semantics
+- docs/choosing-lugas.md — framework comparison
+- docs/cli-security.md — CLI security posture
+- docs/client-error-semantics.md — client error/redaction policy
+- docs/client.md — typed client, per-status results
+- docs/compatibility.md — supported platforms
+- docs/compression.md — gzip/deflate, ETag/304
+- docs/cookies.md — cookie primitives, auth interop
+- docs/cors.md — fail-closed CORS policy
+- docs/design-principles.md — design constraints
+- docs/diagnostics.md — the LUGAS_* diagnostic code catalog
+- docs/drizzle.md — Drizzle service adapter
+- docs/evidence-guide.md — release evidence
+- docs/examples.md — runnable examples
+- docs/getting-started.md — install, first app, core walkthrough
+- docs/guards.md — ordered guards, enrichment, short-circuit
+- docs/logging.md — logging sink, request IDs
+- docs/manifest-v1.md — frozen static route manifest schema
+- docs/migrate-from-elysia.md — from Elysia
+- docs/migrate-from-raw-bun.md — from raw Bun
+- docs/openapi.md — OpenAPI 3.1 + Scalar
+- docs/performance-gates.md — perf budgets
+- docs/production.md
+- docs/rate-limit.md — rateLimit() guard, app-owned store
+- docs/repository-layout.md — repository layout map
+- docs/responses.md — response helpers, RFC 9457 errors
+- docs/roadmap.md — shipped surface, stop-rule
+- docs/routing.md — paths, methods, modules
+- docs/services.md — services, init gate, shutdown
+- docs/sse.md — sse() streaming helper
+- docs/telemetry.md — telemetry hooks, OTel recipe
+- docs/testing.md — createTestServer, bound client
+- docs/toolchain.md — verified toolchain versions
+- docs/uploads.md — form() multipart uploads
+- docs/validation.md — Standard Schema validation slots
+- docs/websockets.md — websocket() routes, close-1001
+- docs/wire-honest-types.md — Jsonify wire truth
 - examples/README.md — runnable example index

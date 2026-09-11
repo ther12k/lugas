@@ -14,6 +14,7 @@ export type { SseConfig, SseEventInput, SseWriter } from "./core/sse";
 export { cookie, parseCookies } from "./core/cookies";
 export { rateLimit, createMemoryRateLimitStore, RATE_LIMIT_PROBLEM_TYPE } from "./core/rate-limit";
 export type {
+  RateLimitBlockedResponse,
   RateLimitConfig,
   RateLimitInfo,
   RateLimitKeyContext,

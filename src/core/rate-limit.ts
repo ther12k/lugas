@@ -16,7 +16,20 @@
  */
 import { diagnostic, type DiagnosticContextValue } from "../internal/diagnostics";
 import { guard } from "./guard";
+import { problem, text } from "./response";
+import type { ProblemFields, TypedResponse } from "./response";
 import type { GuardDescriptor } from "./types";
+
+/**
+ * Typed responses `rateLimit()` short-circuits with (M10-001): the default
+ * RFC 9457 problem body, or the `message` override as plain text. Declared
+ * as TypedResponse members so the typed client's outcome union discriminates
+ * the 429 precisely (`{ status: 429, body: … }`) instead of widening to
+ * `{ status: number, body: unknown }`.
+ */
+export type RateLimitBlockedResponse =
+  | TypedResponse<429, ProblemFields>
+  | TypedResponse<429, string>;
 
 /** A single window's accounting as observed through the store. */
 export type RateLimitSnapshot = {
@@ -92,7 +105,7 @@ function isPositiveInteger(value: unknown): value is number {
  */
 export function rateLimit<TServices = unknown>(
   config: RateLimitConfig<TServices>,
-): GuardDescriptor<TServices, Promise<{ rateLimit: RateLimitInfo } | Response>> {
+): GuardDescriptor<TServices, Promise<{ rateLimit: RateLimitInfo } | RateLimitBlockedResponse>> {
   if (typeof config !== "object" || config === null || Array.isArray(config)) {
     failInvalid("config must be an object", "pass rateLimit({ limit, windowMs, store })");
   }
@@ -127,7 +140,7 @@ export function rateLimit<TServices = unknown>(
   const { limit, windowMs, key, keyPrefix = "", message } = config;
   const storeRef = store as RateLimitStore;
 
-  return guard<TServices, Promise<{ rateLimit: RateLimitInfo } | Response>>({
+  return guard<TServices, Promise<{ rateLimit: RateLimitInfo } | RateLimitBlockedResponse>>({
     name: "rateLimit",
     handler: async (context) => {
       const bucketKey = `${keyPrefix}${key !== undefined ? key(context) : ""}`;
@@ -151,18 +164,19 @@ export function rateLimit<TServices = unknown>(
         "ratelimit-reset": String(retryAfterSeconds),
       });
       if (message !== undefined) {
-        headers.set("content-type", "text/plain; charset=utf-8");
-        return new Response(message, { status: 429, headers });
+        // text() sets text/plain; charset=utf-8 itself; typed 429 keeps the
+        // client outcome union precise ({ status: 429, body: string }).
+        return text(429, message, { headers });
       }
-      headers.set("content-type", "application/problem+json");
-      return new Response(
-        JSON.stringify({
+      return problem(
+        429,
+        {
           type: RATE_LIMIT_PROBLEM_TYPE,
           title: "Too Many Requests",
           status: 429,
           detail: `Rate limit of ${limit} requests per window exceeded.`,
-        }),
-        { status: 429, headers },
+        },
+        { headers },
       );
     },
   });

@@ -5,7 +5,10 @@ Version: 0.0.0
 ## Purpose
 
 Lugas is a Bun-native HTTP framework with derived types, Standard Schema
-validation, ordered guards, and a typed client.
+validation, ordered guards, and a typed client. Shipped feature surface also
+includes cookies, WebSockets, secure headers/health, multipart uploads,
+telemetry hooks, compression/ETag, rate limiting, CORS, SSE, structured
+logging, OpenAPI 3.1 generation, and a Drizzle adapter.
 
 ## Non-negotiable constraints
 
@@ -76,6 +79,30 @@ const enrich = guard({
 
 Guards run in declaration order. Later guards cannot silently shadow earlier
 keys with different types (compile-time never).
+
+## Feature surface (one-paragraph index; each has a docs page)
+
+- Cookies: `parseCookies(request)` reads the Cookie header; `cookie(name, value, attrs)`
+  serializes Set-Cookie entries (fail-closed, LUGAS_COOKIE_001/002). docs/cookies.md.
+- WebSockets: `websocket({ before?, params?, query?, headers?, message, open?, close?, drain? })`
+  route kind; guards short-circuit the upgrade; shutdown closes with 1001. docs/websockets.md.
+- Production: `defineApp({ secureHeaders })` (nosniff, X-Frame-Options DENY, CSP opt-in)
+  and `defineApp({ health })` (/health liveness, /ready readiness over the init gate). docs/production.md.
+- Uploads: `form({ maxFields?, maxFiles?, maxFileSize? })` body descriptor; native FormData
+  values; over-budget → 413, malformed → 400. docs/uploads.md.
+- Telemetry: `defineApp({ telemetry: { onRequestStart, onRequestEnd } })` scalar-only events;
+  OpenTelemetry recipe in docs/telemetry.md.
+- Compression/ETag: `defineApp({ compression })` gzip/deflate negotiation;
+  `defineApp({ etag })` SHA-1 validators with If-None-Match → 304. docs/compression.md.
+- Rate limiting: `rateLimit({ limit, windowMs, store, key?, keyPrefix?, message? })` guard;
+  under limit enriches `ctx.rateLimit`; over limit short-circuits 429 with Retry-After and
+  RateLimit-* headers; storage is application-owned (`get`/`increment`), reference store
+  `createMemoryRateLimitStore()`. docs/rate-limit.md.
+- CORS: `defineApp({ cors })` fail-closed origin policy. docs/cors.md.
+- SSE: `sse({ start(writer) {...} })` route helper with deterministic cleanup. docs/sse.md.
+- Logging: `defineApp({ logging })` sink contract, x-request-id, access log. docs/logging.md.
+- OpenAPI: `defineApp({ openapi })` generated OpenAPI 3.1 at /openapi.json + opt-in Scalar UI. docs/openapi.md.
+- Drizzle: `drizzleService({ db })` from lugas/drizzle. docs/drizzle.md.
 
 ## Responses
 
@@ -149,6 +176,19 @@ git worktree remove .worktrees/<ISSUE-ID>
 | LUGAS_ROUTE_001–005 | route() | descriptor validation |
 | LUGAS_GUARD_001–004 | guard() | guard validation |
 | LUGAS_ROUTES_001–004 | compose/serve | duplicate/unsupported/invalid paths |
+| LUGAS_CORS_001–004 | defineApp | cors config/pipeline-bypass conflicts |
+| LUGAS_SSE_001–002 | sse() | config / event input validation |
+| LUGAS_LOG_001 | defineApp | logging config validation |
+| LUGAS_OPENAPI_001–002 | defineApp | openapi config / path collisions |
+| LUGAS_DRIZZLE_001–002 | drizzleService() | instance shape / closable client |
+| LUGAS_COOKIE_001–002 | cookie() | name/value token / attribute combination |
+| LUGAS_WS_001–002 | websocket()/serve | config / serve-option conflict |
+| LUGAS_HEADERS_001 | defineApp | secureHeaders config |
+| LUGAS_HEALTH_001–002 | defineApp | health config / path collision |
+| LUGAS_FORM_001 | form() | limits config |
+| LUGAS_TELEMETRY_001 | defineApp | telemetry config |
+| LUGAS_COMPRESSION_001 / LUGAS_ETAG_001 | defineApp | compression / etag config |
+| LUGAS_RATE_LIMIT_001 | rateLimit() | config validation |
 
 ## Prohibited patterns
 
