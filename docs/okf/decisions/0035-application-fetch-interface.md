@@ -152,9 +152,23 @@ entry is exposed. The gap is one method wide.
 
 - **Disposal shape for in-process hosting:** today disposal hangs off
   `LugasServer.lugasLifecycle.shutdown()` ([ADR-0020]). A host that never
-  serves needs the same drain-ordered disposal from the application object.
-  The exact API (name, drain-deadline defaulting, outcome object) is pinned
-  in the dispatch ODR.
+  serves needs drain-ordered disposal from the application object. The
+  candidate shape is `await app.dispose()` reusing the existing
+  drain/deadline/outcome vocabulary exactly — deliberately **not** a second,
+  embedding-specific lifecycle model. Design guidance recorded by the owner
+  (2026-09-11); to be answered by reusing current lifecycle semantics where
+  possible, documented but not implemented during 0.1.0 stabilization:
+  1. Who owns disposal?
+  2. Can `dispose()` be called without `serve()` ever having been called?
+  3. What happens to in-flight `app.fetch()` calls?
+  4. Is disposal idempotent?
+  5. Does the default drain deadline equal server shutdown's default?
+  6. Does the outcome reuse the existing shutdown result shape exactly?
+
+  Acceptance criterion: if all six are answerable by reusing ADR-0020
+  semantics, the interface is safe to dispatch; if they require a parallel
+  lifecycle abstraction, this ADR is amended or rejected before dispatch.
+  The exact API is pinned in the dispatch ODR.
 - **Bun-native handler mounting:** whether `fetch()` should also be reachable
   as a Bun route value (zero-copy mounting into another `Bun.serve`) — a
   possible free consequence of the shared pipeline, decided by implementation
