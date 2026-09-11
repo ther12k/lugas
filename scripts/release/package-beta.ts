@@ -140,14 +140,25 @@ async function main(): Promise<void> {
   ];
   writeFileSync(pkgJsonPath, JSON.stringify(pkg, null, 2) + "\n");
   const stagedMeta = JSON.parse(readFileSync(pkgJsonPath, "utf8")) as {
+    version?: string;
     engines?: Record<string, string>;
     repository?: { url?: string };
+    bugs?: { url?: string };
+    homepage?: string;
+    keywords?: string[];
   };
+  // Every injected field is asserted — the check label must not promise more
+  // than the condition verifies (beta.5 candidate-prep review, 2026-09-12).
   check(
-    "staged package metadata (engines.bun, repository, bugs, homepage)",
-    stagedMeta.engines?.bun === ">=1.4.0" &&
-      (stagedMeta.repository?.url ?? "").includes("github.com/ther12k/lugas"),
-    `engines.bun=${stagedMeta.engines?.bun ?? "missing"} repository=${stagedMeta.repository?.url ?? "missing"}`,
+    "staged package metadata (version, engines.bun, repository, bugs, homepage, keywords)",
+    stagedMeta.version === BETA_VERSION &&
+      stagedMeta.engines?.bun === ">=1.4.0" &&
+      stagedMeta.repository?.url === "git+https://github.com/ther12k/lugas.git" &&
+      stagedMeta.bugs?.url === "https://github.com/ther12k/lugas/issues" &&
+      stagedMeta.homepage === "https://ther12k.github.io/lugas/" &&
+      Array.isArray(stagedMeta.keywords) &&
+      stagedMeta.keywords.length > 0,
+    `version=${stagedMeta.version ?? "missing"} engines.bun=${stagedMeta.engines?.bun ?? "missing"} repository=${stagedMeta.repository?.url ?? "missing"} bugs=${stagedMeta.bugs?.url ?? "missing"} homepage=${stagedMeta.homepage ?? "missing"} keywords=${stagedMeta.keywords?.length ?? 0}`,
   );
 
   // Stage 1a: framework-version stamping. The repo keeps package.json at
@@ -228,6 +239,31 @@ console.log("SERVER-CONSUMER-OK format=" + app.manifest.format + " fw=" + app.ma
     serverRun.code === 0 &&
       serverRun.stdout.includes(`SERVER-CONSUMER-OK format=lugas-manifest-v1 fw=${BETA_VERSION}`),
     serverRun.code === 0 ? serverRun.stdout.trim() : serverRun.stderr.slice(0, 200),
+  );
+  // What the rehearsal verified so far is the STAGED copy. The consumer just
+  // installed the packed tarball — re-verify version and the full metadata
+  // set from the installed package.json, so the evidence covers what a user
+  // actually receives (beta.5 candidate-prep review, 2026-09-12).
+  const installedPkg = JSON.parse(
+    readFileSync(join(serverConsumer, "node_modules", "lugas", "package.json"), "utf8"),
+  ) as {
+    version?: string;
+    engines?: Record<string, string>;
+    repository?: { url?: string };
+    bugs?: { url?: string };
+    homepage?: string;
+    keywords?: string[];
+  };
+  check(
+    "installed tarball package.json (version, engines, repository, bugs, homepage, keywords)",
+    installedPkg.version === BETA_VERSION &&
+      installedPkg.engines?.bun === ">=1.4.0" &&
+      installedPkg.repository?.url === "git+https://github.com/ther12k/lugas.git" &&
+      installedPkg.bugs?.url === "https://github.com/ther12k/lugas/issues" &&
+      installedPkg.homepage === "https://ther12k.github.io/lugas/" &&
+      Array.isArray(installedPkg.keywords) &&
+      installedPkg.keywords.length > 0,
+    `version=${installedPkg.version ?? "missing"} engines.bun=${installedPkg.engines?.bun ?? "missing"} repository=${installedPkg.repository?.url ?? "missing"} bugs=${installedPkg.bugs?.url ?? "missing"} homepage=${installedPkg.homepage ?? "missing"} keywords=${installedPkg.keywords?.length ?? 0}`,
   );
 
   // Consumer B: browser-bundled client.
