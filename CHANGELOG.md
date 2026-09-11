@@ -72,4 +72,4 @@ Attested release candidate, frozen at `2ed954deb648cdb8e40d7b05e6c0cb0d116f050b`
 [0.1.0-beta.4]: https://www.npmjs.com/package/lugas/v/0.1.0-beta.4
 [0.1.0-beta.3]: https://www.npmjs.com/package/lugas/v/0.1.0-beta.3
 [0.1.0-beta.2]: https://www.npmjs.com/package/lugas/v/0.1.0-beta.2
-[0.1.0-beta.1]: https://github.com/ther12k/lugas/releases/tag/v0.1.0-beta.1
+[0.1.0-beta.1]: https://www.npmjs.com/package/lugas/v/0.1.0-beta.1
