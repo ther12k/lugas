@@ -65,6 +65,12 @@ After M9-001, the intended battery order is:
 
 Each battery requires its own issue, ADR, and ODR before implementation. **First-party non-goals (standing):** JWT, password/OAuth/passkey authentication, email, queues, Redis/cron/S3/cache backends, GraphQL, payments, migrations tooling, ORM repository pattern, dependency-injection container. Once this sequence lands, the differentiator is the small API, strong typing, Bun-native performance, and unusually good release evidence — not the size of the feature checklist.
 
+## Post-0.1.0 program: the application framework for Bun (ODR-0019, 2026-09-11)
+
+The owner adopted the post-0.1.0 product direction: Lugas turns Bun primitives and ecosystem tools into one explicit, typed, evidence-backed application model (pillars: Explicit, Typed, Integrated, Evidenced). The ODR-0018 stop-rule is **not** superseded — through 0.1.0, only design documentation and compatibility requirements may be prepared. On that basis [ADR-0035](okf/decisions/0035-application-fetch-interface.md) (Application Fetch Interface, `app.fetch`) is proposed with the owner's core pins: `fetch()` and `serve()` MUST execute the same route pipeline with equivalent HTTP semantics; the host owns lifecycle; standard `Request`/`Response` with `Request.url` authoritative (no prefix awareness, no `LugasRequest`); the WebSocket upgrade boundary is explicitly host-specific; bridge support claims require CI-generated per-capability evidence.
+
+Intended post-0.1.0 sequence (milestone IDs assigned at dispatch): (1) fetch interface + TanStack Start and SvelteKit bridges + the certified compatibility matrix; (2) `create-lugas` (a second package on deployment-boundary grounds; ADR-0012 amendment) + official starters; (3) Bun-native structural service adapters (`sqlService`/`redisService`/`s3Service` — the ADR-0026 precedent: adapters, not backends, no wrapper API); (4) OpenTelemetry successor architecture (internal instrumentation surface investigated before any ADR; ADR-0032 non-goals amended explicitly). Reference: [ODR-0019](owner-decisions/post-010-program-adoption.md).
+
 ## Proposed integration defaults
 
 Once the planned integrations land, the intended defaults are:
