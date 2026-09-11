@@ -16,7 +16,7 @@
 14. [ADR-0014 — Separate Compile-Time Contract and Runtime Manifest](0014-contract-manifest-separation.md)
 15. [ADR-0015 — Named Modules Have No Hidden Scope or Prefix](0015-named-modules-no-hidden-scope.md)
 16. [ADR-0016 — Evidence-Gated Performance and Release Claims](0016-evidence-gated-claims.md)
-17. [ADR-0017 — Manifest v1 Method Representation and Route-Record Provenance](0017-manifest-v1-method-and-provenance.md)
+17. [ADR-0017 — Manifest v1 Method Representation and Route-Record Provenance (Proposed)](0017-manifest-v1-method-and-provenance.md)
 18. [ADR-0018 — Opt-In Public Asset Serving Through the Bun Adapter](0018-opt-in-public-asset-serving.md)
 19. [ADR-0019 — Application-Default and Route-Specific Body Budgets](0019-body-budget-policy.md)
 20. [ADR-0020 — Application Service Lifecycle with Drain-Ordered Shutdown](0020-application-service-lifecycle.md)
