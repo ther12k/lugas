@@ -23,10 +23,11 @@ import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { CANDIDATE_VERSION } from "./candidate-version";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const OUT_DIR = resolve(ROOT, "docs", "releases", "beta");
-const BETA_VERSION = "0.1.0-beta.4"
+const BETA_VERSION = CANDIDATE_VERSION;
 
 function sha256(data: Buffer | string): string {
   return createHash("sha256").update(data).digest("hex");
@@ -343,6 +344,9 @@ function main() {
   const validatedRps = fmt(evidence.validatedPostRps!);
   const overhead = `${overheadValidatedPct}%`;
   const typecheckMs = String(evidence.typecheckMs);
+  const typecheckBudgetMs = JSON.parse(
+    readFileSync(resolve(ROOT, "benchmarks", "baselines", "m5-accepted.json"), "utf8"),
+  ).typecheckBudgetMs as number;
   const bundleBytes = String(evidence.clientBundleBytes);
 
 
@@ -361,7 +365,7 @@ function main() {
 
 ## 1. Executive Summary
 
-This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.4** release candidate. All milestones (M0–M9, the complete ODR-0010 battery sequence) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
+This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v${BETA_VERSION}** release candidate. All milestones (M0–M9, the complete ODR-0010 battery sequence) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
 
 Publication remains strictly gated on owner approval in **M8-GATE**.
 
@@ -409,7 +413,7 @@ ${gateFiles.map((f) => `- [\`docs/reports/gates/${f}\`](../../reports/gates/${f}
 | \`plain-static\` | 30,000 rps | 40,000 rps | 60,000 rps | **${plainRps} rps** (${overheadPlainPct}% vs raw Bun) | ✅ Exceeded |
 | \`plain-json\` | 25,000 rps | 35,000 rps | 50,000 rps | **${jsonRps} rps** | ✅ Exceeded |
 | \`validated-post\` | 15,000 rps | 20,000 rps | 30,000 rps | **${validatedRps} rps** | ✅ Exceeded (${overhead} validated overhead vs raw Bun) |
-| Typecheck Duration | — | — | < 2,000ms | **${typecheckMs}ms** | ✅ Measured on candidate |
+| Typecheck Duration | — | — | < ${typecheckBudgetMs}ms | **${typecheckMs}ms** | ✅ Measured on candidate |
 | Client Bundle Size | — | — | < 25,000 B | **${bundleBytes} B** | ✅ Measured on candidate |
 
 ---
@@ -500,14 +504,23 @@ npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag
 
 \`\`\`bash
 # 0. Preflight — FAIL-CLOSED (M6R6.1): any failed command, including the
-#    namespace assertion, aborts before the tag or publish runs.
+#    successor-release assertions, aborts before the tag or publish runs.
 set -euo pipefail
 ( cd docs/releases/beta && sha256sum --check SHA256SUMS )
 npm whoami >/dev/null                            # must be authenticated as the owner
-if npm view lugas version >/dev/null 2>&1; then  # the name MUST still be unclaimed
-  echo "ERROR: npm package 'lugas' is no longer unclaimed — do not publish; contact the owner" >&2
+
+# Successor-release checks (beta.2+): the PACKAGE name is already claimed;
+# what must be free is THIS VERSION — and an indeterminate registry answer
+# (network, auth, unreachable) must ABORT, never be read as "unpublished".
+if npm view "lugas@\${BETA_VERSION}" version >/dev/null 2>&1; then
+  echo "ERROR: lugas@\${BETA_VERSION} is already published — bump the candidate version; never republish a used name+version" >&2
   exit 1
 fi
+if ! npm view lugas dist-tags >/dev/null 2>&1; then
+  echo "ERROR: registry reachability could not be confirmed — indeterminate; do not publish" >&2
+  exit 1
+fi
+# Reaching here: authenticated + registry reachable + candidate version absent.
 
 # 1. Pin the reviewed source BEFORE the irreversible registry action
 git tag -a "v${BETA_VERSION}" "${PACKAGE_SOURCE_SHA}" -m "LugasJS v${BETA_VERSION} release candidate"

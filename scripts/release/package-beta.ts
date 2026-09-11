@@ -36,7 +36,9 @@ import { join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const OUT_DIR = resolve(ROOT, "docs", "releases", "beta");
-const BETA_VERSION = "0.1.0-beta.4"
+import { CANDIDATE_VERSION } from "./candidate-version";
+
+const BETA_VERSION = CANDIDATE_VERSION;
 
 type CheckResult = { name: string; ok: boolean; detail: string };
 const results: CheckResult[] = [];
@@ -157,7 +159,7 @@ async function main(): Promise<void> {
       stagedMeta.bugs?.url === "https://github.com/ther12k/lugas/issues" &&
       stagedMeta.homepage === "https://ther12k.github.io/lugas/" &&
       Array.isArray(stagedMeta.keywords) &&
-      stagedMeta.keywords.length > 0,
+      stagedMeta.keywords.join(",") === "bun,typescript,http,api,framework",
     `version=${stagedMeta.version ?? "missing"} engines.bun=${stagedMeta.engines?.bun ?? "missing"} repository=${stagedMeta.repository?.url ?? "missing"} bugs=${stagedMeta.bugs?.url ?? "missing"} homepage=${stagedMeta.homepage ?? "missing"} keywords=${stagedMeta.keywords?.length ?? 0}`,
   );
 
@@ -262,7 +264,7 @@ console.log("SERVER-CONSUMER-OK format=" + app.manifest.format + " fw=" + app.ma
       installedPkg.bugs?.url === "https://github.com/ther12k/lugas/issues" &&
       installedPkg.homepage === "https://ther12k.github.io/lugas/" &&
       Array.isArray(installedPkg.keywords) &&
-      installedPkg.keywords.length > 0,
+      installedPkg.keywords.join(",") === "bun,typescript,http,api,framework",
     `version=${installedPkg.version ?? "missing"} engines.bun=${installedPkg.engines?.bun ?? "missing"} repository=${installedPkg.repository?.url ?? "missing"} bugs=${installedPkg.bugs?.url ?? "missing"} homepage=${installedPkg.homepage ?? "missing"} keywords=${installedPkg.keywords?.length ?? 0}`,
   );
 
