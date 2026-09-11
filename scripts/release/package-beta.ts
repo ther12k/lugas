@@ -111,7 +111,44 @@ async function main(): Promise<void> {
   delete pkg.private;
   (pkg as StagedPkg & { publishConfig?: { access?: string } }).publishConfig = { access: "public" };
   (pkg as StagedPkg & { bin?: Record<string, string> }).bin = { lugas: "./src/cli/main.ts" };
+  // Consumer-facing metadata the npm page needs and the repo copy does not
+  // carry: engines declares the Bun support floor (owner decision, CF-3,
+  // 2026-09-12) as machine-readable metadata — advisory declaration, not a
+  // release gate; repository/bugs/homepage/keywords make the npm package
+  // page link back to the project (release-readiness sweep, 2026-09-12).
+  (pkg as StagedPkg & {
+    engines?: Record<string, string>;
+    repository?: { type: string; url: string };
+    bugs?: { url: string };
+    homepage?: string;
+    keywords?: string[];
+  }).engines = { bun: ">=1.4.0" };
+  (pkg as StagedPkg & { repository?: { type: string; url: string } }).repository = {
+    type: "git",
+    url: "git+https://github.com/ther12k/lugas.git",
+  };
+  (pkg as StagedPkg & { bugs?: { url: string } }).bugs = {
+    url: "https://github.com/ther12k/lugas/issues",
+  };
+  (pkg as StagedPkg & { homepage?: string }).homepage = "https://ther12k.github.io/lugas/";
+  (pkg as StagedPkg & { keywords?: string[] }).keywords = [
+    "bun",
+    "typescript",
+    "http",
+    "api",
+    "framework",
+  ];
   writeFileSync(pkgJsonPath, JSON.stringify(pkg, null, 2) + "\n");
+  const stagedMeta = JSON.parse(readFileSync(pkgJsonPath, "utf8")) as {
+    engines?: Record<string, string>;
+    repository?: { url?: string };
+  };
+  check(
+    "staged package metadata (engines.bun, repository, bugs, homepage)",
+    stagedMeta.engines?.bun === ">=1.4.0" &&
+      (stagedMeta.repository?.url ?? "").includes("github.com/ther12k/lugas"),
+    `engines.bun=${stagedMeta.engines?.bun ?? "missing"} repository=${stagedMeta.repository?.url ?? "missing"}`,
+  );
 
   // Stage 1a: framework-version stamping. The repo keeps package.json at
   // 0.0.0 by convention (the real version exists only in the staged copy),

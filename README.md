@@ -3,10 +3,10 @@
   <h1>LugasJS</h1>
   <p><strong>Explicit, Bun-native typed HTTP APIs — without runtime proxies, code generation, or production dependencies.</strong></p>
   <p>
-    <a href="./docs/getting-started.md">Getting started</a> ·
-    <a href="./examples">Examples</a> ·
-    <a href="./docs/compatibility.md">Compatibility</a> ·
-    <a href="./docs/roadmap.md">Roadmap</a>
+    <a href="https://github.com/ther12k/lugas/blob/main/docs/getting-started.md">Getting started</a> ·
+    <a href="https://github.com/ther12k/lugas/tree/main/examples">Examples</a> ·
+    <a href="https://github.com/ther12k/lugas/blob/main/docs/compatibility.md">Compatibility</a> ·
+    <a href="https://github.com/ther12k/lugas/blob/main/docs/roadmap.md">Roadmap</a>
   </p>
   <p>
     <a href="https://github.com/ther12k/lugas/actions/workflows/ci.yml"><img src="https://github.com/ther12k/lugas/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -107,7 +107,7 @@ Most TypeScript frameworks sit at one of two extremes: a thin router that leaves
 - an end-to-end typed client — no code generation, no runtime `Proxy`;
 - zero production runtime dependencies.
 
-Full positioning and framework comparisons: [`docs/choosing-lugas.md`](docs/choosing-lugas.md).
+Full positioning and framework comparisons: [`docs/choosing-lugas.md`](https://github.com/ther12k/lugas/blob/main/docs/choosing-lugas.md).
 
 ## Typed client (`lugas/client`)
 
@@ -129,7 +129,7 @@ if (result.ok) {
 }
 ```
 
-Types describe the wire. A handler returning `json(200, { createdAt: new Date() })` is observed by the client as `{ createdAt: string }` — non-finite numbers, `toJSON()` drops, and throws are all modeled, not hidden. Details: [`docs/wire-honest-types.md`](docs/wire-honest-types.md).
+Types describe the wire. A handler returning `json(200, { createdAt: new Date() })` is observed by the client as `{ createdAt: string }` — non-finite numbers, `toJSON()` drops, and throws are all modeled, not hidden. Details: [`docs/wire-honest-types.md`](https://github.com/ther12k/lugas/blob/main/docs/wire-honest-types.md).
 
 ## Features
 
@@ -159,59 +159,59 @@ Types describe the wire. A handler returning `json(200, { createdAt: new Date() 
 
 ## Examples
 
-Runnable, single-concept applications under [`examples/`](examples/) — indexed in [`examples/README.md`](examples/README.md):
+Runnable, single-concept applications under [`examples/`](https://github.com/ther12k/lugas/tree/main/examples/) — indexed in [`examples/README.md`](https://github.com/ther12k/lugas/blob/main/examples/README.md):
 
 | Example | Demonstrates |
 |---|---|
-| [`basic`](examples/basic/) | Minimal app: routes, JSON/text, redirect, Problem Details |
-| [`validation`](examples/validation/) | Zod + Valibot across params, query, headers, body |
-| [`auth`](examples/auth/) | Ordered guards: 401/403 short-circuits, context enrichment |
-| [`client`](examples/client/) | Typed client round-trip against a live test server |
-| [`proof-api`](examples/proof-api/) | Realistic CRUD API combining all of the above |
+| [`basic`](https://github.com/ther12k/lugas/tree/main/examples/basic/) | Minimal app: routes, JSON/text, redirect, Problem Details |
+| [`validation`](https://github.com/ther12k/lugas/tree/main/examples/validation/) | Zod + Valibot across params, query, headers, body |
+| [`auth`](https://github.com/ther12k/lugas/tree/main/examples/auth/) | Ordered guards: 401/403 short-circuits, context enrichment |
+| [`client`](https://github.com/ther12k/lugas/tree/main/examples/client/) | Typed client round-trip against a live test server |
+| [`proof-api`](https://github.com/ther12k/lugas/tree/main/examples/proof-api/) | Realistic CRUD API combining all of the above |
 
 ## Compatibility
 
-Verified matrix (see [`docs/compatibility.md`](docs/compatibility.md)): Bun **1.4.x** on Linux x86-64, macOS arm64, and Windows x64; TypeScript **7.0.2**; Zod **4.4.3** and Valibot **1.4.2** (any Standard Schema v1 validator works). Browser-safe client bundle plus a prebuilt browser artifact (`lugas/client/browser`) verified in a same-origin real-browser lane; real browsers are not part of the per-OS CI matrix.
+Verified matrix (see [`docs/compatibility.md`](https://github.com/ther12k/lugas/blob/main/docs/compatibility.md)): Bun **1.4.x** on Linux x86-64, macOS arm64, and Windows x64; TypeScript **7.0.2**; Zod **4.4.3** and Valibot **1.4.2** (any Standard Schema v1 validator works). Browser-safe client bundle plus a prebuilt browser artifact (`lugas/client/browser`) verified in a same-origin real-browser lane; real browsers are not part of the per-OS CI matrix.
 
 Known beta limitations: the server core and CLI are Bun-only (the client bundle is runtime-neutral), declarations ship as direct `.ts` sources, and in-flight handler work is not cancelled on client disconnect.
 
 ## Roadmap
 
-Shipped and planned work lives in [`docs/roadmap.md`](docs/roadmap.md). `lugas@0.1.0-beta.4` (cookies, WebSockets, secure headers/health, multipart, telemetry, compression/ETag, rate limiting; source commit `373418f`) and the Drizzle adapter ([`docs/drizzle.md`](docs/drizzle.md), `0.1.0-beta.3`) are published under npm `beta`; First-party CORS ([`docs/cors.md`](docs/cors.md)), Server-Sent Events ([`docs/sse.md`](docs/sse.md)), Structured Logging ([`docs/logging.md`](docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](docs/openapi.md)) ship in `0.1.0-beta.2`+; `latest` and `beta` both point at `0.1.0-beta.4`.
+Shipped and planned work lives in [`docs/roadmap.md`](https://github.com/ther12k/lugas/blob/main/docs/roadmap.md). `lugas@0.1.0-beta.4` (cookies, WebSockets, secure headers/health, multipart, telemetry, compression/ETag, rate limiting; source commit `373418f`) and the Drizzle adapter ([`docs/drizzle.md`](https://github.com/ther12k/lugas/blob/main/docs/drizzle.md), `0.1.0-beta.3`) are published under npm `beta`; First-party CORS ([`docs/cors.md`](https://github.com/ther12k/lugas/blob/main/docs/cors.md)), Server-Sent Events ([`docs/sse.md`](https://github.com/ther12k/lugas/blob/main/docs/sse.md)), Structured Logging ([`docs/logging.md`](https://github.com/ther12k/lugas/blob/main/docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](https://github.com/ther12k/lugas/blob/main/docs/openapi.md)) ship in `0.1.0-beta.2`+; `latest` and `beta` both point at `0.1.0-beta.4`.
 
 ## Documentation
 
 | Document | Contents |
 |---|---|
-| [`docs/getting-started.md`](docs/getting-started.md) | Install, first app, validation, guards, client, testing, CLI |
-| [`docs/routing.md`](docs/routing.md) | Route maps, path syntax, modules, native values, the derived handler context |
-| [`docs/validation.md`](docs/validation.md) | Standard Schema slots, coercion, body parsing, the `422` failure contract |
-| [`docs/guards.md`](docs/guards.md) | Ordered guards, typed context enrichment, short-circuits, composition patterns |
-| [`docs/responses.md`](docs/responses.md) | Typed response helpers, Problem Details, `notFound`/`onError`, redaction |
-| [`docs/services.md`](docs/services.md) | Named dependencies, `service()` lifecycle, the init traffic gate, drain shutdown |
-| [`docs/client.md`](docs/client.md) | The end-to-end typed client: calls, per-status results, error classes |
-| [`docs/testing.md`](docs/testing.md) | `createTestServer`, the bound typed client, lifecycle and error-contract tests |
-| [`docs/wire-honest-types.md`](docs/wire-honest-types.md) | How response types model JSON serialization truth |
-| [`docs/design-principles.md`](docs/design-principles.md) | Explicit HTTP, no codegen, no proxies, zero forced ecosystem |
-| [`docs/choosing-lugas.md`](docs/choosing-lugas.md) | Fit and comparison with raw Bun, Elysia, Hono, Fastify, tRPC |
-| [`docs/api-reference.md`](docs/api-reference.md) | Public API reference |
-| [`docs/diagnostics.md`](docs/diagnostics.md) | Diagnostic code catalog (`LUGAS_*`) |
-| [`docs/manifest-v1.md`](docs/manifest-v1.md) | Frozen `lugas-manifest-v1` schema |
-| [`docs/client-error-semantics.md`](docs/client-error-semantics.md) | Client error and redaction policy |
-| [`docs/drizzle.md`](docs/drizzle.md) | Drizzle integration: application-owned instance as a service |
-| [`docs/cookies.md`](docs/cookies.md) | Cookie primitives and the Better Auth interop recipe |
-| [`docs/websockets.md`](docs/websockets.md) | WebSocket routes: pre-upgrade guards, native sockets, shutdown semantics |
-| [`docs/production.md`](docs/production.md) | Production hardening: secure headers and health/readiness |
-| [`docs/uploads.md`](docs/uploads.md) | Bounded multipart uploads: `form()` body codec |
-| [`docs/telemetry.md`](docs/telemetry.md) | Dependency-free telemetry hooks and the OpenTelemetry recipe |
-| [`docs/compression.md`](docs/compression.md) | Response compression (gzip/deflate) and ETag/304 conditional requests |
-| [`docs/rate-limit.md`](docs/rate-limit.md) | Rate limiting: fixed-window guard semantics over application-owned storage |
-| [`docs/ai-agents.md`](docs/ai-agents.md) | Agent-readable surfaces (manifest, OpenAPI), LLM streaming recipe, MCP proposal |
-| [`docs/performance-gates.md`](docs/performance-gates.md) | Release performance budgets and evidence policy |
+| [`docs/getting-started.md`](https://github.com/ther12k/lugas/blob/main/docs/getting-started.md) | Install, first app, validation, guards, client, testing, CLI |
+| [`docs/routing.md`](https://github.com/ther12k/lugas/blob/main/docs/routing.md) | Route maps, path syntax, modules, native values, the derived handler context |
+| [`docs/validation.md`](https://github.com/ther12k/lugas/blob/main/docs/validation.md) | Standard Schema slots, coercion, body parsing, the `422` failure contract |
+| [`docs/guards.md`](https://github.com/ther12k/lugas/blob/main/docs/guards.md) | Ordered guards, typed context enrichment, short-circuits, composition patterns |
+| [`docs/responses.md`](https://github.com/ther12k/lugas/blob/main/docs/responses.md) | Typed response helpers, Problem Details, `notFound`/`onError`, redaction |
+| [`docs/services.md`](https://github.com/ther12k/lugas/blob/main/docs/services.md) | Named dependencies, `service()` lifecycle, the init traffic gate, drain shutdown |
+| [`docs/client.md`](https://github.com/ther12k/lugas/blob/main/docs/client.md) | The end-to-end typed client: calls, per-status results, error classes |
+| [`docs/testing.md`](https://github.com/ther12k/lugas/blob/main/docs/testing.md) | `createTestServer`, the bound typed client, lifecycle and error-contract tests |
+| [`docs/wire-honest-types.md`](https://github.com/ther12k/lugas/blob/main/docs/wire-honest-types.md) | How response types model JSON serialization truth |
+| [`docs/design-principles.md`](https://github.com/ther12k/lugas/blob/main/docs/design-principles.md) | Explicit HTTP, no codegen, no proxies, zero forced ecosystem |
+| [`docs/choosing-lugas.md`](https://github.com/ther12k/lugas/blob/main/docs/choosing-lugas.md) | Fit and comparison with raw Bun, Elysia, Hono, Fastify, tRPC |
+| [`docs/api-reference.md`](https://github.com/ther12k/lugas/blob/main/docs/api-reference.md) | Public API reference |
+| [`docs/diagnostics.md`](https://github.com/ther12k/lugas/blob/main/docs/diagnostics.md) | Diagnostic code catalog (`LUGAS_*`) |
+| [`docs/manifest-v1.md`](https://github.com/ther12k/lugas/blob/main/docs/manifest-v1.md) | Frozen `lugas-manifest-v1` schema |
+| [`docs/client-error-semantics.md`](https://github.com/ther12k/lugas/blob/main/docs/client-error-semantics.md) | Client error and redaction policy |
+| [`docs/drizzle.md`](https://github.com/ther12k/lugas/blob/main/docs/drizzle.md) | Drizzle integration: application-owned instance as a service |
+| [`docs/cookies.md`](https://github.com/ther12k/lugas/blob/main/docs/cookies.md) | Cookie primitives and the Better Auth interop recipe |
+| [`docs/websockets.md`](https://github.com/ther12k/lugas/blob/main/docs/websockets.md) | WebSocket routes: pre-upgrade guards, native sockets, shutdown semantics |
+| [`docs/production.md`](https://github.com/ther12k/lugas/blob/main/docs/production.md) | Production hardening: secure headers and health/readiness |
+| [`docs/uploads.md`](https://github.com/ther12k/lugas/blob/main/docs/uploads.md) | Bounded multipart uploads: `form()` body codec |
+| [`docs/telemetry.md`](https://github.com/ther12k/lugas/blob/main/docs/telemetry.md) | Dependency-free telemetry hooks and the OpenTelemetry recipe |
+| [`docs/compression.md`](https://github.com/ther12k/lugas/blob/main/docs/compression.md) | Response compression (gzip/deflate) and ETag/304 conditional requests |
+| [`docs/rate-limit.md`](https://github.com/ther12k/lugas/blob/main/docs/rate-limit.md) | Rate limiting: fixed-window guard semantics over application-owned storage |
+| [`docs/ai-agents.md`](https://github.com/ther12k/lugas/blob/main/docs/ai-agents.md) | Agent-readable surfaces (manifest, OpenAPI), LLM streaming recipe, MCP proposal |
+| [`docs/performance-gates.md`](https://github.com/ther12k/lugas/blob/main/docs/performance-gates.md) | Release performance budgets and evidence policy |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history |
 | [Release evidence](https://github.com/ther12k/lugas/blob/main/docs/releases/beta/RELEASE_PACKET.md) | Candidate evidence packet, provenance, and checksums (GitHub) |
 
-Agent-facing context: [`llms.txt`](llms.txt) and [`llms-full.txt`](llms-full.txt). Governance, delivery history, and architecture decisions live under [`docs/okf/`](docs/okf/index.md); implementation evidence under [`docs/reports/`](docs/reports/).
+Agent-facing context: [`llms.txt`](llms.txt) and [`llms-full.txt`](llms-full.txt). Governance, delivery history, and architecture decisions live under [`docs/okf/`](https://github.com/ther12k/lugas/blob/main/docs/okf/index.md); implementation evidence under [`docs/reports/`](https://github.com/ther12k/lugas/tree/main/docs/reports/).
 
 ## Contributing and security
 
