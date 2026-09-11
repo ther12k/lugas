@@ -144,18 +144,18 @@ Types describe the wire. A handler returning `json(200, { createdAt: new Date() 
 | Service lifecycle: init, drain-ordered shutdown, reverse disposal (`service()`) | Available |
 | Test-server helpers (`lugas/testing`) | Available |
 | Static route manifest + inspection CLI (`lugas-manifest-v1`) | Available |
-| First-party CORS (`defineApp({ cors })`, opt-in, fail-closed) | Available in `0.1.0-beta.2` (M8-001) |
-| Server-Sent Events (`sse()` helper, deterministic cleanup) | Available in `0.1.0-beta.2` (M8-002) |
-| Structured logging (`defineApp({ logging })`, sink contract) | Available in `0.1.0-beta.2` (M8-003) |
-| OpenAPI 3.1 + Scalar reference UI (`defineApp({ openapi })`, zero-dependency) | Available in `0.1.0-beta.2` (M8-004) |
-| Drizzle ORM adapter (`lugas/drizzle`, application-owned instance) | Available in `0.1.0-beta.3` (M9-001) |
-| Cookie primitives (`parseCookies`/`cookie`, RFC 6265, auth-interop recipe) | Available in `0.1.0-beta.4` (M9-002) |
-| WebSockets (`websocket()` routes, pre-upgrade guards, shutdown close-1001) | Available in `0.1.0-beta.4` (M9-003) |
-| Secure headers + health/readiness (`secureHeaders`, `health`) | Available in `0.1.0-beta.4` (M9-004) |
-| Multipart uploads (`form()` body codec, budget-bounded) | Available in `0.1.0-beta.4` (M9-005) |
-| Telemetry hooks (`onRequestStart`/`onRequestEnd`, OTel recipe) | Available in `0.1.0-beta.4` (M9-006) |
-| Compression + ETag (`compression`, `etag`; native gzip/deflate, 304) | Available in `0.1.0-beta.4` (M9-007) |
-| Rate limiting (`rateLimit()` guard, application-owned storage, 429 + Retry-After) | Available in `0.1.0-beta.4` (M9-008) |
+| First-party CORS (`defineApp({ cors })`, opt-in, fail-closed) | Shipped (M8-001) |
+| Server-Sent Events (`sse()` helper, deterministic cleanup) | Shipped (M8-002) |
+| Structured logging (`defineApp({ logging })`, sink contract) | Shipped (M8-003) |
+| OpenAPI 3.1 + Scalar reference UI (`defineApp({ openapi })`, zero-dependency) | Shipped (M8-004) |
+| Drizzle ORM adapter (`lugas/drizzle`, application-owned instance) | Shipped (M9-001) |
+| Cookie primitives (`parseCookies`/`cookie`, RFC 6265, auth-interop recipe) | Shipped (M9-002) |
+| WebSockets (`websocket()` routes, pre-upgrade guards, shutdown close-1001) | Shipped (M9-003) |
+| Secure headers + health/readiness (`secureHeaders`, `health`) | Shipped (M9-004) |
+| Multipart uploads (`form()` body codec, budget-bounded) | Shipped (M9-005) |
+| Telemetry hooks (`onRequestStart`/`onRequestEnd`, OTel recipe) | Shipped (M9-006) |
+| Compression + ETag (`compression`, `etag`; native gzip/deflate, 304) | Shipped (M9-007) |
+| Rate limiting (`rateLimit()` guard, application-owned storage, 429 + Retry-After) | Shipped (M9-008) |
 
 ## Examples
 
@@ -177,7 +177,7 @@ Known beta limitations: the server core and CLI are Bun-only (the client bundle 
 
 ## Roadmap
 
-Shipped and planned work lives in [`docs/roadmap.md`](https://github.com/ther12k/lugas/blob/main/docs/roadmap.md). `lugas@0.1.0-beta.4` (cookies, WebSockets, secure headers/health, multipart, telemetry, compression/ETag, rate limiting; source commit `373418f`) and the Drizzle adapter ([`docs/drizzle.md`](https://github.com/ther12k/lugas/blob/main/docs/drizzle.md), `0.1.0-beta.3`) are published under npm `beta`; First-party CORS ([`docs/cors.md`](https://github.com/ther12k/lugas/blob/main/docs/cors.md)), Server-Sent Events ([`docs/sse.md`](https://github.com/ther12k/lugas/blob/main/docs/sse.md)), Structured Logging ([`docs/logging.md`](https://github.com/ther12k/lugas/blob/main/docs/logging.md)), and OpenAPI 3.1 + Scalar ([`docs/openapi.md`](https://github.com/ther12k/lugas/blob/main/docs/openapi.md)) ship in `0.1.0-beta.2`+; `latest` and `beta` both point at `0.1.0-beta.4`.
+Shipped and planned work lives in [`docs/roadmap.md`](https://github.com/ther12k/lugas/blob/main/docs/roadmap.md). Lugas distributes prerelease builds through the npm `beta` dist-tag — check [npm](https://www.npmjs.com/package/lugas) or the [release notes](https://github.com/ther12k/lugas/releases) for the currently available version and its attested release evidence. The first-party batteries (CORS, SSE, structured logging, OpenAPI 3.1 + Scalar, Drizzle adapter, cookies, WebSockets, secure headers/health, multipart uploads, telemetry hooks, compression/ETag, rate limiting) are all part of the published beta surface.
 
 ## Documentation
 

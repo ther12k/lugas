@@ -34,21 +34,61 @@ engineering and documentation.
 
 ## beta.5 owner checklist (in execution order)
 
-1. `bun run release:package:rehearse` with `BETA_VERSION` bumped to
-   `0.1.0-beta.4` → `0.1.0-beta.5` in `scripts/release/package-beta.ts`
-   (stamps version + engines + metadata; attests the new artifact set).
-2. Update version claims: `docs/getting-started.md` published-version note,
-   README capability/version lines, changelog `[Unreleased]` →
-   `[0.1.0-beta.5]` with the publish date and attested commit/tarball.
-3. Commit the attested release packet (the regenerated
-   `docs/releases/beta/` artifacts — legitimate now, unlike the PR #398
-   rebuild which was reverted).
-4. Publish (owner OTP): `npm publish lugas@<tarball>` under the `beta`
-   dist-tag; `latest` move per the established owner-controlled flow.
-5. **Registry consumer smoke re-run** against the published `beta.5` from a
-   clean directory — the assertion that failed for beta.4 must pass:
-   `manifest.frameworkVersion === "0.1.0-beta.5"`, CLI banner reports
-   beta.5, all exports resolve, typed client + typecheck lanes green
-   (protocol: `docs/reports/consumer-smoke-2026-09-12.md`).
-6. Record the result in `docs/releases/beta/` evidence and update
-   `docs/roadmap.md` release status.
+Ordering note (candidate-prep review, 2026-09-12): the rehearsal refuses a
+dirty working tree and stages from `git archive HEAD` — so **input changes
+are committed before the rehearsal runs**, and the rehearsal's provenance
+keeps the identity of that true source commit. The later commit that stores
+the attested packet is a separate commit; never substitute its hash into
+provenance to make the two look identical.
+
+1. **Finalize package inputs.** The tarball README is final before packing:
+   it is evergreen as of this sweep (no "beta.N is current" claims; the
+   capability table carries durable first-shipped milestones only). After
+   attestation, tarball contents must not change — any edit means a new
+   candidate rebuilt and re-verified, and npm forbids re-publishing an
+   already-used name+version pair. The `docs/` tree (not shipped) keeps
+   accurate for beta.4 until beta.5 is actually published.
+2. **Bump `BETA_VERSION`** to `0.1.0-beta.5` in
+   `scripts/release/package-beta.ts` and **commit** — working tree clean.
+3. **Run `bun run release:package:rehearse`** from that source commit. It
+   stamps `frameworkVersion` and the consumer metadata (version, engines,
+   repository, bugs, homepage, keywords) with fail-closed checks at staging
+   and again from the installed tarball's `package.json`.
+4. **Review** the rehearsal output: checksums, provenance (bound to the
+   source commit), machine-readable rehearsal result.
+5. **Commit the attested packet** (`docs/releases/beta/` artifacts) per the
+   repo's attestation flow.
+6. **Publish — owner action, owner-authenticated** (no credentials in chat):
+
+   ```bash
+   npm publish ./docs/releases/beta/lugas-0.1.0-beta.5.tgz \
+     --access public \
+     --tag beta
+   ```
+
+   Explicit tarball path and explicit `--tag beta` (npm's default tag is
+   `latest`). `latest` does not move without a separate owner decision.
+7. **Post-publish acceptance battery** — install the exact version in a
+   clean directory (`bun add lugas@0.1.0-beta.5`), then verify:
+   - sha256 of the registry tarball == sha256 of the attested candidate;
+   - `package.version === "0.1.0-beta.5"`;
+   - `manifest.frameworkVersion === "0.1.0-beta.5"` (the CF-1 assertion);
+   - `bunx --bun lugas routes` banner reports beta.5;
+   - metadata + all five exports resolve as expected;
+   - full consumer battery PASS (protocol:
+     `docs/reports/consumer-smoke-2026-09-12.md`).
+   Dist-tags are verified separately from the battery: `beta` →
+   `0.1.0-beta.5`, `latest` unchanged unless the owner moves it — this
+   distinguishes "beta.5 works" from "the beta channel points at the right
+   version".
+8. Record the results in `docs/releases/beta/` evidence and update
+   `docs/roadmap.md` release status and the `docs/` version claims (which
+   correctly still say beta.4 until this point).
+
+## Performance evidence status
+
+Pending — deliberately not run under load (owner soak active, load average
+~27 at sweep time). Per the measurement-conditions record (PR #395): a
+loaded-machine result is not quiet-host evidence and must not be recorded
+as PASS; the 0.1.0 gate requires a quiet-host run, and no threshold
+re-baselining from loaded numbers.
