@@ -3,16 +3,11 @@
     "target": "esnext",
     "module": "esnext",
     "moduleResolution": "bundler",
-    "lib": [
-      "esnext"
-    ],
-    "types": [
-      "@types/bun"
-    ],
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "types": ["@types/bun", "vite/client"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
@@ -20,17 +15,5 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": [
-    "src",
-    "tests",
-    "benchmarks",
-    "examples",
-    "scripts",
-    "spikes"
-  ],
-  "exclude": [
-    "node_modules",
-    ".worktrees",
-    "examples/spa-starter"
-  ]
+  "include": ["src", "server", "scripts", "tests", "vite.config.ts"]
 }

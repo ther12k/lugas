@@ -169,8 +169,17 @@ function isJsonMediaType(mediaType: string): boolean {
  * The response brand carries `Jsonify<B>` (M6R7), not raw `B`: the typed body
  * facts clients observe reflect what `JSON.stringify` actually serializes.
  */
+/**
+ * `ConstructorParameters<typeof Headers>[0]` resolves to the ambient
+ * HeadersInit of whichever environment typechecks the package (Bun's under
+ * the root tsconfig, the DOM lib's under standard frontend setups). Naming
+ * `Bun.HeadersInit` directly would break DOM-lib consumers (CA-11 consumer
+ * truth); naming the bare global would break the root project.
+ */
+type HeaderSeed = ConstructorParameters<typeof Headers>[0];
+
 export function json<S extends number, B>(status: S, body: B, init?: ResponseInit): TypedResponse<S, Jsonify<B>> {
-  const headers = new Headers(init?.headers as Bun.HeadersInit | undefined);
+  const headers = new Headers(init?.headers as HeaderSeed | undefined);
   const override = overrideContentType(headers);
   if (override !== undefined && !isJsonMediaType(override)) {
     throw diagnostic("LUGAS_RESPONSE_001", "json(): content-type override is not a JSON media type", {
@@ -196,7 +205,7 @@ export function json<S extends number, B>(status: S, body: B, init?: ResponseIni
  * brand.
  */
 export function text<S extends number, B extends string>(status: S, body: B, init?: ResponseInit): TypedResponse<S, B> {
-  const headers = new Headers(init?.headers as Bun.HeadersInit | undefined);
+  const headers = new Headers(init?.headers as HeaderSeed | undefined);
   const override = overrideContentType(headers);
   if (override !== undefined && !override.startsWith("text/")) {
     throw diagnostic("LUGAS_RESPONSE_002", "text(): content-type override is not a text media type", {
@@ -210,7 +219,7 @@ export function text<S extends number, B extends string>(status: S, body: B, ini
 
 /** `empty(status, init?)` — bodyless response (204/304 and friends). A content-type override would advertise a body that cannot exist and throws `LUGAS_RESPONSE_004` (M6R8). */
 export function empty<S extends number>(status: S, init?: ResponseInit): TypedResponse<S, undefined> {
-  const override = overrideContentType(new Headers(init?.headers as Bun.HeadersInit | undefined));
+  const override = overrideContentType(new Headers(init?.headers as HeaderSeed | undefined));
   if (override !== undefined) {
     throw diagnostic("LUGAS_RESPONSE_004", "empty(): content-type override on a bodyless response", {
       hint: "empty() owns no body; a response without a body cannot declare a content type",
@@ -242,7 +251,7 @@ const PROBLEM_RESERVED = new Set(["type", "title", "detail", "instance"]);
  * response (M6R8).
  */
 export function problem<S extends number>(status: S, fields: ProblemFields, init?: ResponseInit): TypedResponse<S, ProblemFields> {
-  const headers = new Headers(init?.headers as Bun.HeadersInit | undefined);
+  const headers = new Headers(init?.headers as HeaderSeed | undefined);
   const override = overrideContentType(headers);
   if (override !== undefined && override !== PROBLEM_CONTENT_TYPE) {
     throw diagnostic("LUGAS_RESPONSE_003", "problem(): content-type override is not application/problem+json", {

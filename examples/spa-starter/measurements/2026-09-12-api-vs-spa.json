@@ -1,0 +1,31 @@
+{
+  "measuredAt": "2026-09-12T17:38:20.155Z",
+  "bun": "1.4.0",
+  "lugasSource": "77a165e964ed46e6fdae9be266cf70a86af52506",
+  "frontendArtifacts": {
+    "index-Bie9a_TS.js": "16ed18812f31d59a"
+  },
+  "profiles": {
+    "api-only": {
+      "profile": "api-only",
+      "readyMs": 13,
+      "idleRssMiB": 8,
+      "afterWorkloadRssMiB": 8,
+      "assetRequests": 0,
+      "workloadMs": 2013,
+      "assetCount": 0,
+      "shutdownExit": "0"
+    },
+    "api+spa": {
+      "profile": "full",
+      "readyMs": 11,
+      "idleRssMiB": 7.9,
+      "afterWorkloadRssMiB": 7.9,
+      "assetRequests": 40,
+      "workloadMs": 2048,
+      "assetCount": 1,
+      "shutdownExit": "0"
+    }
+  },
+  "note": "Measurements to establish, not promised savings. RSS bounds are process-resident footprint on this machine/run, not a guarantee; the queue/memory claims live in ADR-0036/ADR-0037, not here."
+}

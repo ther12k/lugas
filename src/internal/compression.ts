@@ -132,8 +132,11 @@ function parseAcceptEncoding(header: string | null): ReadonlyArray<EncodingPrefe
 
 const BODYLESS_STATUSES = new Set([204, 205, 304]);
 
-function encode(encoding: CompressionEncoding, bytes: Uint8Array<ArrayBuffer>): Uint8Array {
-  return encoding === "gzip" ? Bun.gzipSync(bytes) : Bun.deflateSync(bytes);
+function encode(encoding: CompressionEncoding, bytes: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
+  // Bun's gzip/deflate return a fresh buffer over a plain ArrayBuffer; the
+  // default ArrayBufferLike type is wider than the runtime fact, and DOM-lib
+  // consumers need the exact view for BodyInit (CA-11 consumer truth).
+  return (encoding === "gzip" ? Bun.gzipSync(bytes) : Bun.deflateSync(bytes)) as Uint8Array<ArrayBuffer>;
 }
 
 /**
