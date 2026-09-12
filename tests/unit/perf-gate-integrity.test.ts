@@ -88,6 +88,7 @@ function makeSandbox(): string {
 function buildSandbox() {
   const root = makeSandbox();
   mkdirSync(join(root, "scripts"), { recursive: true });
+  mkdirSync(join(root, "scripts", "release"), { recursive: true });
   mkdirSync(join(root, "benchmarks", "baselines"), { recursive: true });
   mkdirSync(join(root, "benchmarks", "results"), { recursive: true });
   {
@@ -96,6 +97,11 @@ function buildSandbox() {
       'const ROOT = resolve(import.meta.dir, "..");',
       "const ROOT = import.meta.dir + \"/..\";",
     ));
+    // The checker imports ./release/candidate-version (the single release
+    // identity source) at module load — the sandbox must mirror it or every
+    // spawned run dies on resolution before any assertion can run (CA-3).
+    const cv = readFileSync(resolve(ROOT, "scripts/release/candidate-version.ts"), "utf8");
+    writeFileSync(join(root, "scripts", "release", "candidate-version.ts"), cv);
     const bl = readFileSync(resolve(ROOT, "benchmarks/baselines/m5-accepted.json"), "utf8");
     writeFileSync(join(root, "benchmarks", "baselines", "m5-accepted.json"), bl);
   }
