@@ -108,27 +108,53 @@ describe("sendAwait: stalled reader bound (deterministic)", () => {
 });
 
 describe("settlement", () => {
-  test("disconnect (cancel) during a blocked write settles waiters false; cleanup exactly once", async () => {
+  // Congestion layout for a 128-byte limit with ~90-byte frames: send #1
+  // enqueues (queue ~90, desiredSize ~38), send #2 enqueues (desiredSize
+  // goes negative — congested), send #3 parks (~90 ≤ 128 parked cap). The
+  // small final event (~35 bytes) still fits the parked cap, so it becomes
+  // a GENUINELY PENDING write — not an immediate overload false (CA-9).
+  test("disconnect (cancel) during a genuinely pending write settles it false; cleanup exactly once", async () => {
     const c = capture({ queueByteLimit: 128, start: () => undefined });
     const { reader, writer } = c;
-    // Congest first.
-    for (let i = 0; i < 6; i++) void writer.sendAwait(event(i, 64));
+    void writer.sendAwait(event(0, 64));
+    void writer.sendAwait(event(1, 64));
+    void writer.sendAwait(event(2, 64));
     await Promise.resolve();
-    const blocked = writer.sendAwait(event(99, 64));
+    expect(writer.pendingSendBytes).toBeGreaterThan(0); // a write is parked
+
+    const blocked = writer.sendAwait(event(99, 20)); // small: fits the parked cap
+    let settled = false;
+    void blocked.then(() => { settled = true; });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(settled).toBe(false); // PROVEN unsettled before cancellation
+    expect(writer.pendingSendBytes).toBeGreaterThan(0);
+
     reader.cancel().catch(() => undefined); // client disconnect mid-write
     expect(await blocked).toBe(false);
+    expect(settled).toBe(true);
     expect(writer.pendingSendBytes).toBe(0);
     expect(c.cleanups).toBe(1);
   });
 
-  test("close() during a parked write settles waiters false; cleanup exactly once", async () => {
+  test("close() during a genuinely pending write settles it false; cleanup exactly once", async () => {
     const c = capture({ queueByteLimit: 128, start: () => undefined });
     const { writer } = c;
-    for (let i = 0; i < 6; i++) void writer.sendAwait(event(i, 64));
+    void writer.sendAwait(event(0, 64));
+    void writer.sendAwait(event(1, 64));
+    void writer.sendAwait(event(2, 64));
     await Promise.resolve();
-    const blocked = writer.sendAwait(event(99, 64));
+    expect(writer.pendingSendBytes).toBeGreaterThan(0);
+
+    const blocked = writer.sendAwait(event(99, 20));
+    let settled = false;
+    void blocked.then(() => { settled = true; });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(settled).toBe(false);
+
     writer.close();
     expect(await blocked).toBe(false);
+    expect(settled).toBe(true);
+    expect(writer.pendingSendBytes).toBe(0);
     expect(c.cleanups).toBe(1);
   });
 
@@ -152,7 +178,7 @@ describe("send() compatibility (ADR-0036 #4)", () => {
 });
 
 describe("heartbeat under congestion (ADR-0036 #6)", () => {
-  test("skipped while congested (no growing backlog); resumes after the reader drains", async () => {
+  test("skipped while congested (no growing backlog); timer-generated heartbeats RESUME after the reader drains", async () => {
     const LIMIT = 256; // 8 events (~48 bytes each) genuinely exceed the budget
     const { reader, writer } = capture({ queueByteLimit: LIMIT, heartbeatMs: 10, start: () => undefined });
     for (let i = 0; i < 8; i++) void writer.sendAwait(event(i, 32));
@@ -162,11 +188,25 @@ describe("heartbeat under congestion (ADR-0036 #6)", () => {
     await new Promise((resolve) => setTimeout(resolve, 45)); // ~4 heartbeat ticks
     const after = writer.queuedBytes! + writer.pendingSendBytes;
     expect(after).toBeLessThanOrEqual(before); // no heartbeat accumulation while congested
-    // Drain: capacity returns; parked events flush; a fresh heartbeat fits again.
+    // Drain: capacity returns; parked events flush.
     await decoded(reader, 8);
-    writer.comment("still-alive"); // enqueue path works after drain
-    const text = await decoded(reader, 1);
-    expect(text).toContain("still-alive");
+    // Resumption must be the TIMER's work, not a manual write: read until a
+    // deadline-bounded window contains a heartbeat frame produced by the
+    // interval (first beat lands within one interval of the drain).
+    const deadline = Date.now() + 500;
+    let tail = "";
+    const decoder = new TextDecoder();
+    while (Date.now() < deadline) {
+      const chunk = await Promise.race([
+        reader.read(),
+        new Promise<{ done: true }>((resolve) => setTimeout(() => resolve({ done: true }), 50)),
+      ]);
+      if (chunk.done && tail.includes(": heartbeat")) break;
+      if (chunk.done) continue;
+      tail += decoder.decode(chunk.value, { stream: true });
+      if (tail.includes(": heartbeat")) break;
+    }
+    expect(tail).toContain(": heartbeat"); // automatic heartbeats resumed
     reader.cancel().catch(() => undefined);
   });
 });
@@ -212,10 +252,8 @@ describe("no SSE work without opt-in", () => {
 });
 
 describe("served stalled consumer (live)", () => {
-  test("read-then-stall holds the bound; abort settles the producer promptly", async () => {
-    let cleanups = 0;
-    let maxRetained = 0;
-    let settledFalse = 0;
+  test("read-then-stall holds the bound; parking settles on abort; release is prompt and exactly-once", async () => {
+    const state = { cleanups: 0, maxRetained: 0, parkedSeen: false, settledFalse: 0 };
     const app = defineApp({
       routes: {
         "/events": {
@@ -225,14 +263,22 @@ describe("served stalled consumer (live)", () => {
                 queueByteLimit: 2048,
                 start: (writer) => {
                   void (async () => {
-                    for (let i = 0; i < 500; i++) {
-                      const sent = await writer.sendAwait(event(i, 64));
-                      if (!sent) settledFalse += 1;
-                      maxRetained = Math.max(maxRetained, (writer.queuedBytes ?? 0) + writer.pendingSendBytes);
-                      if (!sent) break;
+                    // ~450 KB total: loopback socket buffers may absorb part
+                    // of this (they sit OUTSIDE the queue per ADR-0036's
+                    // claim), so parking is expected but not forced here —
+                    // the unconditional parked-write proof is the
+                    // deterministic settlement tests above.
+                    for (let i = 0; i < 5000; i++) {
+                      const pending = writer.pendingSendBytes;
+                      const p = writer.sendAwait(event(i, 64));
+                      void p.then((sent) => { if (!sent) state.settledFalse += 1; });
+                      await Promise.resolve();
+                      if (writer.pendingSendBytes > pending && writer.pendingSendBytes > 0) state.parkedSeen = true;
+                      state.maxRetained = Math.max(state.maxRetained, (writer.queuedBytes ?? 0) + writer.pendingSendBytes);
+                      if (state.settledFalse > 0) break; // ended or overloaded: stop producing
                     }
                   })();
-                  return () => { cleanups += 1; };
+                  return () => { state.cleanups += 1; };
                 },
               }),
           }),
@@ -247,10 +293,15 @@ describe("served stalled consumer (live)", () => {
       const reader = response.body!.getReader();
       await reader.read(); // read one chunk, then stall
       await new Promise((resolve) => setTimeout(resolve, 150)); // producer runs against the stall
-      expect(maxRetained).toBeLessThanOrEqual(2048 * 2 + 128); // documented bound
+      expect(state.maxRetained).toBeLessThanOrEqual(2048 * 2 + 128); // documented bound (always)
       ac.abort(); // disconnect during (possibly) blocked writes
       await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(cleanups).toBe(1); // released promptly, exactly once
+      if (state.parkedSeen) {
+        // If production crossed socket buffering far enough to park a write,
+        // that write must have settled false on disconnect.
+        expect(state.settledFalse).toBeGreaterThanOrEqual(1);
+      }
+      expect(state.cleanups).toBe(1); // released promptly, exactly once (always)
     } finally {
       await server.stop();
     }
