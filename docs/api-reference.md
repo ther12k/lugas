@@ -8,6 +8,7 @@
 | `defineModule(config)` | function | stable |
 | `route(config)` | function | stable |
 | `guard(config)` | function | stable |
+| `bindServices<TServices>()` | factory → `{ route, guard }` | new (RF-1) |
 | `service(config)` | function | stable (M7-004) |
 | `drizzleService(config)` | `lugas/drizzle` function | new (M9-001) |
 | `parseCookies(request)` | function | new (M9-002) |
@@ -26,7 +27,7 @@
 | `problem(status, fields)` | function | stable |
 | `redirect(location)` | function | stable |
 
-Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `SseConfig`, `SseWriter`, `SseEventInput`, `CookieAttrs`, `WebSocketConfig`, `WebSocketEventContext`, `WebSocketMessage`, `ServerWebSocketLike`, `SecureHeadersConfig`, `HealthConfig`, `FormConfig`, `FormDescriptor`, `MultipartBody`, `TelemetryConfig`, `TelemetryRequestStart`, `TelemetryRequestEnd`, `TelemetryErrorClass`, `CompressionConfig`, `CompressionEncoding`, `EtagConfig`, `LoggingConfig`, `LugasLogEntry`, `LugasLogFields`, `LugasLogLevel`, `LogSink`, `OpenApiConfig`, `OpenApiDocumentInfo`, `OpenApiRouteMetadata`, `OpenApiUiConfig`, `CompiledOpenApi`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
+Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceBound`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `SseConfig`, `SseWriter`, `SseEventInput`, `CookieAttrs`, `WebSocketConfig`, `WebSocketEventContext`, `WebSocketMessage`, `ServerWebSocketLike`, `SecureHeadersConfig`, `HealthConfig`, `FormConfig`, `FormDescriptor`, `MultipartBody`, `TelemetryConfig`, `TelemetryRequestStart`, `TelemetryRequestEnd`, `TelemetryErrorClass`, `CompressionConfig`, `CompressionEncoding`, `EtagConfig`, `LoggingConfig`, `LugasLogEntry`, `LugasLogFields`, `LugasLogLevel`, `LogSink`, `OpenApiConfig`, `OpenApiDocumentInfo`, `OpenApiRouteMetadata`, `OpenApiUiConfig`, `CompiledOpenApi`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
 
 `defineApp()` also accepts `assets` (opt-in, ADR-0018): `{ files: { "/robots.txt": "./public/robots.txt" }, dirs: { "/assets/*": "./public/assets" } }`. File mappings are literal exact paths; directory mounts are explicit prefixes ending in `/*`. Native directory mounts (`assets.dirs`) are supported on Linux only (relying on kernel `openat2(RESOLVE_IN_ROOT)` for symlink containment); configuring `dirs` on macOS or Windows fails closed before startup (`LUGAS_ASSET_004`). File mappings (`assets.files`) are supported across all platforms. Assets are served natively by Bun through GET/HEAD; other methods reach the app's not-found policy (no 405). Ownership conflicts with API routes are rejected at startup (`LUGAS_ASSET_002`). Asset routes are outside the manifest and the request pipeline (no guards, no `onError`).
 

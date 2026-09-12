@@ -7,6 +7,8 @@ export { route } from "./core/route";
 export type { RouteConfig } from "./core/route";
 export { guard } from "./core/guard";
 export type { GuardConfig } from "./core/guard";
+export { bindServices } from "./core/bind-services";
+export type { ServiceBound } from "./core/bind-services";
 export { service } from "./core/service";
 export type { ServiceConfig, ServiceDescriptor } from "./core/service";
 export { sse, formatSseEvent } from "./core/sse";
