@@ -35,3 +35,4 @@
 33. [ADR-0033 — Compression and ETag on Native Codecs and Content Validators](0033-compression-etag.md)
 34. [ADR-0034 — Rate Limiting as a Guard Contract over Application-Owned Storage](0034-rate-limit-contract.md)
 35. [ADR-0035 — Application Fetch Interface (Proposed)](0035-application-fetch-interface.md)
+36. [ADR-0036 — Bounded SSE Producer Backpressure](0036-sse-bounded-backpressure.md)
