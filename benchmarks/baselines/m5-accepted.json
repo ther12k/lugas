@@ -1,12 +1,12 @@
 {
-  "version": 2,
+  "version": 3,
   "environment": {
     "bunVersion": "1.4.0",
     "platform": "linux",
     "arch": "x64",
     "cpuModel": "13th Gen Intel(R) Core(TM) i5-13420H",
     "memoryTotalMb": 15360,
-    "commit": "d4e87c3"
+    "commit": "fcdf5ec"
   },
   "thresholds": {
     "plain-static": {
@@ -25,7 +25,7 @@
       "targetRps": 30000
     }
   },
-  "typecheckBudgetMs": 2500,
+  "typecheckBudgetMs": 4000,
   "clientBundleMaxBytes": 25000,
-  "notes": "Thresholds derived from M5-002/003/004/005 measured evidence. Baseline updates require PR review. v2 (beta.4 attestation, 2026-09-11): typecheckBudgetMs 2000→2500 only — throughput thresholds and client bundle cap unchanged. The 2000ms budget was calibrated at M5-007 (316b854) before the M6–M9 batteries (assets, budgets, CORS, logging, OpenAPI, drizzle, cookies, WebSockets, health, multipart, telemetry, compression, rate-limit) grew the checked tree, and before @opentelemetry/api (M9-006 devDependency) resolved its types. Re-measured on the baseline host 2026-09-11 at 7fe452f: tsc --noEmit 1.98/2.18/2.27/2.19/2.32 s (median 2.19 s) — scope growth, not a regression; 2500ms preserves ~14% headroom and stays binding."
+  "notes": "Thresholds derived from M5-002/003/004/005 measured evidence. Baseline updates require PR review. v2 (beta.4 attestation, 2026-09-11): typecheckBudgetMs 2000\u21922500 only \u2014 throughput thresholds and client bundle cap unchanged. The 2000ms budget was calibrated at M5-007 (316b854) before the M6\u2013M9 batteries (assets, budgets, CORS, logging, OpenAPI, drizzle, cookies, WebSockets, health, multipart, telemetry, compression, rate-limit) grew the checked tree, and before @opentelemetry/api (M9-006 devDependency) resolved its types. Re-measured on the baseline host 2026-09-11 at 7fe452f: tsc --noEmit 1.98/2.18/2.27/2.19/2.32 s (median 2.19 s) \u2014 scope growth, not a regression; 2500ms preserves ~14% headroom and stays binding. v3 (post-CA-11, 2026-09-12): typecheckBudgetMs 2500\u21924000 only \u2014 throughput thresholds and client bundle cap unchanged. The 2500ms budget was calibrated at the v2 raise before the RF-1/RF-3/multipart/SPA-hosting batteries and their test suites grew the checked tree further. Re-measured on the baseline host at fcdf5ec: tsc --noEmit 3.42/3.65/3.42/3.37/3.43 s (median 3.42 s) \u2014 scope growth, not a regression; 4000ms preserves ~14% headroom and stays binding. PROPOSED FOR OWNER REVIEW \u2014 not self-merged."
 }
