@@ -15,7 +15,7 @@
 | `cookie(name, value, attrs?)` | function | new (M9-002) |
 | `websocket(config)` | function | new (M9-003) |
 | `secureHeaders` / `health` | `defineApp()` config | new (M9-004) |
-| `form(config)` | body codec function | new (M9-005) |
+| `form(config)` | body codec function (`repeated: "last-wins" \| "preserve"`) | new (M9-005; `repeated` new in RF-3) |
 | `telemetry` (`onRequestStart`/`onRequestEnd`) | `defineApp()` config | new (M9-006) |
 | `compression` / `etag` | `defineApp()` config | new (M9-007) |
 | `rateLimit(config)` / `createMemoryRateLimitStore()` | guard factory functions | new (M9-008) |
@@ -116,6 +116,7 @@ defineApp({
 | `serializeQuery(query)` | function | stable |
 | `appendQuery(path, qs)` | function | stable |
 | `buildRequestInit(opts)` | function | stable |
+| `formBody(values)` | function — multipart body wrapper for `form()` routes | new (RF-3) |
 | `normalizeBaseUrl(url)` | function | stable |
 | `joinUrl(base, path)` | function | stable |
 | `CLIENT_HTTP_METHODS` | const | stable |
@@ -124,7 +125,7 @@ defineApp({
 | `ClientRequestError` | class | stable |
 | `ClientDecodeError` | class | stable |
 
-Types: `LugasClient`, `ClientConfig`, `MethodCallInput`, `ClientCallResult`, `ClientSuccess`, `ClientFailure`, etc.
+Types: `LugasClient`, `ClientConfig`, `MethodCallInput`, `ClientCallResult`, `ClientSuccess`, `ClientFailure`, `FrameworkProblemBody`, `FormBodyInput`, `FormBodyValue`, `FormBodyValues`, etc.
 
 ## Testing subpath (`lugas/testing`)
 

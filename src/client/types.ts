@@ -8,6 +8,7 @@
  */
 import type { AppContract } from "../core/contract";
 import type { HttpMethod } from "../core/types";
+import type { FormBodyInput } from "../core/form";
 import type { NormalizedValidationIssue } from "../internal/validation-issues";
 import type { ClientFailure, ClientResult, ClientSuccess } from "./parse-response";
 
@@ -133,6 +134,24 @@ type ValidationFailedOutcome = {
   readonly body: FrameworkProblemBody<"VALIDATION_FAILED", 422>;
 };
 
+/** JSON-body route failures: parse (415/400) then validate (422). */
+type JsonBodyFailureOutcomes =
+  | ValidationFailedOutcome
+  | { readonly status: 415; readonly body: FrameworkProblemBody<"UNSUPPORTED_MEDIA_TYPE", 415> }
+  | { readonly status: 400; readonly body: FrameworkProblemBody<"MALFORMED_JSON", 400> };
+
+/**
+ * Multipart (`form()`) route failures: media type (415), platform parse
+ * (400 MALFORMED_MULTIPART), and the Lugas-level 413s — both ALWAYS carry a
+ * Problem Details body (FORM_LIMIT via the unconditional form() defaults;
+ * BODY_BUDGET when a budget is configured). The BARE transport-ceiling 413
+ * stays out of every union (see below).
+ */
+type MultipartFailureOutcomes =
+  | { readonly status: 415; readonly body: FrameworkProblemBody<"UNSUPPORTED_MEDIA_TYPE", 415> }
+  | { readonly status: 400; readonly body: FrameworkProblemBody<"MALFORMED_MULTIPART", 400> }
+  | { readonly status: 413; readonly body: FrameworkProblemBody<"FORM_LIMIT_EXCEEDED" | "BODY_BUDGET_EXCEEDED", 413> };
+
 /**
  * Framework failures derivable from a route entry's DECLARED capabilities
  * (RF-3, dogfood findings): schema slots make the framework's own rejection
@@ -140,24 +159,25 @@ type ValidationFailedOutcome = {
  *
  * - any declared schema slot (params/query/headers/body) → 422 VALIDATION_FAILED
  * - a declared standard-schema body additionally → 415 UNSUPPORTED_MEDIA_TYPE
- *   (non-JSON content type) and 400 MALFORMED_JSON (syntax error), because
- *   the framework parses the body before validating it.
+ *   and 400 MALFORMED_JSON (the framework parses the body before validating)
+ * - a `form()` body → the multipart failure set above (no 422: a form body
+ *   has no schema to validate against; params/query/headers schemas on the
+ *   same route still contribute 422 through their own branches)
  *
  * Deliberately NOT included:
- * - 413: budget applicability (route `budget`, app default, serve ceiling) is
- *   runtime configuration invisible to the type, and the transport ceiling
- *   emits a BARE 413 with no Problem document (`docs/body-limits.md`) — an
- *   out-of-union 413 still arrives safely through the runtime fallback
- *   (the decoder keys off the actual response, `parse-response.ts`).
- * - `form()` bodies: today's contract maps them to an undeclared body slot;
- *   their failure outcomes arrive with multipart client support.
+ * - 413 for JSON-schema routes: budget applicability (route `budget`, app
+ *   default, serve ceiling) is runtime configuration invisible to the type,
+ *   and the transport ceiling emits a BARE 413 with no Problem document
+ *   (`docs/body-limits.md`) — an out-of-union 413 still arrives safely
+ *   through the runtime fallback (the decoder keys off the actual response,
+ *   `parse-response.ts`).
  */
 type FrameworkFailureOutcomes<TEntry> = TEntry extends { readonly input: infer I }
   ? (I extends { readonly body?: infer B }
-      ? SlotDeclared<B> extends true
-        ? ValidationFailedOutcome
-            | { readonly status: 415; readonly body: FrameworkProblemBody<"UNSUPPORTED_MEDIA_TYPE", 415> }
-            | { readonly status: 400; readonly body: FrameworkProblemBody<"MALFORMED_JSON", 400> }
+      ? B extends FormBodyInput
+        ? MultipartFailureOutcomes
+        : SlotDeclared<B> extends true
+        ? JsonBodyFailureOutcomes
         : never
       : never)
       | (I extends { readonly params?: infer P } ? (SlotDeclared<P> extends true ? ValidationFailedOutcome : never) : never)
