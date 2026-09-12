@@ -30,6 +30,7 @@ export { websocket } from "./core/websocket";
 export type { WebSocketConfig, WebSocketEventContext, WebSocketMessage, ServerWebSocketLike } from "./core/websocket";
 export type { LugasLifecycle, ShutdownOutcome, ShutdownOptions } from "./internal/lifecycle";
 export type { CorsConfig, CorsOriginDecision, CorsOriginInput } from "./internal/cors";
+export type { SpaConfig } from "./internal/spa";
 export type { SecureHeadersConfig, HealthConfig } from "./internal/production";
 export type { TelemetryConfig, TelemetryRequestStart, TelemetryRequestEnd, TelemetryErrorClass } from "./internal/telemetry";
 export type { CompressionConfig, CompressionEncoding, EtagConfig } from "./internal/compression";

@@ -23,6 +23,7 @@ import { diagnostic, duplicateRoute } from "./diagnostics";
 import { makeFact, descriptorFacts, type RouteFact } from "./route-fact";
 import { classifyRoute } from "./classify-route";
 import { compileAssets, type AssetsConfig } from "./assets";
+import { compileSpa, type SpaConfig } from "./spa";
 import { compileRoute } from "./compile-route";
 import { defaultNotFound, defaultOnError, withErrorPolicy, type ErrorPolicy, type NotFoundPolicy } from "./error-policy";
 import { isServiceDescriptor } from "../core/service";
@@ -127,6 +128,7 @@ export function prepareApp<TServices>(config: {
   modules?: ReadonlyArray<ModuleDescriptor<TServices, any>> | undefined;
   services: TServices;
   assets?: AssetsConfig | undefined;
+  spa?: SpaConfig | undefined;
   bodyBudget?: number | undefined;
   cors?: CompiledCorsPolicy | undefined;
   logging?: CompiledLogging | undefined;
@@ -590,6 +592,46 @@ export function prepareApp<TServices>(config: {
       if (config.cors !== undefined) mounted = corsWrapHandler(config.cors, mounted);
       compiled[path] = Object.freeze({ GET: mounted });
       facts.push(makeFact({ method: "GET", path, module: null, kind: "native", native: "handler", validates: [], guards: [] }));
+    }
+  }
+
+  // ADR-0037: SPA navigations mount after every other owner so ownership can
+  // be validated against routes, assets, health, and OpenAPI paths, and so
+  // the policy wraps (logging, secureHeaders, CORS) apply to the shell
+  // exactly as they do to health endpoints. Native static values still bypass
+  // the pipeline (unchanged, documented); the shell deliberately does not.
+  if (config.spa !== undefined) {
+    const ownedHealth = new Set<string>();
+    const ownedOpenApi = new Set<string>();
+    if (config.health !== undefined) {
+      ownedHealth.add(config.health.livenessPath);
+      ownedHealth.add(config.health.readinessPath);
+    }
+    if (config.openapi !== undefined) {
+      ownedOpenApi.add(config.openapi.path);
+      if (config.openapi.uiPath !== null) ownedOpenApi.add(config.openapi.uiPath);
+    }
+    const spaRoutes = compileSpa(config.spa, {
+      routes: new Set(declarationsByPath.keys()),
+      assets: new Set(Object.keys(assetRoutes)),
+      health: ownedHealth,
+      openapi: ownedOpenApi,
+    });
+    for (const [path, methodMap] of Object.entries(spaRoutes)) {
+      const wrappedMap: Record<string, unknown> = {};
+      for (const [method, entry] of Object.entries(methodMap as Record<string, (request: Request) => Response | Promise<Response>>)) {
+        let mounted: (request: Request) => Response | Promise<Response> = entry;
+        if (config.logging !== undefined) mounted = wrapLogHandler(config.logging, `${method} ${path}`, mounted);
+        if (config.secureHeaders !== undefined) {
+          const policy = config.secureHeaders;
+          const inner = mounted;
+          mounted = async (request: Request) => applySecureHeaders(policy, await inner(request));
+        }
+        if (config.cors !== undefined) mounted = corsWrapHandler(config.cors, mounted);
+        wrappedMap[method] = mounted;
+        facts.push(makeFact({ method, path, module: null, kind: "native", native: "handler", validates: [], guards: [] }));
+      }
+      compiled[path] = Object.freeze(wrappedMap);
     }
   }
 

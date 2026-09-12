@@ -39,6 +39,7 @@ export type DiagnosticCode =
   | "LUGAS_RATE_LIMIT_001"
   | "LUGAS_HEADERS_001"
   | "LUGAS_HEALTH_001" | "LUGAS_HEALTH_002"
+  | "LUGAS_SPA_001" | "LUGAS_SPA_002"
   | "LUGAS_LIFECYCLE_001"
   | "LUGAS_TEST_001"
   | "LUGAS_CLI_001";
@@ -104,6 +105,8 @@ export const DIAGNOSTIC_CATALOG: ReadonlyArray<CatalogEntry> = [
   { code: "LUGAS_HEADERS_001", thrownBy: "defineApp()", meaning: "invalid secureHeaders configuration", hint: "pass secureHeaders: true or { contentSecurityPolicy?: string, hstsMaxAge?: number }; CSP is strictly opt-in" },
   { code: "LUGAS_HEALTH_001", thrownBy: "defineApp()", meaning: "invalid health configuration", hint: "pass health: true or { livenessPath?: string, readinessPath?: string }; paths are concrete and must differ" },
   { code: "LUGAS_HEALTH_002", thrownBy: "defineApp()", meaning: "health endpoint path collision with a route or asset", hint: "rename the health endpoint: health: { livenessPath: '/healthz' }" },
+  { code: "LUGAS_SPA_001", thrownBy: "defineApp()", meaning: "invalid spa configuration", hint: "spa: { shell, navigations } — shell is an existing built file; navigations are exact paths or explicit prefixes ending in '/*' (ADR-0037)" },
+  { code: "LUGAS_SPA_002", thrownBy: "defineApp()", meaning: "SPA navigation ownership collision", hint: "navigations must not overlap routes, assets, health, openapi endpoints, or each other (ADR-0037)" },
   { code: "LUGAS_LIFECYCLE_001", thrownBy: "service()", meaning: "invalid service lifecycle descriptor", hint: "use service({ name, value, init?, dispose? }) with a non-empty name" },
   { code: "LUGAS_MODULE_001", thrownBy: "defineModule()", meaning: "config must be an object", hint: "pass defineModule({ name, routes })" },
   { code: "LUGAS_MODULE_002", thrownBy: "defineModule()", meaning: "unknown config key", hint: "allowed keys: name, routes" },

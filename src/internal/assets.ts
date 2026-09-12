@@ -19,7 +19,17 @@ import { diagnostic } from "./diagnostics";
 import { analyzePath, isDiagnostic } from "./path";
 
 /** Exact URL path → filesystem file. Values resolve relative to process CWD when relative. */
-export type AssetFileMappings = Readonly<Record<string, string>>;
+export type AssetFileMappings = Readonly<Record<string, string | AssetFileMapping>>;
+/**
+ * Explicitly identified content-hashed asset mapping (ADR-0037): served as a
+ * lazy file-backed pipeline handler carrying the given cache header, so the
+ * immutable caching and the framework policies compose. Path semantics are
+ * identical to the string form (exact URL path → filesystem file).
+ */
+export type AssetFileMapping = {
+  readonly path: string;
+  readonly cacheControl: string;
+};
 /** URL prefix ending in `/*` → filesystem directory (served as a native Bun directory route). */
 export type AssetDirMounts = Readonly<Record<string, string>>;
 export type AssetsConfig = {
@@ -32,7 +42,7 @@ export type AssetsConfig = {
  * Literals are patterns without `:param`/`*`; `*` is valid only as the final
  * segment and matches at least one further segment (Bun's `<prefix>/*` shape).
  */
-function patternsOverlap(a: string, b: string): boolean {
+export function patternsOverlap(a: string, b: string): boolean {
   const sa = a.split("/").slice(1);
   const sb = b.split("/").slice(1);
   let i = 0;
@@ -78,10 +88,35 @@ export function compileAssets(assets: AssetsConfig | undefined, apiPaths: Readon
       });
     }
     for (const [key, value] of Object.entries(map)) {
-      if (typeof value !== "string" || value.length === 0) {
-        throw diagnostic("LUGAS_ASSET_001", `defineApp(): assets.${mapName}['${key}'] must be a non-empty filesystem path`, {
+      if (mapName === "dirs") {
+        if (typeof value !== "string" || value.length === 0) {
+          throw diagnostic("LUGAS_ASSET_001", `defineApp(): assets.${mapName}['${key}'] must be a non-empty filesystem path`, {
+            context: { key },
+          });
+        }
+        continue;
+      }
+      if (typeof value === "string") {
+        if (value.length === 0) {
+          throw diagnostic("LUGAS_ASSET_001", `defineApp(): assets.${mapName}['${key}'] must be a non-empty filesystem path`, {
+            context: { key },
+          });
+        }
+        continue;
+      }
+      // Object form (ADR-0037): explicitly identified content-hashed asset.
+      if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        throw diagnostic("LUGAS_ASSET_001", `defineApp(): assets.files['${key}'] must be a filesystem path string or { path, cacheControl }`, {
+          hint: 'string form serves natively; { path, cacheControl } serves a file-backed pipeline handler for long-lived caching',
           context: { key },
         });
+      }
+      for (const field of ["path", "cacheControl"] as const) {
+        if (typeof value[field] !== "string" || value[field].length === 0) {
+          throw diagnostic("LUGAS_ASSET_001", `defineApp(): assets.files['${key}'].${field} must be a non-empty string`, {
+            context: { key },
+          });
+        }
       }
     }
   }
@@ -114,10 +149,11 @@ export function compileAssets(assets: AssetsConfig | undefined, apiPaths: Readon
 
   // Explicit declarations point at real content.
   for (const [key, value] of Object.entries(files)) {
-    const abs = resolve(value);
+    const target = typeof value === "string" ? value : value.path;
+    const abs = resolve(target);
     if (!existsSync(abs) || !statSync(abs).isFile()) {
-      throw diagnostic("LUGAS_ASSET_003", `defineApp(): assets.files['${key}'] does not point at an existing file: '${value}'`, {
-        context: { key, path: value },
+      throw diagnostic("LUGAS_ASSET_003", `defineApp(): assets.files['${key}'] does not point at an existing file: '${target}'`, {
+        context: { key, path: target },
       });
     }
   }
@@ -181,9 +217,20 @@ export function compileAssets(assets: AssetsConfig | undefined, apiPaths: Readon
 
   // Native route values under GET-keyed method maps: GET (+ implicit HEAD)
   // serves; all other methods reach the app's not-found policy.
+  // Object-form hashed mappings (ADR-0037) compile to file-backed pipeline
+  // HANDLERS — lazy Bun.file responses carrying the configured cache header,
+  // wrapped by the secure-headers/CORS passes like every other handler.
   const compiled: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(files)) {
-    compiled[key] = Object.freeze({ GET: Bun.file(resolve(value)) });
+    if (typeof value === "string") {
+      compiled[key] = Object.freeze({ GET: Bun.file(resolve(value)) });
+      continue;
+    }
+    const abs = resolve(value.path);
+    const headers = { "cache-control": value.cacheControl };
+    const handler = (): Response => new Response(Bun.file(abs), { headers });
+    const headHandler = (): Response => new Response(null, { headers });
+    compiled[key] = Object.freeze({ GET: handler, HEAD: headHandler });
   }
   for (const [key, value] of Object.entries(dirs)) {
     compiled[key] = Object.freeze({ GET: { dir: resolve(value) } });

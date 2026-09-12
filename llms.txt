@@ -107,6 +107,7 @@ See docs/diagnostics.md.
 - docs/roadmap.md — shipped surface, stop-rule
 - docs/routing.md — paths, methods, modules
 - docs/services.md — services, init gate, shutdown
+- docs/spa.md
 - docs/sse.md — sse() streaming helper
 - docs/telemetry.md — telemetry hooks, OTel recipe
 - docs/testing.md — createTestServer, bound client
