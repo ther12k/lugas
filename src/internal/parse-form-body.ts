@@ -7,17 +7,16 @@
  * `FormData` implementation over a synthetic request. Lugas ships no MIME
  * parser; the budget guarantee comes from bounding the bytes before parse.
  */
-import type { FormDescriptor } from "../core/form";
+import type { FormDescriptor, FormRepeated, MultipartBody, MultipartBodyPreserved } from "../core/form";
 import {
   createBodyBudgetProblem,
   createFormLimitProblem,
   createMalformedMultipartProblem,
   createUnsupportedMediaTypeProblem,
 } from "./validation-problem";
-import type { MultipartBody } from "../core/form";
 
 export type ParseFormBodyResult =
-  | { readonly ok: true; readonly data: MultipartBody }
+  | { readonly ok: true; readonly data: MultipartBody | MultipartBodyPreserved }
   | { readonly ok: false; readonly response: Response };
 
 function isMultipartContentType(contentType: string | null): boolean {
@@ -63,7 +62,7 @@ async function readBodyBytesBounded(
 
 export async function parseFormBody(
   request: Request,
-  descriptor: FormDescriptor,
+  descriptor: FormDescriptor<FormRepeated>,
   budget: number | undefined,
 ): Promise<ParseFormBodyResult> {
   const contentType = request.headers.get("content-type");
@@ -97,6 +96,10 @@ export async function parseFormBody(
 
   const fields: Record<string, string> = {};
   const files: Record<string, File> = {};
+  // `repeated: "preserve"` additionally records every part per name, in wire
+  // order; fields/files keep their documented last-wins contract in both modes.
+  const preserve = descriptor.repeated === "preserve";
+  const groups: Record<string, Array<string | File>> = {};
   let fieldCount = 0;
   let fileCount = 0;
   // Runtime parts are global File values; undici's *type* for the synthetic
@@ -120,6 +123,11 @@ export async function parseFormBody(
       }
       files[name] = file;
     }
+    if (preserve) {
+      const group = groups[name] ?? (groups[name] = []);
+      group.push(value as string | File);
+    }
   }
-  return { ok: true, data: { fields, files } };
+  const data: MultipartBody | MultipartBodyPreserved = preserve ? { fields, files, groups } : { fields, files };
+  return { ok: true, data };
 }

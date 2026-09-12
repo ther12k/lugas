@@ -10,6 +10,7 @@ import type {
   RouteResponseUnion,
   TypedResponse,
 } from "./types";
+import type { AnyFormDescriptor, FormBodyInput } from "./form";
 import type { StandardSchemaInput } from "../internal/standard-schema";
 
 export type RouteInputContract<TDescriptor> = TDescriptor extends {
@@ -22,7 +23,13 @@ export type RouteInputContract<TDescriptor> = TDescriptor extends {
       readonly params: P extends { readonly "~standard": unknown } ? StandardSchemaInput<P> : undefined;
       readonly query: Q extends { readonly "~standard": unknown } ? StandardSchemaInput<Q> : undefined;
       readonly headers: H extends { readonly "~standard": unknown } ? StandardSchemaInput<H> : undefined;
-      readonly body: B extends { readonly "~standard": unknown } ? StandardSchemaInput<B> : undefined;
+      // A form() descriptor is a multipart body codec: the client must send a
+      // formBody() wrapper (the runtime encoder discriminator), not JSON.
+      readonly body: B extends AnyFormDescriptor
+        ? FormBodyInput
+        : B extends { readonly "~standard": unknown }
+        ? StandardSchemaInput<B>
+        : undefined;
     }
   : {
       readonly params: undefined;

@@ -37,6 +37,9 @@ export type {
   ClientRequestErrorCode,
 } from "./request";
 
+export { formBody } from "./form-body";
+export type { FormBodyInput, FormBodyValue, FormBodyValues } from "../core/form";
+
 export { parseResponse } from "./parse-response";
 export type {
   ClientFailure,

@@ -80,13 +80,35 @@ The union is not only handler and guard outcomes. Routes that **declare schemas*
 |---|---|
 | any schema slot (`params`, `query`, `headers`, `body`) | `422` `VALIDATION_FAILED` |
 | a `body` schema (JSON) | `415` `UNSUPPORTED_MEDIA_TYPE`, `400` `MALFORMED_JSON` |
+| a [`form()`](./uploads.md) body | `415` `UNSUPPORTED_MEDIA_TYPE`, `400` `MALFORMED_MULTIPART`, `413` `FORM_LIMIT_EXCEEDED`/`BODY_BUDGET_EXCEEDED` (Problem body) |
 
 Each failure branch carries the Problem Details document the framework emits (`code` is the literal failure kind, `issues` the normalized validation issues). Routes that declare no schemas gain nothing.
 
 Two honest boundaries:
 
-- **413 is not in the union.** Whether a body budget applies (route `budget`, app default, serve ceiling) is runtime configuration, and the transport ceiling emits a **bare** `413` with no body — an out-of-union status still arrives safely: the runtime branch follows the actual response, and the result always carries `status`, the decoded payload slot, and `response`.
-- **`form()` multipart routes** do not yet contribute their failure branches; they arrive with typed multipart support.
+- **413 is not in the union for JSON-schema routes.** Whether a body budget applies (route `budget`, app default, serve ceiling) is runtime configuration, and the transport ceiling emits a **bare** `413` with no body — an out-of-union status still arrives safely: the runtime branch follows the actual response, and the result always carries `status`, the decoded payload slot, and `response`.
+- **`form()` routes' 413 always carries a Problem body** (the limits are unconditional `form()` configuration), which is why it joins the union — the bare transport-ceiling 413 stays out for every route kind.
+
+### Multipart uploads through the typed client
+
+Routes whose body is [`form()`](./uploads.md) take a `formBody()` wrapper — the explicit runtime discriminator that selects the multipart encoder (the contract is erased at dispatch, so generics alone cannot pick the encoder):
+
+```ts
+import { formBody } from "lugas/client";
+
+const res = await api.post("/upload", {
+  body: formBody({
+    note: "quarterly report",
+    attachments: [new File([bytes], "q3.pdf", { type: "application/pdf" }), new File([bytes], "q4.pdf")],
+  }),
+});
+if (res.ok) res.data;          // the handler's typed json() body
+if (!res.ok) res.error.code;   // "FORM_LIMIT_EXCEEDED" | "BODY_BUDGET_EXCEEDED" | … (literal)
+```
+
+- Native `File`/`Blob` values are preserved as parts; scalars stringify; a flat array sends one part per element under the same field name (nested arrays are rejected).
+- The **platform generates the boundary**: the client never sets `content-type`, and a caller-supplied content type is a conflict (`LUGAS_CLIENT_008`).
+- Cancellation and every other platform option behave exactly as on JSON calls.
 
 ## Error classes
 

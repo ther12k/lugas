@@ -21,7 +21,7 @@
  *   different types surface as `never` instead of silently shadowing (the
  *   runtime throws on reserved-key collisions).
  */
-import type { FormDescriptor, MultipartBody } from "../core/form";
+import type { AnyFormDescriptor, FormDescriptor, MultipartBody, MultipartBodyPreserved } from "../core/form";
 import type { GuardDescriptor, RouteHandler } from "../core/types";
 import type { StandardSchema, StandardSchemaOutput } from "./standard-schema";
 
@@ -86,11 +86,13 @@ export type SchemaOutputOrRawParams<TParamsSchema> =
  * reads stay visible without breaking exactOptionalPropertyTypes.
  */
 export type DeclaredSlot<Key extends string, TSchema> =
-  TSchema extends FormDescriptor
-    ? { [P in Key]: MultipartBody }
-    : TSchema extends StandardSchema<any, infer Output>
-      ? { [P in Key]: Output }
-      : { [P in Key]?: undefined };
+  TSchema extends FormDescriptor<"preserve">
+    ? { [P in Key]: MultipartBodyPreserved }
+    : TSchema extends AnyFormDescriptor
+      ? { [P in Key]: MultipartBody }
+      : TSchema extends StandardSchema<any, infer Output>
+        ? { [P in Key]: Output }
+        : { [P in Key]?: undefined };
 
 /**
  * Non-response contribution of one guard. Short-circuit-only guards

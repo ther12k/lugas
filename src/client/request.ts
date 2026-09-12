@@ -9,10 +9,16 @@
  * - `headers` are owned by the structured input; platform options may not
  *   carry them, so there is exactly one header channel and no silent
  *   cross-channel contradictions.
- * - A declared body is JSON-serialized; `content-type` defaults to
+ * - A declared JSON body is JSON-serialized; `content-type` defaults to
  *   `application/json` only when the caller did not supply one. A caller
  *   content-type that is not JSON-compatible is a documented conflict and
  *   fails with a stable diagnostic (mirrors M2-007's media-type policy).
+ * - A declared multipart body (`formBody()` wrapper — the runtime encoder
+ *   discriminator, RF-3 roadmap item 3) is converted to native `FormData`:
+ *   native `File`/`Blob` values are preserved as parts, flat arrays send one
+ *   part per element under the same field name, and `content-type` is NEVER
+ *   set by the client — the platform generates the multipart boundary. A
+ *   caller content type is a conflict (`LUGAS_CLIENT_008`).
  * - `signal`, `credentials`, `redirect`, `cache`, and every other non-owned
  *   platform option are forwarded unchanged.
  * - Body presence is distinct from body value (M4R1-006): an omitted key or
@@ -119,6 +125,62 @@ function serializeJsonBody(body: unknown): string {
 }
 
 /**
+ * Runtime discriminator for the multipart encoder (the compile-time contract
+ * is erased before dispatch): the `formBody()` wrapper shape. A declared JSON
+ * body never carries `multipart: true` plus a `values` object; a payload that
+ * deliberately fakes the shape on a JSON route fails loudly server-side with
+ * the typed 415 branch instead of silently succeeding.
+ */
+function isMultipartBodyValue(body: unknown): body is { readonly multipart: true; readonly values: Record<string, unknown> } {
+  return (
+    typeof body === "object" && body !== null &&
+    (body as { multipart?: unknown }).multipart === true &&
+    typeof (body as { values?: unknown }).values === "object" &&
+    (body as { values?: unknown }).values !== null
+  );
+}
+
+function appendMultipartPart(formData: FormData, key: string, value: unknown): void {
+  if (typeof value === "string") {
+    formData.append(key, value);
+    return;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    formData.append(key, String(value));
+    return;
+  }
+  if (value instanceof Blob) {
+    // Native File/Blob values are preserved as parts (File keeps its name).
+    formData.append(key, value);
+    return;
+  }
+  throw new ClientRequestError(
+    "LUGAS_CLIENT_008",
+    `multipart field '${key}' must be a string, number, boolean, Blob, or a flat array of those`,
+  );
+}
+
+function toMultipartFormData(values: Record<string, unknown>): FormData {
+  const formData = new FormData();
+  for (const [key, value] of Object.entries(values)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      // Fan out one level: one part per element under the same field name.
+      // Elements must be scalar/Blob — nested arrays are rejected, never flattened.
+      for (const element of value) {
+        if (Array.isArray(element)) {
+          throw new ClientRequestError("LUGAS_CLIENT_008", `multipart field '${key}' must be a flat array (no nested arrays)`);
+        }
+        appendMultipartPart(formData, key, element);
+      }
+      continue;
+    }
+    appendMultipartPart(formData, key, value);
+  }
+  return formData;
+}
+
+/**
  * Builds the final `RequestInit` for one client dispatch. All ownership,
  * precedence, and serialization rules are enforced here so that no caller
  * input can contradict an owned field silently.
@@ -144,8 +206,19 @@ export function buildRequestInit(options: BuildRequestOptions): BuiltRequest {
   applyHeaderEntries(headers, options.headers, "typed header");
 
   const hasDeclaredBody = options.body !== undefined;
-  let body: string | undefined;
-  if (hasDeclaredBody) {
+  let body: string | FormData | undefined;
+  if (hasDeclaredBody && isMultipartBodyValue(options.body)) {
+    // Multipart path: the platform generates the boundary, so ANY caller
+    // content type is a conflict — there is no compatible one to set.
+    const callerContentType = headers.get("content-type");
+    if (callerContentType !== null) {
+      throw new ClientRequestError(
+        "LUGAS_CLIENT_008",
+        `declared multipart body conflicts with caller content-type '${callerContentType.split(";")[0]!.trim().toLowerCase()}'; the platform generates the multipart boundary`,
+      );
+    }
+    body = toMultipartFormData(options.body.values);
+  } else if (hasDeclaredBody) {
     const callerContentType = headers.get("content-type");
     if (callerContentType !== null && !isJsonCompatibleContentType(callerContentType)) {
       throw new ClientRequestError(

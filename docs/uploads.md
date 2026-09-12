@@ -54,6 +54,20 @@ The effective budget is the usual composition: app `bodyBudget` default, per-rou
 
 Limits are positive integers validated at `form()` creation (`LUGAS_FORM_001` on violations, including unknown keys). Byte overruns and shape overruns are both `413` — "too large" — with distinct `code` values (`BODY_BUDGET_EXCEEDED` vs `FORM_LIMIT_EXCEEDED`) so clients can tell which bound fired.
 
+## Multiplicity: repeated part names
+
+By default, repeated part names collapse **last-wins** (`fields`/`files`), mirroring [`parseCookies`](./cookies.md) — the M9-005 contract, unchanged. Uploads that legitimately repeat a field name (an ordinary `multiple` file input) can opt into an additional per-name view:
+
+```ts
+body: form({ repeated: "preserve" })
+```
+
+The handler body then also carries `groups`: every part per name, in wire order — `ctx.body.groups.attachments` is `Array<string | File>`. `fields`/`files` stay last-wins in both modes; the default is never changed silently.
+
+## Sending from the typed client
+
+`form()` routes are end-to-end typed: the client call takes a [`formBody()`](./client.md#multipart-uploads-through-the-typed-client) wrapper, the platform generates the boundary, and the route's failure contract below appears as typed failure branches in the client result union.
+
 ## Failure contract
 
 | Condition | Status | Code |
@@ -67,7 +81,7 @@ None of these reach the handler — handlers never see half-parsed bodies.
 
 ## Value semantics
 
-- **Repeated part names collapse last-wins**, mirroring [`parseCookies`](./cookies.md). The native `request.formData()` remains available in handlers when you genuinely need multiplicity.
+- **Repeated part names collapse last-wins by default**; `form({ repeated: "preserve" })` additionally exposes every part per name under `groups` (above). The native `request.formData()` remains available in handlers as the raw escape hatch.
 - **Files are native `File`** — `stream()` forwards to storage/another service without re-serializing; `arrayBuffer()` for small files.
 - **No disk-spooling config, no streaming part events** (ADR-0030 non-goals): handlers get the complete bounded body; spooling for large caps is platform behavior.
 
