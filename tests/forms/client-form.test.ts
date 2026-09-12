@@ -80,7 +80,27 @@ describe("typed-client multipart", () => {
     expect(res.ok).toBe(false);
     if (!res.ok) {
       expect(res.status).toBe(413);
-      expect(res.error.code).toBe("FORM_LIMIT_EXCEEDED");
+      // Lugas-level 413s carry the Problem body — narrowed before field access.
+      expect(res.error?.code).toBe("FORM_LIMIT_EXCEEDED");
+    }
+  });
+
+  test("transport-ceiling 413 arrives with NO payload; the type forces narrowing (CA-7)", async () => {
+    // Same typed route, but Bun's maxRequestBodySize rejects before the
+    // framework sees the body: bare 413, empty body, no Problem document.
+    const raw = app.serve({ port: 0, development: false, maxRequestBodySize: 16 });
+    try {
+      const client = createClient<API>({ baseUrl: raw.url });
+      const res = await client.post("/upload", {
+        body: formBody({ files: [file("big.bin", 128)] }),
+      });
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.status).toBe(413);
+        expect(res.error).toBeUndefined(); // decoder never manufactures a body
+      }
+    } finally {
+      raw.stop(true);
     }
   });
 

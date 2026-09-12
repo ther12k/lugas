@@ -10,7 +10,7 @@ import { form } from "../../src/core/form";
 import { json } from "../../src/core/response";
 import { z } from "zod";
 import type { AppContract } from "../../src/core/contract";
-import type { ClientOutcomesFor, ClientCallResult, MethodBodyInput } from "../../src/client/types";
+import type { ClientOutcomesFor, ClientCallResult, FrameworkProblemBody, MethodBodyInput } from "../../src/client/types";
 import type { MultipartBody, MultipartBodyPreserved } from "../../src/core/form";
 import type { RouteContext } from "../../src/internal/context";
 
@@ -65,8 +65,21 @@ type _bodyRequired = Expect<Equal<"body" extends keyof UploadInput ? true : fals
 type UploadOutcomes = ClientOutcomesFor<Contract, "/upload", "POST">;
 type _uploadStatuses = Expect<Equal<UploadOutcomes["status"], 201 | 400 | 413 | 415>>;
 type _malformedCode = Expect<Equal<Extract<UploadOutcomes, { status: 400 }>["body"]["code"], "MALFORMED_MULTIPART">>;
-type _limitCode = Expect<Equal<Extract<UploadOutcomes, { status: 413 }>["body"]["code"], "FORM_LIMIT_EXCEEDED" | "BODY_BUDGET_EXCEEDED">>;
 type _mediaCode = Expect<Equal<Extract<UploadOutcomes, { status: 415 }>["body"]["code"], "UNSUPPORTED_MEDIA_TYPE">>;
+
+// 2b. The 413 payload is ABSENTABLE (CA-7): Lugas-level 413s carry the
+//     Problem body, but the transport ceiling can bare-413 the same route
+//     before the framework sees it. The type forces narrowing.
+type Upload413 = Extract<UploadOutcomes, { status: 413 }>;
+type _413Absentable = Expect<Equal<Upload413["body"], FrameworkProblemBody<"FORM_LIMIT_EXCEEDED" | "BODY_BUDGET_EXCEEDED", 413> | undefined>>;
+declare const result413: Extract<ClientCallResult<Contract, "/upload", "POST">, { ok: false; status: 413 }>;
+// @ts-expect-error Problem fields are unreachable without narrowing — the
+// numeric status alone cannot distinguish Lugas 413s from a bare transport 413.
+result413.error.code;
+if (result413.error !== undefined) {
+  const narrowed: "FORM_LIMIT_EXCEEDED" | "BODY_BUDGET_EXCEEDED" = result413.error.code;
+  void narrowed;
+}
 
 // 3. Declared params on a form route still contribute 422 through their own branch.
 type WithParamsOutcomes = ClientOutcomesFor<Contract, "/upload-with-params/:id", "POST">;

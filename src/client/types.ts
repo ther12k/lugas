@@ -142,15 +142,18 @@ type JsonBodyFailureOutcomes =
 
 /**
  * Multipart (`form()`) route failures: media type (415), platform parse
- * (400 MALFORMED_MULTIPART), and the Lugas-level 413s — both ALWAYS carry a
- * Problem Details body (FORM_LIMIT via the unconditional form() defaults;
- * BODY_BUDGET when a budget is configured). The BARE transport-ceiling 413
- * stays out of every union (see below).
+ * (400 MALFORMED_MULTIPART), and 413. The 413 payload is ABSENTABLE: the
+ * Lugas-level 413s always carry a Problem Details body (FORM_LIMIT via the
+ * unconditional form() defaults; BODY_BUDGET when a budget is configured),
+ * but the transport ceiling can reject the same request with a BARE 413 and
+ * no body before the framework sees it (`docs/body-limits.md`) — declaring
+ * `form()` does not exclude that path. Consumers MUST narrow before reading
+ * Problem fields off a 413 (CA-7); the decoder never manufactures a body.
  */
 type MultipartFailureOutcomes =
   | { readonly status: 415; readonly body: FrameworkProblemBody<"UNSUPPORTED_MEDIA_TYPE", 415> }
   | { readonly status: 400; readonly body: FrameworkProblemBody<"MALFORMED_MULTIPART", 400> }
-  | { readonly status: 413; readonly body: FrameworkProblemBody<"FORM_LIMIT_EXCEEDED" | "BODY_BUDGET_EXCEEDED", 413> };
+  | { readonly status: 413; readonly body: FrameworkProblemBody<"FORM_LIMIT_EXCEEDED" | "BODY_BUDGET_EXCEEDED", 413> | undefined };
 
 /**
  * Framework failures derivable from a route entry's DECLARED capabilities
