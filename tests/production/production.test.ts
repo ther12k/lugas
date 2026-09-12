@@ -9,6 +9,7 @@
  * (LUGAS_HEALTH_001/LUGAS_HEADERS_001), manifest facts, CORS composition.
  */
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import { defineApp, json, route, service } from "../../src/index";
 import { createTestServer } from "../../src/testing";
 
@@ -40,6 +41,34 @@ describe("secureHeaders", () => {
         expect(res.headers.get("x-frame-options")).toBe("deny");
         expect(res.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
       }
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("static method-map entries survive the secure-headers pass (CA-1)", async () => {
+    const app = defineApp({
+      secureHeaders: true,
+      routes: {
+        "/api": { GET: route({ handler: () => json(200, {}) }) },
+        "/native": { GET: Bun.file(join(import.meta.dir, "fixtures", "note.txt")) },
+      },
+      assets: { files: { "/logo.svg": join(import.meta.dir, "fixtures", "logo.svg") } },
+    });
+    const routes = app.prepared.bunRoutes as Record<string, Record<string, unknown>>;
+    expect(routes["/native"]?.GET).toBeInstanceOf(Blob);
+    expect(routes["/logo.svg"]?.GET).toBeInstanceOf(Blob);
+    const server = createTestServer(app);
+    try {
+      const native = await server.fetch("/native");
+      expect(native.status).toBe(200);
+      expect(await native.text()).toContain("native note body");
+      const asset = await server.fetch("/logo.svg");
+      expect(asset.status).toBe(200);
+      expect(await asset.text()).toContain("<svg");
+      const wrapped = await server.fetch("/api");
+      expect(wrapped.status).toBe(200);
+      expect(wrapped.headers.get("x-content-type-options")).toBe("nosniff");
     } finally {
       await server.stop();
     }
