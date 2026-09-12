@@ -12,6 +12,7 @@ import { compose, type Composition } from "../internal/compose";
 import { buildManifest, type LugasManifestV1 } from "../internal/manifest";
 import { prepareApp, type PreparedApp } from "../internal/prepared-app";
 import type { AssetsConfig } from "../internal/assets";
+import type { SpaConfig } from "../internal/spa";
 import { compileCorsPolicy, type CompiledCorsPolicy, type CorsConfig } from "../internal/cors";
 import { compileLogging, type CompiledLogging, type LoggingConfig } from "../internal/logging";
 import { compileOpenApiConfig, type CompiledOpenApi, type OpenApiConfig } from "../internal/openapi";
@@ -33,6 +34,16 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
    * startup. Absent assets leave every behavior unchanged.
    */
   assets?: AssetsConfig;
+  /**
+   * Opt-in SPA hosting (ADR-0037): serve an already-built frontend from the
+   * same process. `shell` is the built HTML document, served at every
+   * declared `navigations` pattern through the framework pipeline (security
+   * headers, CORS, logging apply; revalidation cache policy). Ownership is
+   * application-declared and fail-closed: navigations must not overlap
+   * routes, assets, health, or OpenAPI paths. Absent `spa` leaves every
+   * behavior unchanged.
+   */
+  spa?: SpaConfig;
   /**
    * Application-default body budget in bytes (M7-003, ADR-0019). Applied to
    * routes with a declared framework-parsed body when the route declares no
@@ -106,7 +117,7 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
   onError?: (error: unknown, request: Request) => Response | Promise<Response>;
 };
 
-const APP_KEYS = new Set(["services", "routes", "modules", "assets", "bodyBudget", "cors", "logging", "openapi", "secureHeaders", "health", "telemetry", "compression", "etag", "notFound", "onError"]);
+const APP_KEYS = new Set(["services", "routes", "modules", "assets", "spa", "bodyBudget", "cors", "logging", "openapi", "secureHeaders", "health", "telemetry", "compression", "etag", "notFound", "onError"]);
 
 export type AppInternals<TServices = unknown> = {
   readonly composition: Composition;
@@ -217,6 +228,7 @@ export function defineApp<
     modules: config.modules as ReadonlyArray<ModuleDescriptor<TServices, any>> | undefined,
     services: config.services as TServices,
     assets: config.assets,
+    spa: config.spa,
     bodyBudget: config.bodyBudget,
     cors: corsPolicy,
     logging: loggingConfig,

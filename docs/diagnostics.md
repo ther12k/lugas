@@ -54,6 +54,8 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | LUGAS_HEADERS_001 | defineApp() | invalid secureHeaders configuration | pass secureHeaders: true or { contentSecurityPolicy?: string, hstsMaxAge?: number }; CSP is strictly opt-in |
 | LUGAS_HEALTH_001 | defineApp() | invalid health configuration | pass health: true or { livenessPath?: string, readinessPath?: string }; paths are concrete and must differ |
 | LUGAS_HEALTH_002 | defineApp() | health endpoint path collision with a route or asset | rename the health endpoint: health: { livenessPath: '/healthz' } |
+| LUGAS_SPA_001 | defineApp() | invalid spa configuration | spa: { shell, navigations } — shell is an existing built file; navigations are exact paths or explicit prefixes ending in '/*' (ADR-0037) |
+| LUGAS_SPA_002 | defineApp() | SPA navigation ownership collision | navigations must not overlap routes, assets, health, openapi endpoints, or each other (ADR-0037) |
 | LUGAS_WS_001 | websocket() | invalid websocket configuration | allowed keys: before, params, query, headers, message, open, close, drain; message is required |
 | LUGAS_WS_002 | serve() | custom websocket option conflicts with declared websocket() routes | websocket routes are served by Lugas; remove the serve() websocket option |
 | LUGAS_COOKIE_002 | cookie() | invalid cookie attributes or attribute combination | sameSite "none" requires secure; path/domain are non-empty strings; maxAge is an integer; expires is a valid Date |
