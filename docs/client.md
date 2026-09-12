@@ -86,8 +86,8 @@ Each failure branch carries the Problem Details document the framework emits (`c
 
 Two honest boundaries:
 
-- **413 is not in the union for JSON-schema routes.** Whether a body budget applies (route `budget`, app default, serve ceiling) is runtime configuration, and the transport ceiling emits a **bare** `413` with no body — an out-of-union status still arrives safely: the runtime branch follows the actual response, and the result always carries `status`, the decoded payload slot, and `response`.
-- **`form()` routes' 413 always carries a Problem body** (the limits are unconditional `form()` configuration), which is why it joins the union — the bare transport-ceiling 413 stays out for every route kind.
+- **413 is not in the union for JSON-schema routes.** Whether a body budget applies (route `budget`, app default, serve ceiling) is runtime configuration, and an out-of-union status still arrives safely: the runtime branch follows the actual response, and the result always carries `status`, the decoded payload slot, and `response`.
+- **The transport ceiling can bare-413 `form()` routes too.** Lugas-level 413s (`FORM_LIMIT_EXCEEDED`, `BODY_BUDGET_EXCEEDED`) always carry a Problem body, but Bun's `maxRequestBodySize` can reject the same request before the framework sees it — empty body, no Problem document. The multipart `413` branch therefore types its payload as **absentable** (`…ProblemBody | undefined`): narrow before reading Problem fields, and never assume `status: 413` alone identifies the rejection's origin. The decoder never manufactures a body.
 
 ### Multipart uploads through the typed client
 
