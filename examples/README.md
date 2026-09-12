@@ -18,6 +18,7 @@ Each example teaches exactly one concept using only public exports. Run any serv
 | [`production`](./production/) | Secure-header policy and lifecycle-aware `/health` + `/ready` endpoints | `bun run examples/production/server.ts` |
 | [`websockets`](./websockets/) | WebSocket routes: guard-gated upgrade, echo context, close-1001 shutdown | `bun run examples/websockets/server.ts` |
 | [`drizzle`](./drizzle/) | Application-owned Drizzle instance as a service (`lugas/drizzle`) | `bun run examples/drizzle/server.ts` |
+| [`spa-starter`](./spa-starter/) | **Vite + React + API in one production process** (ADR-0037): typed client, validated mutations, cookie auth, typed multipart upload, SSE, hashed-asset caching, SPA navigation fallback — against the installed package | `cd examples/spa-starter && bun run verify` |
 
 The client example runs as a self-contained smoke check that prints `EXAMPLE-SMOKE-OK` on success and is covered by `bun test tests/integration/server-client/`.
 

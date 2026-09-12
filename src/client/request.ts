@@ -244,7 +244,11 @@ export function buildRequestInit(options: BuildRequestOptions): BuiltRequest {
     method: options.method,
     headers,
   };
-  if (hasDeclaredBody) {
+  // Presence guard on the value (not the flag): under DOM-lib consumers
+  // `undefined` is not assignable to `body?: BodyInit | null` with
+  // exactOptionalPropertyTypes, and the two are equivalent here — body is
+  // undefined exactly when no body was declared.
+  if (body !== undefined) {
     init.body = body;
   }
   return { init };

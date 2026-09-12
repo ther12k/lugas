@@ -28,7 +28,7 @@ function isMultipartContentType(contentType: string | null): boolean {
 async function readBodyBytesBounded(
   request: Request,
   budget: number | undefined,
-): Promise<{ ok: true; bytes: Uint8Array } | { ok: false; kind: "budget_exceeded" | "empty" }> {
+): Promise<{ ok: true; bytes: Uint8Array<ArrayBuffer> } | { ok: false; kind: "budget_exceeded" | "empty" }> {
   const contentLength = Number(request.headers.get("content-length") ?? Number.NaN);
   if (Number.isFinite(contentLength) && budget !== undefined && contentLength > budget) {
     return { ok: false, kind: "budget_exceeded" };

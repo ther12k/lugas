@@ -1,0 +1,29 @@
+{
+  "name": "lugas-spa-starter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "bun scripts/setup.ts",
+    "build": "bun scripts/build.ts",
+    "check": "tsc --noEmit",
+    "start": "bun server/main.ts",
+    "start:built": "bun dist-server/main.js",
+    "test": "bun test tests/starter.test.ts",
+    "measure": "bun scripts/measure.ts",
+    "verify": "bun run setup && bun run build && bun run check && bun run test"
+  },
+  "dependencies": {
+    "lugas": "file:lugas-starter.tgz",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.0"
+  }
+}

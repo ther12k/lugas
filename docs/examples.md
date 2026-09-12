@@ -76,3 +76,20 @@ bun run examples/realworld/server.ts
 bun run examples/realworld/client.ts   # REALWORLD-CLIENT-OK
 bun test tests/integration/realworld.test.ts
 ```
+
+## spa-starter: Vite + React + API in one production process
+
+[`examples/spa-starter/`](../examples/spa-starter/) is the reference
+application for [ADR-0037](okf/decisions/0037-spa-hosting.md): a **built**
+Vite + React frontend and the typed API served by one Bun process — hashed
+assets with explicit long-lived caching, a policy-capable shell with SPA
+navigation fallback, typed multipart uploads, cookie auth, and SSE. It
+installs the packed lugas tarball so everything runs against the installed
+package, and records an API-only vs API-plus-SPA measurement
+(launch-to-readiness, idle RSS, asset-workload RSS) under `measurements/`.
+
+```bash
+cd examples/spa-starter
+bun run verify    # setup → build → typecheck → tests
+bun run measure   # API-only vs API+SPA comparison
+```
