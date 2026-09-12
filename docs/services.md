@@ -14,23 +14,31 @@ tags:
 
 ## Plain services
 
-Any value in the map is available as-is. Handler access to `ctx.services` is typed explicitly: pass a services type parameter to `route()` (`route<{ db: typeof db }>({ … })`) when the route declares nothing else, or use a narrow local cast when the route also declares schemas — schema slots occupy `route()`'s other type parameters (tracked as dogfood finding RF-1, `docs/reports/dogfood-realworld-findings.md`):
+Any value in the map is available as-is. Handler access to `ctx.services` is typed explicitly. Routes constructed independently of `defineApp()` (the common case for modules and multi-file apps) should bind the services type once with `bindServices()` — the returned `route`/`guard` infer every other slot (params, query, headers, body, guards, response statuses) per descriptor exactly like the plain factories, with no type arguments and no casts (closes dogfood finding RF-1, `docs/reports/dogfood-realworld-findings.md`):
 
 ```ts
-import { defineApp, route, json } from "lugas";
+import { bindServices, defineApp, json } from "lugas";
 
 const db = createDb();                 // your construction, your version
 const mailer = createMailer(process.env.SMTP_URL);
 
 type Services = { db: typeof db; mailer: ReturnType<typeof createMailer> };
 
+const { route, guard } = bindServices<Services>();
+
+const auth = guard({
+  name: "auth",
+  handler: () => ({ user: currentUser() }),
+});
+
 export default defineApp({
   services: { db, mailer },
   routes: {
     "/users/:id": {
       GET: route({
+        before: [auth],
         handler: async (ctx) => {
-          const { db } = ctx.services as Services;
+          const { db } = ctx.services;      // typed as Services — no cast
           const user = await db.users.find(ctx.params.id);
           return user ? json(200, user) : json(404, { error: "not found" });
         },
@@ -39,6 +47,10 @@ export default defineApp({
   },
 });
 ```
+
+`bindServices()` is compile-time only: the bound functions delegate to the plain `route()`/`guard()` factories, so validation and diagnostics are identical, and there is no container or runtime lookup.
+
+For a route that declares no schemas, `route<{ db: typeof db }>({ … })` also works — but supplying the services parameter pins every other generic slot to its default, which is why the cast-free pattern above is the recommended one.
 
 Plain values are **live references**: never initialized or disposed by the framework. That is the default on purpose — Lugas adds nothing you did not ask for.
 
