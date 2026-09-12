@@ -131,7 +131,8 @@ type _t8c = Expect<Equal<GuardedCtxTwo["user"], { id: string }>>;
 
 type GuardedContract = AppContract<typeof guardedApp>;
 type InvoiceOutcomes = ClientOutcomesFor<GuardedContract, "/invoices", "POST">;
-type _t6 = Expect<Equal<InvoiceOutcomes["status"], 201 | 401>>;
+// Declared body schema adds the framework's 400/415/422 body failures (RF-3)
+type _t6 = Expect<Equal<InvoiceOutcomes["status"], 201 | 401 | 400 | 415 | 422>>;
 type Body401 = Extract<InvoiceOutcomes, { status: 401 }>["body"];
 type _t6b = Expect<Equal<Body401, { error: string }>>;
 type Body201 = Extract<InvoiceOutcomes, { status: 201 }>["body"];

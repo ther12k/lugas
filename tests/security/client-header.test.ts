@@ -92,6 +92,7 @@ describe("client header security", () => {
         body: { name: "Ada", tags: ["admin", "dev"] },
       });
       expect(res.status).toBe(200);
+      if (!res.ok) throw new Error(`expected success, got ${res.status}`);
       expect(res.data).toEqual({ name: "Ada", tags: ["admin", "dev"] });
     } finally {
       server.stop(true);

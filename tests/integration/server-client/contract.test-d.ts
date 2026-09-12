@@ -15,9 +15,10 @@ type Client = LugasClient<API>;
 
 // 1. /users/:id GET narrows to exactly its declared success payload.
 type UsersGet = ClientCallResult<API, "/users/:id", "GET">;
+type UsersGetSuccess = Extract<UsersGet, { readonly ok: true }>;
 type _t1 = Expect<
   Equal<
-    UsersGet,
+    UsersGetSuccess,
     {
       readonly ok: true;
       readonly status: 200;
@@ -26,6 +27,10 @@ type _t1 = Expect<
     }
   >
 >;
+// Declared params+query schemas make the framework's 422 validation failure
+// part of this route's result union (RF-3).
+type UsersGetFailureStatuses = Extract<UsersGet, { readonly ok: false }>["status"];
+type _t1b = Expect<Equal<UsersGetFailureStatuses, 422>>;
 
 // 2. Guard statuses merge into /guarded's union as failures.
 type GuardedGet = ClientCallResult<API, "/guarded", "GET">;

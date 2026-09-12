@@ -72,6 +72,22 @@ if (result.ok) {
 
 What `result.data` says is **wire truth**, derived from the server handler's `json()` body type: `Date` fields are `string`, non-finite numbers are `number | null`, possibly-dropped members are optional. See [`wire-honest-types.md`](./wire-honest-types.md) for the full model.
 
+### Framework-generated failures in the union
+
+The union is not only handler and guard outcomes. Routes that **declare schemas** can be rejected by the framework before any handler runs, and those outcomes are part of the contract:
+
+| Route declares… | Added to the union |
+|---|---|
+| any schema slot (`params`, `query`, `headers`, `body`) | `422` `VALIDATION_FAILED` |
+| a `body` schema (JSON) | `415` `UNSUPPORTED_MEDIA_TYPE`, `400` `MALFORMED_JSON` |
+
+Each failure branch carries the Problem Details document the framework emits (`code` is the literal failure kind, `issues` the normalized validation issues). Routes that declare no schemas gain nothing.
+
+Two honest boundaries:
+
+- **413 is not in the union.** Whether a body budget applies (route `budget`, app default, serve ceiling) is runtime configuration, and the transport ceiling emits a **bare** `413` with no body — an out-of-union status still arrives safely: the runtime branch follows the actual response, and the result always carries `status`, the decoded payload slot, and `response`.
+- **`form()` multipart routes** do not yet contribute their failure branches; they arrive with typed multipart support.
+
 ## Error classes
 
 The client's own failures are typed classes, distinct from HTTP failures:
