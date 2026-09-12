@@ -64,14 +64,59 @@ outlive their connection.
 | Method | Behavior |
 |---|---|
 | `send({ data, event?, id?, retry? })` | Serializes one frame; returns `false` once the stream has ended (never throws for late sends) |
+| `sendAwait({ … })` | Capacity-aware send: resolves `true` once enqueued, `false` on stream end or — as the declared overload outcome — when the parked-bytes cap is exhausted. Parks FIFO while the queue is at/over budget. See [backpressure](#bounded-backpressure-adr-0036). |
 | `comment(text)` | Single-line comment (e.g. heartbeats); same `false`-after-end |
 | `retry(ms)` | Standalone reconnect hint frame |
 | `close()` | Ends the stream gracefully and runs the cleanup |
 | `desiredSize` | Mirrors the underlying stream; `null` once ended |
+| `queuedBytes` | Bytes retained in the stream queue; `null` without `queueByteLimit`, `0` once ended |
+| `pendingSendBytes` | Bytes of parked `sendAwait` events held outside the stream queue |
 
 Backpressure is explicit: `send()` enqueues and never blocks, so an
 unbounded producer against a stalled client grows the buffer — poll
 `desiredSize` and pause when it drops low.
+
+## Bounded backpressure (ADR-0036)
+
+For streams where a stalled consumer must not grow framework-owned
+buffering, opt into a byte budget and the waiting send:
+
+```ts
+sse({
+  queueByteLimit: 65_536, // encoded bytes retained by this stream's queue
+  heartbeatMs: 15_000,
+  start: (writer) => {
+    void (async () => {
+      for await (const event of bus.events()) {
+        if (!(await writer.sendAwait({ data: event.payload }))) break; // ended or overloaded
+      }
+    })();
+  },
+});
+```
+
+The bound is precise: `queueByteLimit` caps the stream queue's retained
+**encoded bytes** (byte-based `desiredSize` via a byte-length strategy) and
+caps the bytes of parked `sendAwait` events held outside the queue — so
+waiting cannot become a second unbounded queue. Total framework-owned
+retained payload stays within `queueByteLimit` (queue) + `queueByteLimit`
+(parked) + the largest single event; a single event larger than the budget
+is still enqueued once capacity exists. It bounds **this queue** — not
+total process memory, socket buffers, or application-owned upstream queues.
+
+Behavioral details that are contract, not incidental:
+
+- **Disconnect settles.** If the consumer disconnects while a send is
+  parked, every parked `sendAwait` resolves `false` promptly and the
+  cleanup runs exactly once.
+- **Overload is explicit.** A call beyond the parked-bytes cap resolves
+  `false` immediately — the event was not accepted; nothing is dropped
+  silently from the middle of a stream. What a producer does with `false`
+  is application policy.
+- **Heartbeats skip while congested** (byte-budget mode): a due beat is
+  skipped, never accumulated for later delivery.
+- **`send()` is unchanged** and remains the deliberate escape hatch: it
+  still never blocks and still enqueues regardless of the budget.
 
 ## Failure semantics
 

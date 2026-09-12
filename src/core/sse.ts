@@ -24,9 +24,24 @@ export type SseEventInput = {
 
 /** Producer handle handed to `start`. Send methods return `false` once the stream has ended instead of throwing. */
 export type SseWriter = {
-  /** Mirrors the underlying stream's `desiredSize`; `null` once ended. Producers flooding a stalled client buffer unboundedly — respect this for unbounded streams. */
+  /** Mirrors the underlying stream's `desiredSize`; `null` once ended. Producers flooding a stalled client buffer unboundedly — respect this for unbounded streams, or use `queueByteLimit` + `sendAwait` (ADR-0036). */
   readonly desiredSize: number | null;
+  /** Bytes retained in the stream queue (ADR-0036). `null` without `queueByteLimit` — byte accounting requires the byte-based strategy; `0` once ended. */
+  readonly queuedBytes: number | null;
+  /** Bytes of encoded events parked by `sendAwait` outside the stream queue (ADR-0036). Capped by `queueByteLimit` when configured. */
+  readonly pendingSendBytes: number;
   send(input: SseEventInput): boolean;
+  /**
+   * Capacity-aware send (ADR-0036): resolves `true` once the encoded event
+   * is enqueued, `false` when the stream has ended — or immediately, as the
+   * declared overload outcome, when `queueByteLimit` is configured and the
+   * parked-bytes cap is exhausted. Parks (FIFO) while the queue is at/over
+   * budget and resolves when consumer progress frees capacity or the stream
+   * ends. Validation throws synchronously exactly like `send()`. Without
+   * `queueByteLimit` the wait tracks the stream's default chunk-count
+   * backpressure — set `queueByteLimit` for a byte bound.
+   */
+  sendAwait(input: SseEventInput): Promise<boolean>;
   comment(text: string): boolean;
   retry(ms: number): boolean;
   close(): void;
@@ -35,8 +50,17 @@ export type SseWriter = {
 /** `sse()` configuration. `start` runs synchronously during `sse()`; a returned function is the deterministic cleanup. */
 export type SseConfig = {
   start: (writer: SseWriter) => void | (() => void);
-  /** Opt-in comment-heartbeat interval in milliseconds; owned and cleared by the helper. */
+  /** Opt-in comment-heartbeat interval in milliseconds; owned and cleared by the helper. Skipped while congested when `queueByteLimit` is set — never accumulated. */
   heartbeatMs?: number;
+  /**
+   * Opt-in producer backpressure budget in encoded bytes (ADR-0036). Bounds
+   * the framework-owned retained payload: the stream queue waits at this
+   * high-water mark and parked `sendAwait` events may not exceed it, so a
+   * stalled consumer cannot grow either without bound. Bounds the queue —
+   * not total process memory or socket buffers. A single event larger than
+   * the budget is still enqueued once capacity exists.
+   */
+  queueByteLimit?: number;
 };
 
 /** Characters that would corrupt the SSE field framing if allowed in field values. */
@@ -133,8 +157,8 @@ export function sse(config: SseConfig): Response {
   }
   const keys = Object.keys(config);
   for (const key of keys) {
-    if (key !== "start" && key !== "heartbeatMs") {
-      sseError("LUGAS_SSE_001", `sse(): unknown config key '${key}'`, "allowed keys: start, heartbeatMs");
+    if (key !== "start" && key !== "heartbeatMs" && key !== "queueByteLimit") {
+      sseError("LUGAS_SSE_001", `sse(): unknown config key '${key}'`, "allowed keys: start, heartbeatMs, queueByteLimit");
     }
   }
   if (typeof config.start !== "function") {
@@ -143,12 +167,20 @@ export function sse(config: SseConfig): Response {
   if (config.heartbeatMs !== undefined && (typeof config.heartbeatMs !== "number" || !Number.isInteger(config.heartbeatMs) || config.heartbeatMs <= 0)) {
     sseError("LUGAS_SSE_001", "sse(): 'heartbeatMs' must be a positive integer number of milliseconds", "example: heartbeatMs: 15000");
   }
+  if (config.queueByteLimit !== undefined && (typeof config.queueByteLimit !== "number" || !Number.isInteger(config.queueByteLimit) || config.queueByteLimit <= 0)) {
+    sseError("LUGAS_SSE_001", "sse(): 'queueByteLimit' must be a positive integer number of bytes", "example: queueByteLimit: 65536");
+  }
 
   const encoder = new TextEncoder();
   let cleanup: (() => void) | undefined;
   let cleanedUp = false;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
   const state = { closed: false };
+  // ADR-0036: parked sendAwait events, FIFO. Frames are encoded once at
+  // park time; their bytes are capped by queueByteLimit so waiting cannot
+  // become a second unbounded queue outside the stream.
+  const waiters: Array<{ bytes: Uint8Array; resolve: (sent: boolean) => void }> = [];
+  let pendingSendBytes = 0;
 
   const stopHeartbeat = (): void => {
     if (heartbeat !== undefined) {
@@ -156,8 +188,16 @@ export function sse(config: SseConfig): Response {
       heartbeat = undefined;
     }
   };
+  const settleWaiters = (sent: boolean): void => {
+    while (waiters.length > 0) {
+      const waiter = waiters.shift()!;
+      pendingSendBytes -= waiter.bytes.byteLength;
+      waiter.resolve(sent);
+    }
+  };
   const runCleanup = (): void => {
     stopHeartbeat();
+    settleWaiters(false);
     if (cleanup !== undefined && !cleanedUp) {
       cleanedUp = true;
       cleanup();
@@ -172,24 +212,82 @@ export function sse(config: SseConfig): Response {
       return false;
     }
   };
+  const enqueueBytesOrFalse = (bytes: Uint8Array): boolean => {
+    if (state.closed) return false;
+    try {
+      controller.enqueue(bytes);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const congested = (): boolean =>
+    waiters.length > 0 || (controller.desiredSize ?? 0) <= 0;
 
   let controller!: ReadableStreamDefaultController<Uint8Array>;
-  const stream = new ReadableStream<Uint8Array>({
-    start: (streamController) => {
-      controller = streamController;
+  const flushWaiters = (): void => {
+    // FIFO; a single event larger than the remaining capacity is still
+    // enqueued once capacity exists (the budget bounds steady state, not
+    // the largest event — ADR-0036 #2).
+    while (waiters.length > 0 && (controller.desiredSize ?? 0) > 0) {
+      const waiter = waiters.shift()!;
+      pendingSendBytes -= waiter.bytes.byteLength;
+      waiter.resolve(enqueueBytesOrFalse(waiter.bytes));
+    }
+  };
+  const strategy = config.queueByteLimit !== undefined
+    ? new ByteLengthQueuingStrategy({ highWaterMark: config.queueByteLimit })
+    : undefined;
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      start: (streamController) => {
+        controller = streamController;
+      },
+      // Consumer progress: the controller calls pull whenever the queue
+      // falls below the high-water mark — the wake signal for parked sends.
+      pull: () => {
+        flushWaiters();
+      },
+      cancel: () => {
+        state.closed = true;
+        runCleanup();
+      },
     },
-    cancel: () => {
-      state.closed = true;
-      runCleanup();
-    },
-  });
+    strategy,
+  );
 
   const writer: SseWriter = {
     get desiredSize(): number | null {
       return state.closed ? null : controller.desiredSize;
     },
+    get queuedBytes(): number | null {
+      if (config.queueByteLimit === undefined) return null;
+      if (state.closed) return 0;
+      const desired = controller.desiredSize;
+      return desired === null ? 0 : Math.max(0, config.queueByteLimit - desired);
+    },
+    get pendingSendBytes(): number {
+      return pendingSendBytes;
+    },
     send(input: SseEventInput): boolean {
       return enqueueOrFalse(formatSseEvent(input));
+    },
+    sendAwait(input: SseEventInput): Promise<boolean> {
+      const bytes = encoder.encode(formatSseEvent(input)); // validation throws sync, like send()
+      if (state.closed) return Promise.resolve(false);
+      // Preserve FIFO: even with apparent capacity, an event never overtakes
+      // parked ones. The parked-bytes cap is the declared overload outcome
+      // (resolve false — not accepted; nothing dropped silently mid-stream).
+      if (waiters.length === 0 && (controller.desiredSize ?? 0) > 0) {
+        return Promise.resolve(enqueueBytesOrFalse(bytes));
+      }
+      if (config.queueByteLimit !== undefined && pendingSendBytes + bytes.byteLength > config.queueByteLimit) {
+        return Promise.resolve(false);
+      }
+      return new Promise((resolve) => {
+        waiters.push({ bytes, resolve });
+        pendingSendBytes += bytes.byteLength;
+      });
     },
     comment(text: string): boolean {
       if (typeof text !== "string" || FORBIDDEN_FIELD_CHARS.test(text)) {
@@ -228,6 +326,11 @@ export function sse(config: SseConfig): Response {
   // cleared and would fire against a closed controller forever (CA-2).
   if (config.heartbeatMs !== undefined && !state.closed) {
     heartbeat = setInterval(() => {
+      // ADR-0036 #6: in byte-budget mode a due heartbeat is SKIPPED while
+      // congested — never accumulated for later delivery, so the heartbeat
+      // itself cannot grow the queue the budget bounds. Without the budget,
+      // heartbeat behavior is exactly as shipped.
+      if (config.queueByteLimit !== undefined && congested()) return;
       enqueueOrFalse(": heartbeat\n\n");
     }, config.heartbeatMs);
   }
