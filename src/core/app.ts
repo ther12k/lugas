@@ -118,6 +118,10 @@ export type AppInternals<TServices = unknown> = {
 
 export type LugasAppInstance<TServices = unknown, TRoutes = unknown> = LugasApp<TServices, TRoutes> & {
   readonly manifest: AppInternals<TServices>["manifest"];
+  /** Present at runtime since M4R1; typed here because ADR-0035 records the
+   * application model as `{ manifest, prepared, serve }` — the instance type
+   * must not hide a documented member. */
+  readonly prepared: AppInternals<TServices>["prepared"];
   readonly serve: (options?: import("../internal/serve").SafeServeOptions) => import("../internal/serve").LugasServer;
 };
 
