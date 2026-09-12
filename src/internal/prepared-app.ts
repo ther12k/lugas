@@ -450,8 +450,13 @@ export function prepareApp<TServices>(config: {
       if (keys.length === 1 && typeof record["dir"] === "string") continue;
       const wrappedMap: Record<string, unknown> = {};
       for (const [method, entry] of Object.entries(record)) {
-        if (typeof entry !== "function") continue;
-        wrappedMap[method] = wrapHeaders(entry as (request: Request) => Response | Promise<Response>);
+        // Static method-map entries (native file/Response values) are
+        // preserved verbatim — they bypass the pipeline and carry no policy
+        // headers (documented truth above); silently dropping them from the
+        // rebuilt map turned every native entry into an empty map (CA-1).
+        wrappedMap[method] = typeof entry === "function"
+          ? wrapHeaders(entry as (request: Request) => Response | Promise<Response>)
+          : entry;
       }
       compiled[path] = Object.freeze(wrappedMap);
     }
