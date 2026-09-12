@@ -44,10 +44,11 @@ const app = defineApp({
 
 type Contract = AppContract<typeof app>;
 
-// 1. Guard + handler statuses narrow distinctly in one union
+// 1. Guard + handler statuses narrow distinctly in one union; the declared
+//    params schema adds the framework's 422 validation failure (RF-3)
 type AdminOutcomes = ClientOutcomesFor<Contract, "/admin/users/:id", "GET">;
 type AdminStatuses = AdminOutcomes["status"];
-type _t1 = Expect<Equal<AdminStatuses, 200 | 401 | 403 | 404>>;
+type _t1 = Expect<Equal<AdminStatuses, 200 | 401 | 403 | 404 | 422>>;
 
 type Body200 = Extract<AdminOutcomes, { status: 200 }>["body"];
 type _t2 = Expect<Equal<Body200, { id: number | null }>>;

@@ -79,7 +79,8 @@ const app = defineApp({
 });
 type Contract = AppContract<typeof app>;
 type OrderOutcomes = ClientOutcomesFor<Contract, "/orders/:id", "POST">;
-type _orderStatuses = Expect<Equal<OrderOutcomes["status"], 201 | 409>>;
+// Declared schemas add the framework's own failure statuses (RF-3).
+type _orderStatuses = Expect<Equal<OrderOutcomes["status"], 201 | 409 | 400 | 415 | 422>>;
 type Order201 = Extract<OrderOutcomes, { status: 201 }>;
 // Jsonify maps NaN/Infinity-capable numbers to `number | null` (wire-honest
 // JSON.stringify semantics, M6R11/M6R12) — member-level checks avoid pinning

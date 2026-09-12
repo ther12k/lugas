@@ -8,6 +8,7 @@
  */
 import type { AppContract } from "../core/contract";
 import type { HttpMethod } from "../core/types";
+import type { NormalizedValidationIssue } from "../internal/validation-issues";
 import type { ClientFailure, ClientResult, ClientSuccess } from "./parse-response";
 
 /** Extracts `:param` names from a literal path such as `/users/:id/posts/:slug`. */
@@ -95,12 +96,74 @@ export type ClientOutcomes<TEntry> = TEntry extends { readonly responses: infer 
  * the single indexed `RouteEntryForMethod` lookup, so guard statuses (e.g.
  * 401/403) and handler statuses appear in one discriminated union without
  * re-expanding the whole contract per client method.
+ *
+ * Framework-generated failures (RF-3): routes that declare schemas can fail
+ * before any user code runs — those outcomes join the union so a frontend can
+ * branch on them without casts (see `FrameworkFailureOutcomes`).
  */
 export type ClientOutcomesFor<
   TContract,
   TPath extends string,
   TMethod extends HttpMethod,
-> = ClientOutcomes<RouteEntryForMethod<TContract, TPath, TMethod>>;
+> = RouteEntryForMethod<TContract, TPath, TMethod> extends infer TEntry
+  ? ClientOutcomes<TEntry> | FrameworkFailureOutcomes<TEntry>
+  : never;
+
+/**
+ * Wire shape of the Problem Details documents the framework itself emits for
+ * request validation/decoding failures (M2-009, `src/internal/validation-problem.ts`).
+ * `code` and `status` are literal per failure kind; `issues` carries
+ * adapter-specific fields beyond the normalized core.
+ */
+export type FrameworkProblemBody<Code extends string = string, Status extends number = number> = {
+  readonly type: string;
+  readonly title: string;
+  readonly status: Status;
+  readonly code: Code;
+  readonly detail?: string | undefined;
+  readonly source?: "params" | "query" | "headers" | "body" | undefined;
+  readonly issues?: ReadonlyArray<NormalizedValidationIssue> | undefined;
+};
+
+/** A schema slot is "declared" in the contract when it is not `undefined`. */
+type SlotDeclared<T> = [T] extends [undefined] ? false : true;
+
+type ValidationFailedOutcome = {
+  readonly status: 422;
+  readonly body: FrameworkProblemBody<"VALIDATION_FAILED", 422>;
+};
+
+/**
+ * Framework failures derivable from a route entry's DECLARED capabilities
+ * (RF-3, dogfood findings): schema slots make the framework's own rejection
+ * outcomes possible regardless of handler code.
+ *
+ * - any declared schema slot (params/query/headers/body) → 422 VALIDATION_FAILED
+ * - a declared standard-schema body additionally → 415 UNSUPPORTED_MEDIA_TYPE
+ *   (non-JSON content type) and 400 MALFORMED_JSON (syntax error), because
+ *   the framework parses the body before validating it.
+ *
+ * Deliberately NOT included:
+ * - 413: budget applicability (route `budget`, app default, serve ceiling) is
+ *   runtime configuration invisible to the type, and the transport ceiling
+ *   emits a BARE 413 with no Problem document (`docs/body-limits.md`) — an
+ *   out-of-union 413 still arrives safely through the runtime fallback
+ *   (the decoder keys off the actual response, `parse-response.ts`).
+ * - `form()` bodies: today's contract maps them to an undeclared body slot;
+ *   their failure outcomes arrive with multipart client support.
+ */
+type FrameworkFailureOutcomes<TEntry> = TEntry extends { readonly input: infer I }
+  ? (I extends { readonly body?: infer B }
+      ? SlotDeclared<B> extends true
+        ? ValidationFailedOutcome
+            | { readonly status: 415; readonly body: FrameworkProblemBody<"UNSUPPORTED_MEDIA_TYPE", 415> }
+            | { readonly status: 400; readonly body: FrameworkProblemBody<"MALFORMED_JSON", 400> }
+        : never
+      : never)
+      | (I extends { readonly params?: infer P } ? (SlotDeclared<P> extends true ? ValidationFailedOutcome : never) : never)
+      | (I extends { readonly query?: infer Q } ? (SlotDeclared<Q> extends true ? ValidationFailedOutcome : never) : never)
+      | (I extends { readonly headers?: infer H } ? (SlotDeclared<H> extends true ? ValidationFailedOutcome : never) : never)
+  : never;
 
 /**
  * Explicit lower-case client method bound to one HTTP verb (M3-007).
