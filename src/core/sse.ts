@@ -223,7 +223,10 @@ export function sse(config: SseConfig): Response {
     // racing cancel) before returning the cleanup — run it immediately.
     if (state.closed) runCleanup();
   }
-  if (config.heartbeatMs !== undefined) {
+  // No heartbeat when start() already ended the stream synchronously:
+  // cleanup has run by then, so a timer created here would never be
+  // cleared and would fire against a closed controller forever (CA-2).
+  if (config.heartbeatMs !== undefined && !state.closed) {
     heartbeat = setInterval(() => {
       enqueueOrFalse(": heartbeat\n\n");
     }, config.heartbeatMs);

@@ -369,4 +369,36 @@ describe("M8-002 served SSE behavior", () => {
     expectCode(() => writer!.comment(5 as never));
     expectCode(() => writer!.retry(-1));
   });
+
+  test("heartbeat timer lifecycle: created for a live stream, never after a synchronous close (CA-2)", () => {
+    const originalSetInterval = globalThis.setInterval;
+    let timersCreated = 0;
+    globalThis.setInterval = ((handler: () => void, timeout: number) => {
+      timersCreated += 1;
+      const timer = originalSetInterval(handler, timeout);
+      timer.unref?.(); // if the fix regresses, a leaked timer must not hang the runner
+      return timer;
+    }) as unknown as typeof setInterval;
+    try {
+      let writer: import("../../src").SseWriter | undefined;
+      const live = sse({ heartbeatMs: 10, start: (w) => { writer = w; } });
+      expect(live.status).toBe(200);
+      expect(timersCreated).toBe(1); // live stream: the helper owns exactly one timer
+      writer!.close(); // clears it through the normal close path
+
+      let cleanups = 0;
+      const closedEarly = sse({
+        heartbeatMs: 10,
+        start: (w) => {
+          w.close();
+          return () => { cleanups += 1; };
+        },
+      });
+      expect(closedEarly.status).toBe(200);
+      expect(cleanups).toBe(1); // cleanup still runs exactly once
+      expect(timersCreated).toBe(1); // regression: no timer may outlive the early cleanup
+    } finally {
+      globalThis.setInterval = originalSetInterval;
+    }
+  });
 });
