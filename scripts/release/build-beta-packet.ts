@@ -11,12 +11,20 @@
  * Usage (FINAL assembly step — M6R6 order):
  *   bun run scripts/release/build-beta-packet.ts --package-source-sha <sha>
  *
+ * Deferred perf-gate assembly (ODR-0020): with LUGAS_PERF_DEFERRED=1 and
+ * LUGAS_PERF_DEFERRAL_REF=<decision> exported, the builder assembles a packet
+ * whose performance gate is DEFERRED — the evidence must carry
+ * `perfGate: "deferred"` with null measurements, and the generated checklist
+ * states the deferral instead of a PASS. The invocation env and the evidence
+ * must agree; disagreement aborts.
+ *
  * Required preceding order (see docs/reports/gates/M6.md, M6R6 addendum):
- *   1. benchmarks (plain, validated, client-types) — ignored archives
+ *   1. benchmarks (plain, validated, client-types) — skipped when deferred
  *   2. bun run release:package:rehearse   — requires a CLEAN tree; produces
  *      the final tarball + package-rehearsal.json
  *   3. LUGAS_PERF_RELEASE=1 bun run verify — release gate hashes the FINAL
- *      tarball and writes release-evidence.json
+ *      tarball and writes release-evidence.json (add LUGAS_PERF_DEFERRED=1
+ *      for the ODR-0020 deferral)
  *   4. THIS builder — re-executes verification itself, then writes the packet
  */
 import { createHash } from "node:crypto";
@@ -92,6 +100,8 @@ function main() {
     format?: string;
     packageSourceCommit?: string | null;
     attestationCommit?: string | null;
+    perfGate?: string;
+    deferralRef?: string | null;
     plainStaticRps?: number | null;
     plainJsonRps?: number | null;
     validatedPostRps?: number | null;
@@ -125,21 +135,54 @@ function main() {
       `re-run 'LUGAS_PERF_RELEASE=1 bun run verify' on this exact HEAD before assembling the packet`,
     );
   }
-  const required: Array<[string, unknown]> = [
-    ["plainStaticRps", evidence.plainStaticRps],
-    ["plainJsonRps", evidence.plainJsonRps],
-    ["validatedPostRps", evidence.validatedPostRps],
-    ["rawBunPlainStaticRps", evidence.rawBunPlainStaticRps],
-    ["rawBunValidatedPostRps", evidence.rawBunValidatedPostRps],
-    ["typecheckMs", evidence.typecheckMs],
-    ["clientBundleBytes", evidence.clientBundleBytes],
-    ["tarballSha256", evidence.tarballSha256],
-    ["blockingFailures", evidence.blockingFailures],
-    ["alerts", evidence.alerts],
-  ];
-  const missing = required.filter(([, v]) => v === null || v === undefined).map(([k]) => k);
-  if (missing.length > 0) {
-    fail(`release evidence incomplete — missing: ${missing.join(", ")}`);
+  // ODR-0020: the perf-gate mode is defined by the evidence artifact, and the
+  // invocation env must agree with it — a builder asked to assemble a
+  // deferred packet from executed evidence (or vice versa) is a pipeline error.
+  const PERF_DEFERRED = evidence.perfGate === "deferred";
+  const envDeferred = process.env.LUGAS_PERF_DEFERRED === "1";
+  if (envDeferred !== PERF_DEFERRED) {
+    fail(
+      `LUGAS_PERF_DEFERRED=${envDeferred ? "1" : "unset"} disagrees with evidence perfGate=${evidence.perfGate ?? "executed"} — ` +
+      `re-run the release gate in the intended mode before assembling`,
+    );
+  }
+  if (PERF_DEFERRED) {
+    if (typeof evidence.deferralRef !== "string" || evidence.deferralRef.length === 0) {
+      fail("deferred evidence must record deferralRef (the authorizing owner decision)");
+    }
+    const mustBeNull: Array<[string, unknown]> = [
+      ["plainStaticRps", evidence.plainStaticRps],
+      ["plainJsonRps", evidence.plainJsonRps],
+      ["validatedPostRps", evidence.validatedPostRps],
+      ["typecheckMs", evidence.typecheckMs],
+      ["clientBundleBytes", evidence.clientBundleBytes],
+      ["rawBunPlainStaticRps", evidence.rawBunPlainStaticRps],
+      ["rawBunValidatedPostRps", evidence.rawBunValidatedPostRps],
+    ];
+    const populated = mustBeNull.filter(([, v]) => v !== null && v !== undefined).map(([k]) => k);
+    if (populated.length > 0) {
+      fail(`deferred evidence must not carry measurements — populated: ${populated.join(", ")}`);
+    }
+  } else {
+    const required: Array<[string, unknown]> = [
+      ["plainStaticRps", evidence.plainStaticRps],
+      ["plainJsonRps", evidence.plainJsonRps],
+      ["validatedPostRps", evidence.validatedPostRps],
+      ["rawBunPlainStaticRps", evidence.rawBunPlainStaticRps],
+      ["rawBunValidatedPostRps", evidence.rawBunValidatedPostRps],
+      ["typecheckMs", evidence.typecheckMs],
+      ["clientBundleBytes", evidence.clientBundleBytes],
+      ["tarballSha256", evidence.tarballSha256],
+      ["blockingFailures", evidence.blockingFailures],
+      ["alerts", evidence.alerts],
+    ];
+    const missing = required.filter(([, v]) => v === null || v === undefined).map(([k]) => k);
+    if (missing.length > 0) {
+      fail(`release evidence incomplete — missing: ${missing.join(", ")}`);
+    }
+  }
+  if (evidence.tarballSha256 === null || evidence.tarballSha256 === undefined) {
+    fail("release evidence incomplete — missing: tarballSha256");
   }
   if (evidence.blockingFailures !== 0) {
     fail(`release evidence records ${evidence.blockingFailures} blocking failure(s) — not releasable`);
@@ -253,15 +296,24 @@ function main() {
     resolve(ROOT, "benchmarks", "results", "m5-plain", "results.json"),
     resolve(ROOT, "benchmarks", "results", "m5-validated", "results.json"),
   ];
-  for (const archive of archivePaths) {
-    if (!existsSync(archive)) {
-      fail(`benchmark archive missing: ${archive} — run the benchmarks before packet assembly`);
+  if (!PERF_DEFERRED) {
+    for (const archive of archivePaths) {
+      if (!existsSync(archive)) {
+        fail(`benchmark archive missing: ${archive} — run the benchmarks before packet assembly`);
+      }
     }
   }
   console.log("== verify (builder-executed, LUGAS_PERF_RELEASE=1) ==");
   const verifyProc = Bun.spawnSync(["bun", "run", "verify"], {
     cwd: ROOT,
-    env: { ...process.env, LUGAS_PERF_RELEASE: "1", LUGAS_PACKAGE_SOURCE_SHA: PACKAGE_SOURCE_SHA },
+    env: {
+      ...process.env,
+      LUGAS_PERF_RELEASE: "1",
+      LUGAS_PACKAGE_SOURCE_SHA: PACKAGE_SOURCE_SHA,
+      ...(PERF_DEFERRED
+        ? { LUGAS_PERF_DEFERRED: "1", LUGAS_PERF_DEFERRAL_REF: evidence.deferralRef! }
+        : {}),
+    },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -295,26 +347,35 @@ function main() {
   if (freshEvidence.tarballSha256 !== sha256(readFileSync(tarballPath))) {
     fail("regenerated evidence tarball hash ≠ actual tarball bytes");
   }
+  if ((freshEvidence.perfGate ?? "executed") !== (PERF_DEFERRED ? "deferred" : "executed")) {
+    fail("regenerated evidence perf-gate mode changed during builder-executed verification");
+  }
+  if (PERF_DEFERRED && freshEvidence.deferralRef !== evidence.deferralRef) {
+    fail("regenerated evidence deferralRef changed during builder-executed verification");
+  }
   // M6R6.1 #311: the evidence must record the measured machine. Missing
   // environment = pre-binding evidence; a differing cpuModel on the same
   // platform/arch is a warning (legitimate two-worktree attestation), while a
   // differing platform/arch would already have failed inside the gate.
+  // Deferred evidence (ODR-0020) records no measured environment by design.
   const evidenceEnvironment = (freshEvidence as {
     environment?: { platform?: string | null; arch?: string | null; cpuModel?: string | null } | null;
   }).environment;
-  if (evidenceEnvironment === undefined || evidenceEnvironment === null) {
-    console.error("✗ regenerated evidence missing environment binding — re-run the release gate with M6R6.1 tooling");
-    process.exit(1);
-  }
-  const evidencePlatform = evidenceEnvironment.platform;
-  const evidenceArch = evidenceEnvironment.arch;
-  if (!evidencePlatform || !evidenceArch) {
-    fail("regenerated evidence environment incomplete (platform/arch) — re-run the release gate with M6R6.1 tooling");
-  }
-  if (evidencePlatform !== process.platform || evidenceArch !== process.arch) {
-    console.warn(
-      `⚠ evidence environment ${evidencePlatform}/${evidenceArch} ≠ assembly host ${process.platform}/${process.arch} (audit note)`,
-    );
+  if (!PERF_DEFERRED) {
+    if (evidenceEnvironment === undefined || evidenceEnvironment === null) {
+      console.error("✗ regenerated evidence missing environment binding — re-run the release gate with M6R6.1 tooling");
+      process.exit(1);
+    }
+    const evidencePlatform = evidenceEnvironment.platform;
+    const evidenceArch = evidenceEnvironment.arch;
+    if (!evidencePlatform || !evidenceArch) {
+      fail("regenerated evidence environment incomplete (platform/arch) — re-run the release gate with M6R6.1 tooling");
+    }
+    if (evidencePlatform !== process.platform || evidenceArch !== process.arch) {
+      console.warn(
+        `⚠ evidence environment ${evidencePlatform}/${evidenceArch} ≠ assembly host ${process.platform}/${process.arch} (audit note)`,
+      );
+    }
   }
   evidence = freshEvidence;
   const attestationSha = evidence.attestationCommit ?? commit;
@@ -332,22 +393,24 @@ function main() {
   }
 
   // -- derived figures (all from evidence; zero literals) -----------------------
-  const overheadValidatedPct = (
-    ((evidence.rawBunValidatedPostRps! - evidence.validatedPostRps!) / evidence.rawBunValidatedPostRps!) * 100
-  ).toFixed(1);
-  const overheadPlainPct = (
-    ((evidence.rawBunPlainStaticRps! - evidence.plainStaticRps!) / evidence.rawBunPlainStaticRps!) * 100
-  ).toFixed(1);
+  // Deferred evidence (ODR-0020) carries no measurements — figures render as
+  // explicit deferral markers instead of numbers.
   const fmt = (n: number) => n.toLocaleString("en-US");
-  const plainRps = fmt(evidence.plainStaticRps!);
-  const jsonRps = fmt(evidence.plainJsonRps!);
-  const validatedRps = fmt(evidence.validatedPostRps!);
+  const overheadValidatedPct = PERF_DEFERRED
+    ? "n/a"
+    : (((evidence.rawBunValidatedPostRps! - evidence.validatedPostRps!) / evidence.rawBunValidatedPostRps!) * 100).toFixed(1);
+  const overheadPlainPct = PERF_DEFERRED
+    ? "n/a"
+    : (((evidence.rawBunPlainStaticRps! - evidence.plainStaticRps!) / evidence.rawBunPlainStaticRps!) * 100).toFixed(1);
+  const plainRps = PERF_DEFERRED ? "DEFERRED" : fmt(evidence.plainStaticRps!);
+  const jsonRps = PERF_DEFERRED ? "DEFERRED" : fmt(evidence.plainJsonRps!);
+  const validatedRps = PERF_DEFERRED ? "DEFERRED" : fmt(evidence.validatedPostRps!);
   const overhead = `${overheadValidatedPct}%`;
-  const typecheckMs = String(evidence.typecheckMs);
+  const typecheckMs = PERF_DEFERRED ? "DEFERRED" : String(evidence.typecheckMs);
   const typecheckBudgetMs = JSON.parse(
     readFileSync(resolve(ROOT, "benchmarks", "baselines", "m5-accepted.json"), "utf8"),
   ).typecheckBudgetMs as number;
-  const bundleBytes = String(evidence.clientBundleBytes);
+  const bundleBytes = PERF_DEFERRED ? "DEFERRED" : String(evidence.clientBundleBytes);
 
 
   // 1. Assemble RELEASE_PACKET.md
@@ -365,7 +428,7 @@ function main() {
 
 ## 1. Executive Summary
 
-This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v${BETA_VERSION}** release candidate. All milestones (M0–M9, the complete ODR-0010 battery sequence) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
+This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v${BETA_VERSION}** release candidate. All milestones (M0–M9, the complete ODR-0010 battery sequence) are complete with ${PERF_DEFERRED ? `one recorded deferral: the release-mode performance gate is DEFERRED by ${evidence.deferralRef} (see §4 — full gate runs on the quiet baseline host before general-availability promotion)` : "zero waivers"}; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
 
 Publication remains strictly gated on owner approval in **M8-GATE**.
 
@@ -406,15 +469,19 @@ ${gateFiles.map((f) => `- [\`docs/reports/gates/${f}\`](../../reports/gates/${f}
 
 ---
 
-## 4. Performance & Resource Budgets (Release Mode)
+## 4. Performance & Resource Budgets (Release Mode)${PERF_DEFERRED ? " — DEFERRED" : ""}
+
+${PERF_DEFERRED
+    ? `> **DEFERRED by ${evidence.deferralRef}.** The release-mode performance gate was **not executed** for this candidate: the pinned baseline host is occupied by an unrelated soak campaign, and measurements captured under load are void per \`docs/performance-gates.md\` (loaded-machine failures are environmental, never evidence). No throughput, typecheck-budget, or bundle measurement is recorded for this candidate — the table below shows the *thresholds only*. The full gate plus a fresh ≥5-run typecheck calibration are committed to run on the quiet baseline host after the campaign ends, with calibration samples and the gate result recorded separately. Published versions are immutable: if the deferred gate later finds a regression, a successor version supersedes this one — this tarball is never republished.`
+    : "The release-mode performance gate was executed at assembly time on the recorded baseline host."}
 
 | Scenario / Metric | Release Floor | Alert Floor | Target | Candidate Measured | Result |
 |---|---|---|---|---|---|
-| \`plain-static\` | 30,000 rps | 40,000 rps | 60,000 rps | **${plainRps} rps** (${overheadPlainPct}% vs raw Bun) | ✅ Exceeded |
-| \`plain-json\` | 25,000 rps | 35,000 rps | 50,000 rps | **${jsonRps} rps** | ✅ Exceeded |
-| \`validated-post\` | 15,000 rps | 20,000 rps | 30,000 rps | **${validatedRps} rps** | ✅ Exceeded (${overhead} validated overhead vs raw Bun) |
-| Typecheck Duration | — | — | < ${typecheckBudgetMs}ms | **${typecheckMs}ms** | ✅ Measured on candidate |
-| Client Bundle Size | — | — | < 25,000 B | **${bundleBytes} B** | ✅ Measured on candidate |
+| \`plain-static\` | 30,000 rps | 40,000 rps | 60,000 rps | **${plainRps} rps** ${PERF_DEFERRED ? "" : `(${overheadPlainPct}% vs raw Bun)`} | ${PERF_DEFERRED ? "⏸ DEFERRED" : "✅ Exceeded"} |
+| \`plain-json\` | 25,000 rps | 35,000 rps | 50,000 rps | **${jsonRps} rps** | ${PERF_DEFERRED ? "⏸ DEFERRED" : "✅ Exceeded"} |
+| \`validated-post\` | 15,000 rps | 20,000 rps | 30,000 rps | **${validatedRps} rps** | ${PERF_DEFERRED ? "⏸ DEFERRED" : `✅ Exceeded (${overhead} validated overhead vs raw Bun)`} |
+| Typecheck Duration | — | — | < ${typecheckBudgetMs}ms | **${typecheckMs}ms** | ${PERF_DEFERRED ? "⏸ DEFERRED" : "✅ Measured on candidate"} |
+| Client Bundle Size | — | — | < 25,000 B | **${bundleBytes} B** | ${PERF_DEFERRED ? "⏸ DEFERRED" : "✅ Measured on candidate"} |
 
 ---
 
@@ -449,7 +516,7 @@ ${gateFiles.map((f) => `- [\`docs/reports/gates/${f}\`](../../reports/gates/${f}
 ## 8. Open Limitations & Post-Beta Roadmap
 
 - Node.js runtime for the server core is not supported (Bun-only by design through 1.x).
-- TypeScript declarations (\`.d.ts\`) ship as direct \`.ts\` sources (pre-release packaging posture).
+- Distribution ships module-preserving pre-transpiled ESM (\`dist/*.js\`) with emitted declaration files (\`dist/*.d.ts\`); the browser client remains a separate prebuilt artifact (CA-17).
 - Real browser automation is not in beta scope (bundle-level graph safety and Node execution proved).
 
 ---
@@ -482,9 +549,11 @@ npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag
 
 ## Verified at Packet Assembly (executed by the builder — not aspirational)
 
-- [x] **Repository Verification:** \`bun run verify\` executed by this builder with \`LUGAS_PERF_RELEASE=1\` — exit 0 (typecheck, tests, docs, diff, release-mode perf gate).
+- [x] **Repository Verification:** \`bun run verify\` executed by this builder with \`LUGAS_PERF_RELEASE=1\` — exit 0 (typecheck, tests, docs, diff${PERF_DEFERRED ? "; release-mode perf gate DEFERRED — see below" : ", release-mode perf gate"}).
 - [x] **Typecheck Integrity:** included in the builder-executed verify (\`tsc --noEmit\`, strict compiler options).
-- [x] **Performance Gate:** release-mode gate executed during assembly; \`release-evidence.json\` records 0 blocking failures, 0 alerts, bound to the commits above.
+- [x] **Performance Gate:** ${PERF_DEFERRED
+    ? `**DEFERRED by ${evidence.deferralRef}** — not executed at assembly; the pinned baseline host was occupied and loaded-host measurements are void per \`docs/performance-gates.md\`. \`release-evidence.json\` records \`perfGate: "deferred"\` with null measurements, 0 blocking failures, 0 alerts, bound to the commits above. The full gate plus a fresh ≥5-run typecheck calibration run on the quiet baseline host before general-availability promotion; published versions are immutable, so a failing gate forces a successor version.`
+    : "release-mode gate executed during assembly; `release-evidence.json` records 0 blocking failures, 0 alerts, bound to the commits above."}
 - [x] **Package Rehearsal:** \`release:package:rehearse\` passed ${rehearsal.checksPassed}/${rehearsal.checksTotal} checks with dry-run publication validated (\`package-rehearsal.json\`).
 - [x] **Clean-Room Proof:** independent clean-room suite ran inside the builder-executed verify (\`bun test\`).
 - [x] **Owner Decisions Recorded:** \`docs/owner-decisions/naming-assets.md\` (ODR-0001), \`docs/owner-decisions/license-governance.md\` (ODR-0002) — presence checked by the builder.
@@ -496,7 +565,9 @@ npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag
 
 - [ ] **Compatibility Matrix:** CI \`.github/workflows/compatibility.yml\` green across all 6 OS/Bun cells on the artifact commit.
 - [ ] **No Open P0/P1:** issue tracker free of open P0/P1 defects at publication time.
-- [ ] **Owner Release Gate Sign-Off:** M8-GATE approval recorded in \`docs/reports/gates/M8.md\` (GO verdict + post-GATE addenda).
+- [ ] **Owner Release Gate Sign-Off:** ${PERF_DEFERRED
+    ? `owner approval for publishing THIS candidate recorded at publication time (perf-gate deferral authorized by ${evidence.deferralRef}; owner executes the publication sequence personally)`
+    : "M8-GATE approval recorded in `docs/reports/gates/M8.md` (GO verdict + post-GATE addenda)."}
 
 ---
 
