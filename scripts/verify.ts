@@ -7,6 +7,7 @@ import { resolvePerfGatePlan } from "./perf-gate-plan";
 type CheckResult = { name: string; status: "PASS" | "FAIL" | "SKIP"; output: string };
 
 const checks = [
+  ["build", ["bun", "run", "build"]],
   ["typecheck", ["bunx", "tsc", "--noEmit"]],
   ["test", ["bun", "test"]],
 ] as const;

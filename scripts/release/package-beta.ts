@@ -112,7 +112,7 @@ async function main(): Promise<void> {
   // rehearsal then executes from the installed tarball.
   delete pkg.private;
   (pkg as StagedPkg & { publishConfig?: { access?: string } }).publishConfig = { access: "public" };
-  (pkg as StagedPkg & { bin?: Record<string, string> }).bin = { lugas: "./src/cli/main.ts" };
+  (pkg as StagedPkg & { bin?: Record<string, string> }).bin = { lugas: "./dist/cli/main.js" };
   // Consumer-facing metadata the npm page needs and the repo copy does not
   // carry: engines declares the Bun support floor (owner decision, CF-3,
   // 2026-09-12) as machine-readable metadata — advisory declaration, not a
@@ -163,18 +163,19 @@ async function main(): Promise<void> {
     `version=${stagedMeta.version ?? "missing"} engines.bun=${stagedMeta.engines?.bun ?? "missing"} repository=${stagedMeta.repository?.url ?? "missing"} bugs=${stagedMeta.bugs?.url ?? "missing"} homepage=${stagedMeta.homepage ?? "missing"} keywords=${stagedMeta.keywords?.length ?? 0}`,
   );
 
-  // Stage 1a: framework-version stamping. The repo keeps package.json at
-  // 0.0.0 by convention (the real version exists only in the staged copy),
-  // and src/internal/framework-version.ts is a generated constant synced
-  // from package.json by scripts/sync-version.ts — which the repo never
-  // needs to run. Without this rewrite every published tarball ships
-  // FRAMEWORK_VERSION "0.0.0" and consumers' manifests/CLI misreport the
-  // framework version (consumer-smoke finding CF-1, 2026-09-12).
+  // Stage 1a: module-preserving ESM distribution + declarations (CA-17).
+  // Compiles all src TypeScript files into dist/ with declarations, stamped
+  // framework-version, and executable CLI binary.
+  const { buildDist } = await import("./build-dist");
+  const distArtifact = await buildDist({ sourceRoot: stagePkg, version: BETA_VERSION });
+  check(
+    "module-preserving ESM distribution & declarations built into staged package",
+    distArtifact.jsFileCount > 0 && distArtifact.dtsFileCount > 0,
+    `${distArtifact.jsFileCount} JS files, ${distArtifact.dtsFileCount} declaration files, ${(distArtifact.totalBytes / 1024).toFixed(1)} KiB total`,
+  );
+
+  // Assert staged framework-version stamp in both src and dist
   const stagedVersionPath = join(stagePkg, "src", "internal", "framework-version.ts");
-  const stagedVersionContents =
-    `/** Generated build constant — synced from package.json by scripts/sync-version.ts. Do not edit by hand. */\n` +
-    `export const FRAMEWORK_VERSION = ${JSON.stringify(BETA_VERSION)};\n`;
-  writeFileSync(stagedVersionPath, stagedVersionContents);
   const stagedConstant = /export const FRAMEWORK_VERSION = "([^"]+)"/.exec(
     readFileSync(stagedVersionPath, "utf8"),
   )?.[1];
@@ -188,11 +189,12 @@ async function main(): Promise<void> {
 
   // ------------------------------------------------------------------
   // Stage 1b: browser-executable client artifact (M7-005 / ADR-0021).
-  // Built from the same committed sources into the staged copy so the
-  // packed tarball carries the prebuilt ESM artifact under build/.
+  // Built from the staged sources into the staged copy so the packed
+  // tarball carries the prebuilt ESM artifact under build/. Source root
+  // is passed explicitly to guarantee provenance.
   // ------------------------------------------------------------------
   const { buildBrowserClient, ARTIFACT_PACKAGE_PATH } = await import("./build-browser-client");
-  const browserArtifact = await buildBrowserClient(join(stagePkg, "build"));
+  const browserArtifact = await buildBrowserClient(join(stagePkg, "build"), stagePkg);
   check(
     "browser client artifact built into staged package",
     existsSync(join(stagePkg, ARTIFACT_PACKAGE_PATH)),
@@ -342,9 +344,25 @@ console.log("TESTING-CONSUMER-OK");`,
     testRun.code === 0 ? testRun.stdout.trim() : testRun.stderr.slice(0, 300),
   );
 
+  // Consumer C2: Drizzle subpath export (CA-17).
+  const drizzleConsumer = makeConsumer("consumer-drizzle");
+  writeFileSync(
+    join(drizzleConsumer, "probe.ts"),
+    `import { drizzleService } from "lugas/drizzle";
+if (typeof drizzleService !== "function") throw new Error("bad drizzleService");
+console.log("DRIZZLE-CONSUMER-OK");`,
+  );
+  const drizzleRun = run("bun run probe.ts", drizzleConsumer);
+  check(
+    "drizzle consumer (drizzleService) runs from tarball",
+    drizzleRun.code === 0 && drizzleRun.stdout.includes("DRIZZLE-CONSUMER-OK"),
+    drizzleRun.code === 0 ? drizzleRun.stdout.trim() : drizzleRun.stderr.slice(0, 300),
+  );
+
   // Consumer D: the REAL CLI, executed through the npm bin link created
   // from the staged candidate (#283). `lugas routes <fixture>` must run an
-  // actual inspection command from the installed tarball.
+  // actual inspection command from the installed tarball, and `lugas --version`
+  // must output the candidate version.
   const cliConsumer = makeConsumer("consumer-cli");
   writeFileSync(
     join(cliConsumer, "fixture-app.ts"),
@@ -356,6 +374,12 @@ export default defineApp({ routes: { "/x": { GET: route({ handler: () => text(20
     "CLI consumer executes real 'lugas routes' command from tarball",
     cliRun.code === 0 && cliRun.stdout.includes("lugas-manifest") && cliRun.stdout.includes("/x"),
     cliRun.code === 0 ? "route table rendered" : cliRun.stderr.slice(0, 200),
+  );
+  const cliVersion = run(`./node_modules/.bin/lugas --version`, cliConsumer);
+  check(
+    "CLI consumer reports candidate version from installed tarball",
+    cliVersion.code === 0 && cliVersion.stdout.includes(BETA_VERSION),
+    cliVersion.code === 0 ? cliVersion.stdout.trim() : cliVersion.stderr.slice(0, 200),
   );
 
   // ------------------------------------------------------------------

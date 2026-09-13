@@ -27,6 +27,12 @@ function stageAndInstall(): string {
   const stagePkg = join(stage, "package");
   mkdirSync(stagePkg, { recursive: true });
   cpSync(join(ROOT, "src"), join(stagePkg, "src"), { recursive: true });
+  if (existsSync(join(ROOT, "dist"))) {
+    cpSync(join(ROOT, "dist"), join(stagePkg, "dist"), { recursive: true });
+  }
+  if (existsSync(join(ROOT, "build"))) {
+    cpSync(join(ROOT, "build"), join(stagePkg, "build"), { recursive: true });
+  }
   for (const entry of ["package.json", "README.md", "NOTICE", "AGENTS.md"]) {
     cpSync(join(ROOT, entry), join(stagePkg, entry));
   }

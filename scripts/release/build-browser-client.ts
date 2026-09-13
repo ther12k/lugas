@@ -30,9 +30,10 @@ export type BrowserArtifact = {
   readonly sha256: string;
 };
 
-export async function buildBrowserClient(outdir: string): Promise<BrowserArtifact> {
+export async function buildBrowserClient(outdir: string, sourceRoot = ROOT): Promise<BrowserArtifact> {
+  const clientEntry = join(sourceRoot, "src", "client", "index.ts");
   const result = await Bun.build({
-    entrypoints: [CLIENT_ENTRY],
+    entrypoints: [clientEntry],
     target: "browser",
     format: "esm",
     minify: false,

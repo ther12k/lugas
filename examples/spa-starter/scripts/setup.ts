@@ -52,6 +52,12 @@ delete pkg.scripts["release:package:rehearse"];
 pkg.publishConfig = { access: "public" };
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
 
+// 2b. Build pre-transpiled distribution (dist/) and browser client (build/)
+const { buildDist } = await import("../../../scripts/release/build-dist");
+await buildDist({ sourceRoot: staged, version: "0.0.0-starter" });
+const { buildBrowserClient } = await import("../../../scripts/release/build-browser-client");
+await buildBrowserClient(join(staged, "build"), staged);
+
 // 3. Pack and install into the starter.
 const packed = Bun.spawnSync(["bun", "pm", "pack"], { cwd: staged });
 if (packed.exitCode !== 0) {
