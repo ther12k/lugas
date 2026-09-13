@@ -14,12 +14,18 @@
  * - The report binds to the actual tested artifacts by hash: installed
  *   tarball, server bundle, every frontend output, plus the source commit,
  *   clean/dirty state, and resolved dependency versions.
+ * - Failure paths are bounded (CA-15): one retained stdout reader with
+ *   complete-line assembly for readiness, per-attempt and total deadlines
+ *   enforced inside every await, and SIGTERM→SIGKILL escalation on
+ *   shutdown. A silent child, a stalled response, or a child ignoring
+ *   SIGTERM fails the measurement within its bound instead of hanging it.
  *
  * Measurements to establish, not promised savings.
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fetchOk, fetchText, readinessOrigin, stopServer, waitForReady } from "./lib/server-process";
 
 const STARTER = join(import.meta.dir, "..");
 const LUGAS_REPO = join(STARTER, "..", "..");
@@ -60,50 +66,38 @@ async function measure(profile: Profile) {
     stdin: "ignore",
   });
 
+  let stopped = false;
+  const shutdown = async (): Promise<{ exitCode: number }> => {
+    if (stopped) return { exitCode: Number.NaN };
+    const result = await stopServer(proc, { graceMs: 5_000, killTimeoutMs: 2_000 });
+    stopped = true;
+    return result;
+  };
+
   try {
-    // Origin discovery from the readiness line (a sub-metric of its own);
-    // the launch timer keeps running until /api/ready answers 200.
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let origin = "";
-    const lineDeadline = Date.now() + 15_000;
-    while (!origin) {
-      if (Date.now() > lineDeadline) throw new Error(`${profile}: no readiness line within 15s`);
-      const chunk = await proc.stdout.getReader().read().then((r) => (r.done ? "" : decoder.decode(r.value)));
-      if (chunk === "") throw new Error(`${profile}: server exited before readiness line`);
-      buffer += chunk;
-      origin = /LUGAS_STARTER_READY (\S+)/.exec(buffer)?.[1] ?? "";
-    }
+    // Origin discovery from the readiness line (a sub-metric of its own):
+    // ONE retained reader assembles complete lines, so fragmented output
+    // cannot wedge the loop; the deadline is enforced inside the await.
+    // The launch timer keeps running until /api/ready answers 200.
+    const origin = await readinessOrigin(proc, { pattern: /LUGAS_STARTER_READY (\S+)/, timeoutMs: 15_000 });
     const readyLineMs = Math.round(performance.now() - t0);
 
-    const readyDeadline = Date.now() + 15_000;
-    for (;;) {
-      const res = await fetch(`${origin}/api/ready`).catch(() => undefined);
-      if (res) {
-        if (res.ok) {
-          await res.arrayBuffer(); // consume: the response is complete
-          break;
-        }
-        await res.arrayBuffer();
-      }
-      if (Date.now() > readyDeadline) throw new Error(`${profile}: /api/ready never answered 200`);
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    }
+    // Readiness = a 200 with a fully consumed body; each attempt (fetch +
+    // consume) is bounded, so a hanging response cannot stall the probe.
+    await waitForReady(origin, { path: "/api/ready", timeoutMs: 15_000, attemptTimeoutMs: 2_000, intervalMs: 5 });
     const readyMs = Math.round(performance.now() - t0);
 
     await new Promise((resolve) => setTimeout(resolve, 2_000)); // settle (recorded, not conflated)
     const idleRssMiB = rssMiB(proc.pid);
 
     // Workload: shell + deep navigation + every hashed asset, 40 rounds —
-    // each request must succeed and be fully consumed to count. The shell
-    // exists only in the full profile (api-only serves no frontend by
-    // definition — the #414 harness silently accepted its 404 here).
+    // each request must succeed, be bounded, and be fully consumed to
+    // count. The shell exists only in the full profile (api-only serves no
+    // frontend by definition — the #414 harness silently accepted its 404
+    // here).
     let assetUrls: string[] = [];
     if (profile === "full") {
-      const shell = await fetch(`${origin}/`).then(async (r) => {
-        if (!r.ok) throw new Error(`${profile}: shell request failed`);
-        return r.text();
-      });
+      const shell = await fetchText(`${origin}/`);
       assetUrls = [...shell.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]!);
     }
     const deepOrApi = profile === "full" ? `${origin}/app/projects/42` : `${origin}/api/hello`;
@@ -111,14 +105,10 @@ async function measure(profile: Profile) {
     const w0 = performance.now();
     for (let i = 0; i < 40; i++) {
       for (const url of assetUrls) {
-        const res = await fetch(`${origin}${url}`);
-        if (!res.ok) throw new Error(`${profile}: asset request failed: ${url}`);
-        await res.arrayBuffer();
+        await fetchOk(`${origin}${url}`);
         requests += 1;
       }
-      const res = await fetch(deepOrApi);
-      if (!res.ok) throw new Error(`${profile}: navigation/api request failed`);
-      await res.arrayBuffer();
+      await fetchOk(deepOrApi);
       requests += 1;
     }
     const requestPhaseMs = Math.round(performance.now() - w0);
@@ -126,8 +116,7 @@ async function measure(profile: Profile) {
     await new Promise((resolve) => setTimeout(resolve, 2_000)); // settle (recorded, not conflated)
     const afterWorkloadRssMiB = rssMiB(proc.pid);
 
-    proc.kill("SIGTERM");
-    const exitCode = await proc.exited; // the server process's real exit result
+    const { exitCode } = await shutdown(); // the server process's real exit result
 
     return {
       profile,
@@ -142,9 +131,9 @@ async function measure(profile: Profile) {
       exitCode,
     };
   } finally {
-    // Failure paths must not leak the child.
-    proc.kill("SIGTERM");
-    await proc.exited.catch(() => undefined);
+    // Failure paths must not leak the child; SIGKILL escalation bounds a
+    // child that ignores SIGTERM.
+    await shutdown().catch(() => undefined);
   }
 }
 
@@ -182,7 +171,8 @@ const full = await measure("full");
 
 const report = {
   measuredAt: new Date().toISOString(),
-  harness: "CA-14 repaired: direct spawn of the pinned Bun executable, monotonic launch timer closed on a successful readiness response, server-process RSS sampling, real exit code retained, workload requests verified and consumed, request phase timed separately from settling",
+  harness:
+    "CA-14 repaired + CA-15 bounded failure paths: direct spawn of the pinned Bun executable, monotonic launch timer closed on a successful readiness response, single-reader complete-line readiness discovery, per-attempt and total deadlines enforced inside every await, server-process RSS sampling, verified and consumed workload requests, real exit code retained, SIGTERM-to-SIGKILL escalation on shutdown",
   identity,
   profiles: { "api-only": apiOnly, "api+spa": full },
   note: "Measurements to establish, not promised savings. RSS figures are the server process's resident footprint on this machine/run — not a guarantee; framework queue/memory claims live in ADR-0036/ADR-0037, not here.",
@@ -191,7 +181,7 @@ const report = {
 const outDir = join(STARTER, "measurements");
 mkdirSync(outDir, { recursive: true });
 const stamp = report.measuredAt.slice(0, 19).replaceAll(":", "");
-const out = join(outDir, `${stamp}-api-vs-spa-v2.json`);
+const out = join(outDir, `${stamp}-api-vs-spa-v3.json`);
 writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
 console.log(`\nwrote ${out}`);
