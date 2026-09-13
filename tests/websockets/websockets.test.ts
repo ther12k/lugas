@@ -7,10 +7,11 @@
  * across open/message/close, multi-route multiplexing through the single
  * Bun handler, shutdown close-1001, manifest facts, and both diagnostics.
  */
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { z } from "zod";
 import { defineApp, guard, json, websocket } from "../../src/index";
 import { createTestServer } from "../../src/testing";
+import * as wsHubModule from "../../src/internal/websocket-hub";
 
 function connect(url: string, headers?: Record<string, string>): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
@@ -269,20 +270,33 @@ describe("serve-time conflict", () => {
     }
   });
 
-  test("conditional hub: null when no websocket routes, instantiated when websocket route present", () => {
-    const plainApp = defineApp({
-      routes: {
-        "/hello": { GET: () => new Response("ok") },
-      },
-    });
-    expect(plainApp.prepared.websocketHub).toBeNull();
+  test("conditional hub: zero construction for HTTP-only apps, single shared construction for multi-route apps", () => {
+    const hubSpy = spyOn(wsHubModule, "createWebSocketHub");
 
-    const wsApp = defineApp({
-      routes: {
-        "/ws": { GET: websocket({ message: () => {} }) },
-      },
-    });
-    expect(wsApp.prepared.websocketHub).not.toBeNull();
-    expect(wsApp.prepared.websocketHub?.routes.size).toBe(1);
+    try {
+      // 1. HTTP-only application: zero hub constructions
+      const plainApp = defineApp({
+        routes: {
+          "/hello": { GET: () => new Response("ok") },
+          "/items/:id": { GET: () => new Response("item") },
+        },
+      });
+      expect(plainApp.prepared.websocketHub).toBeNull();
+      expect(hubSpy).toHaveBeenCalledTimes(0);
+
+      // 2. Several websocket routes: exactly one shared hub construction
+      const wsApp = defineApp({
+        routes: {
+          "/ws1": { GET: websocket({ message: () => {} }) },
+          "/ws2": { GET: websocket({ message: () => {} }) },
+          "/ws3": { GET: websocket({ message: () => {} }) },
+        },
+      });
+      expect(wsApp.prepared.websocketHub).not.toBeNull();
+      expect(wsApp.prepared.websocketHub?.routes.size).toBe(3);
+      expect(hubSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      hubSpy.mockRestore();
+    }
   });
 });

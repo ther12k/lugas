@@ -132,6 +132,18 @@ describe("Lifecycle Gate Fast Path Regressions (CA-16)", () => {
       // Traffic gate settled is true for sync app
       expect(app.prepared.trafficGate.settled).toBe(true);
 
+      // Direct invocation assertion: invoking prepared handler for synchronous route
+      // returns a Response directly, synchronously before any await (not a Promise).
+      const syncHandler = (app.prepared.bunRoutes["/sync"] as Record<string, (req: Request) => Response | Promise<Response>>)["GET"]!;
+      const directSyncResult = syncHandler(new Request("http://localhost/sync"));
+      expect(directSyncResult).toBeInstanceOf(Response);
+      expect(directSyncResult instanceof Promise).toBe(false);
+
+      // Asynchronous route still returns a Promise
+      const asyncHandler = (app.prepared.bunRoutes["/async"] as Record<string, (req: Request) => Response | Promise<Response>>)["GET"]!;
+      const directAsyncResult = asyncHandler(new Request("http://localhost/async"));
+      expect(directAsyncResult).toBeInstanceOf(Promise);
+
       const rSync = await fetch(`${server.url.origin}/sync`);
       expect(rSync.status).toBe(200);
       expect(await rSync.json()).toEqual({ mode: "sync" });
@@ -139,6 +151,55 @@ describe("Lifecycle Gate Fast Path Regressions (CA-16)", () => {
       const rAsync = await fetch(`${server.url.origin}/async`);
       expect(rAsync.status).toBe(200);
       expect(await rAsync.json()).toEqual({ mode: "async" });
+    } finally {
+      await server.lugasLifecycle.shutdown("test");
+    }
+  });
+
+  test("synchronous direct-return holds after async service initialization completes", async () => {
+    let resolveService!: () => void;
+    const initPromise = new Promise<void>((resolve) => {
+      resolveService = resolve;
+    });
+
+    const asyncService = service({
+      name: "asyncSvc",
+      value: {},
+      init: async () => {
+        await initPromise;
+      },
+    });
+
+    const app = defineApp({
+      services: { svc: asyncService },
+      routes: {
+        "/sync-after-init": {
+          GET: route({
+            handler: () => Response.json({ status: "settled" }),
+          }),
+        },
+      },
+    });
+
+    const server = app.serve({ port: 0, development: false });
+    try {
+      const handler = (app.prepared.bunRoutes["/sync-after-init"] as Record<string, (req: Request) => Response | Promise<Response>>)["GET"]!;
+
+      // While init is pending, handler returns a Promise (traffic gate is holding traffic)
+      expect(app.prepared.trafficGate.settled).toBe(false);
+      const pendingResult = handler(new Request("http://localhost/sync-after-init"));
+      expect(pendingResult).toBeInstanceOf(Promise);
+
+      // Settle service initialization
+      resolveService();
+      await server.lugasLifecycle.ready;
+      expect(app.prepared.trafficGate.settled).toBe(true);
+
+      // Once settled, invoking the synchronous handler returns Response directly, without Promise wrapper
+      const settledResult = handler(new Request("http://localhost/sync-after-init"));
+      expect(settledResult).toBeInstanceOf(Response);
+      expect(settledResult instanceof Promise).toBe(false);
+      expect(((settledResult as Response).status)).toBe(200);
     } finally {
       await server.lugasLifecycle.shutdown("test");
     }
