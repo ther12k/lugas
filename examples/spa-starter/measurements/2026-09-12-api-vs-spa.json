@@ -1,4 +1,11 @@
 {
+  "superseded": {
+    "status": "superseded-invalid-harness",
+    "reason": "The v1 measurement harness misidentified its metrics (owner review of #414/#415): readyMs excluded process launch, imports, and initialization (its timer started only after the LUGAS_STARTER_READY line, so 13ms/11ms is the /api/ready confirmation fetch, not launch-to-readiness); RSS and SIGTERM were sampled/sent to the `bun run` script-runner process rather than the server (bun run start:built spawns a runner); and shutdownExit discarded the child's real exit code. The v1 workload also did not require ok responses with consumed bodies and folded the settle delay into workloadMs. These are measurement-definition errors, not run-to-run noise.",
+    "invalidMetrics": ["readyMs", "idleRssMiB", "afterWorkloadRssMiB", "workloadMs", "shutdownExit"],
+    "doNotUseFor": "server-memory or startup comparisons, including the 13ms-vs-11ms and 8.0-vs-7.9MiB figures",
+    "supersededBy": "lugas-starter-measurement-v2 outputs of the repaired scripts/measure.ts"
+  },
   "measuredAt": "2026-09-12T17:38:20.155Z",
   "bun": "1.4.0",
   "lugasSource": "77a165e964ed46e6fdae9be266cf70a86af52506",
