@@ -67,16 +67,19 @@ async function main(): Promise<number> {
     console.log(`== ${name} ==\n${result.status}: ${result.output || "(no output)"}`);
   }
 
-  // Performance gate (M6R1-001): runs when benchmark results archive is present.
-  // SKIP on a clean checkout (no benchmarks run yet); FAIL when archive present but gate fails.
+  // Performance gate (M6R1-001): runs whenever benchmark evidence exists,
+  // and UNCONDITIONALLY when release verification is requested. The checker
+  // itself fails closed on missing/stale evidence in --release mode; the
+  // wrapper used to consult LUGAS_PERF_RELEASE only inside the
+  // archive-exists branch, so a release run on a checkout without archives
+  // recorded a SKIP and could exit 0 (owner review of #415). Ordinary
+  // development-mode skipping on a clean checkout is preserved.
   const perfGatePath = `${import.meta.dir}/check-performance-budget.ts`;
-  const perfGateArgv = [perfGatePath];
+  const releasePerf = process.env.LUGAS_PERF_RELEASE === "1";
+  const perfGateArgv = releasePerf ? [perfGatePath, "--release"] : [perfGatePath];
   const plainResultsPath = resolve(import.meta.dir, "..", "benchmarks", "results", "m5-plain", "results.json");
-  if (await Bun.file(plainResultsPath).exists()) {
-    // M6R2 #282: release verification invokes the gate in --release mode;
-    // LUGAS_PERF_RELEASE=1 is set by release tooling (#114 flow).
-    const perfArgs = process.env.LUGAS_PERF_RELEASE === "1" ? [...perfGateArgv, "--release"] : perfGateArgv;
-    const perfResult = await run("perf-gate", ["bun", "run", ...perfArgs]);
+  if (releasePerf || (await Bun.file(plainResultsPath).exists())) {
+    const perfResult = await run("perf-gate", ["bun", "run", ...perfGateArgv]);
     results.push(perfResult);
     console.log(`== perf-gate ==\n${perfResult.status}: ${perfResult.output || "(no output)"}`);
   } else {
