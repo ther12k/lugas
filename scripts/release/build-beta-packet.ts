@@ -526,7 +526,10 @@ ${PERF_DEFERRED
 To publish this release candidate to npm after M8-GATE approval:
 
 \`\`\`bash
-npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag beta
+npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz \\
+  --access public \\
+  --tag beta \\
+  --registry=https://registry.npmjs.org/
 \`\`\`
 
 *Note: This command must only be executed upon formal owner sign-off.*
@@ -577,20 +580,30 @@ npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag
 # 0. Preflight — FAIL-CLOSED (M6R6.1): any failed command, including the
 #    successor-release assertions, aborts before the tag or publish runs.
 set -euo pipefail
+BETA_VERSION='${BETA_VERSION}'
+REGISTRY='https://registry.npmjs.org/'
 ( cd docs/releases/beta && sha256sum --check SHA256SUMS )
 npm whoami >/dev/null                            # must be authenticated as the owner
 
-# Successor-release checks (beta.2+): the PACKAGE name is already claimed;
-# what must be free is THIS VERSION — and an indeterminate registry answer
-# (network, auth, unreachable) must ABORT, never be read as "unpublished".
-if npm view "lugas@\${BETA_VERSION}" version >/dev/null 2>&1; then
-  echo "ERROR: lugas@\${BETA_VERSION} is already published — bump the candidate version; never republish a used name+version" >&2
-  exit 1
-fi
-if ! npm view lugas dist-tags >/dev/null 2>&1; then
-  echo "ERROR: registry reachability could not be confirmed — indeterminate; do not publish" >&2
-  exit 1
-fi
+# Successor-release check (beta.2+): the PACKAGE name is already claimed;
+# what must be free is THIS VERSION. A successful, well-formed version-list
+# response is REQUIRED — a failed or malformed lookup aborts (pipefail +
+# node throw), never reads as "unpublished". Indeterminate ⇒ do not publish.
+npm view lugas versions --json --registry="$REGISTRY" |
+  node -e '
+    const fs = require("node:fs");
+    const versions = JSON.parse(fs.readFileSync(0, "utf8"));
+    const candidate = process.argv[1];
+
+    if (!Array.isArray(versions) || versions.length === 0 ||
+        !versions.every(v => typeof v === "string")) {
+      throw new Error("Invalid registry version list; abort.");
+    }
+
+    if (versions.includes(candidate)) {
+      throw new Error("Candidate already published; stop and verify that release.");
+    }
+  ' "$BETA_VERSION"
 # Reaching here: authenticated + registry reachable + candidate version absent.
 
 # 1. Pin the reviewed source BEFORE the irreversible registry action
@@ -598,11 +611,14 @@ git tag -a "v${BETA_VERSION}" "${PACKAGE_SOURCE_SHA}" -m "LugasJS v${BETA_VERSIO
 git push origin "v${BETA_VERSION}"
 
 # 2. Publish the exact attested tarball
-npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz --access public --tag beta
+npm publish ./docs/releases/beta/lugas-${BETA_VERSION}.tgz \\
+  --access public \\
+  --tag beta \\
+  --registry=https://registry.npmjs.org/
 
 # 3. Post-publication verification
-npm view lugas@${BETA_VERSION} version dist.integrity dist.tarball
-npm dist-tag ls lugas                        # beta -> ${BETA_VERSION} (NOT latest)
+npm view lugas@${BETA_VERSION} version dist.integrity dist.tarball --registry=https://registry.npmjs.org/
+npm dist-tag ls lugas   # REQUIRED: beta -> ${BETA_VERSION} AND latest unchanged (verify the prior latest)
 
 # 4. GitHub release with the attested artifacts
 gh release create "v${BETA_VERSION}" \
@@ -613,9 +629,25 @@ gh release create "v${BETA_VERSION}" \
   --title "v${BETA_VERSION}" \
   --notes-file ./docs/releases/beta/RELEASE_PACKET.md \
   --prerelease
+
+# 5. Registry acceptance (post-publication) — execute the installed package,
+#    not just metadata lookups. Download the registry tarball and compare it
+#    to the attested digest, then run the exact-version consumer battery and
+#    check BOTH dist-tags separately.
+cd "$(mktemp -d)"
+npm pack "lugas@${BETA_VERSION}" --registry=https://registry.npmjs.org/
+echo "${actualTarballHash}  lugas-${BETA_VERSION}.tgz" | sha256sum --check -
+bun init -y >/dev/null 2>&1
+bun add "lugas@${BETA_VERSION}" --registry=https://registry.npmjs.org/
+bun -e 'const l = require("lugas"); if (typeof l.defineApp !== "function") process.exit(1); console.log("root export OK");'
+bun -e 'const c = require("lugas/client"); if (typeof c.createClient !== "function") process.exit(1); console.log("client export OK");'
+bunx lugas --version                          # must print: lugas v${BETA_VERSION}
+npm view "lugas@${BETA_VERSION}" version         # ${BETA_VERSION}
+npm dist-tag ls lugas                          # beta -> ${BETA_VERSION}; latest unchanged (verify the prior latest)
+cd - >/dev/null
 \`\`\`
 
-*Note: The namespace check in step 0 is not a reservation — re-verify immediately before step 2.*
+*Note: The version-list check in step 0 is not a reservation — npm itself rejects reuse of an existing name+version; re-verify immediately before step 2.*
 `
 
   writeFileSync(resolve(OUT_DIR, "CHECKLIST.md"), checklist);
