@@ -72,7 +72,11 @@ describe.skipIf(GATED)("spa-starter: installed package, built server", () => {
     if (ok.ok) expect(ok.data.greeting).toBe("Hello, Ada!");
 
     const invalid = await client.post("/api/greetings", {
-      // @ts-expect-error deliberately invalid for the runtime branch
+      // Runtime-invalid payload: the schema type is a plain string —
+      // min(1) is a runtime constraint, so the empty string is type-valid
+      // and the framework-422 branch is exercised at runtime (a former
+      // expect-error directive here was environment-dependent and unused
+      // under fresh dependency resolution).
       body: { name: "" },
     });
     expect(invalid.ok).toBe(false);
@@ -127,10 +131,14 @@ describe.skipIf(GATED)("spa-starter: installed package, built server", () => {
     const decoder = new TextDecoder();
     let text = "";
     const deadline = Date.now() + 8_000;
-    // Native async iteration over the response stream; the framing contract
-    // (3 ticks, then the 2s heartbeat) is asserted on the wire text.
-    for await (const chunk of res.body!) {
-      text += decoder.decode(chunk, { stream: true });
+    // Explicit reader loop: DOM's ReadableStream type carries no
+    // async-iterator declaration, so `for await` on res.body fails
+    // typecheck under fresh dependency resolution.
+    const reader = res.body!.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
       if (text.includes('"n":3}') && text.includes(": heartbeat")) break;
       if (Date.now() > deadline) break;
     }

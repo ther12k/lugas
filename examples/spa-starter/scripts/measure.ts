@@ -111,13 +111,16 @@ async function measure(profile: Profile): Promise<Record<string, unknown>> {
     const idleRssKiB = rssKiB(proc.pid);
 
     // Asset-request workload: shell, deep navigation, and every hashed asset
-    // referenced by the shell — api-only drives the same request count
-    // against /api/hello. workloadMs covers requests only; the settle after
-    // it is recorded separately.
-    const shellRes = await fetch(`${origin}/`);
-    if (!shellRes.ok) throw new Error(`${profile}: shell answered ${shellRes.status}`);
-    const shell = await shellRes.text();
-    const assetUrls = [...shell.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]!);
+    // referenced by the shell — api-only (no assets/spa by profile) drives
+    // the same request count against /api/hello. workloadMs covers requests
+    // only; the settle after it is recorded separately.
+    let assetUrls: string[] = [];
+    if (profile === "full") {
+      const shellRes = await fetch(`${origin}/`);
+      if (!shellRes.ok) throw new Error(`${profile}: shell answered ${shellRes.status}`);
+      const shell = await shellRes.text();
+      assetUrls = [...shell.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]!);
+    }
     let completedRequests = 0;
     const workloadStart = performance.now();
     for (let i = 0; i < 40; i++) {

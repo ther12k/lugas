@@ -1,0 +1,67 @@
+{
+  "format": "lugas-starter-measurement-v2",
+  "measuredAt": "2026-09-13T00:56:07.206Z",
+  "bun": "1.4.0",
+  "bunExecutable": "/home/ther12k/.bun/bin/bun",
+  "hostLoadAverage": {
+    "before": [
+      20.82,
+      18.97,
+      16.69
+    ],
+    "after": [
+      20.16,
+      18.89,
+      16.69
+    ]
+  },
+  "artifactIdentity": {
+    "installedTarball": {
+      "file": "lugas-starter.tgz",
+      "sha256": "1ea715a7f2791428b0befda205496ac9c62a7cd44c37e0ac369d6e1ed89b4c57"
+    },
+    "installedPackage": {
+      "name": "lugas",
+      "version": "0.0.0-starter",
+      "resolvedFrom": "file:lugas-starter.tgz"
+    },
+    "serverBundle": {
+      "main.js": "c7892ca0a0e3ccd667d1d5769d39972e36d21829d509d098d7a5f0c6f01495bf"
+    },
+    "frontend": {
+      "indexHtml": "380fdcf9e73304472b69a4014f38bdfc5051f127d2a66b94f38e69b90b47b346",
+      "assets": {
+        "index-Bie9a_TS.js": "16ed18812f31d59a189bfe4ee1f6aaa8094ecb923cd269a9ab8cda10630be603"
+      }
+    },
+    "producerRepo": {
+      "head": "bda1e8b0d52b2e3f93483caf1f1b32fa2267d606",
+      "dirtyFiles": 2
+    }
+  },
+  "profiles": {
+    "api-only": {
+      "profile": "api-only",
+      "launchToReadyMs": 115,
+      "idleRssMiB": 35,
+      "afterWorkloadRssMiB": 36.1,
+      "assetRequests": 40,
+      "workloadMs": 18,
+      "workloadSettleMs": 2000,
+      "assetCount": 0,
+      "shutdownExit": 0
+    },
+    "api+spa": {
+      "profile": "full",
+      "launchToReadyMs": 92,
+      "idleRssMiB": 32.1,
+      "afterWorkloadRssMiB": 38.1,
+      "assetRequests": 80,
+      "workloadMs": 88,
+      "workloadSettleMs": 2000,
+      "assetCount": 1,
+      "shutdownExit": 0
+    }
+  },
+  "note": "Measurements to establish, not promised savings. launchToReadyMs spans process spawn (pinned Bun executable, built server entry, direct child) to the first 200 from /api/ready. RSS bounds are the measured server process's resident footprint on this machine/run, not a guarantee; the queue/memory claims live in ADR-0036/ADR-0037, not here."
+}
