@@ -167,11 +167,18 @@ export function prepareApp<TServices>(config: {
   // a startup failure answers held requests with a redacted 503 problem.
   // `settled` lets /ready answer synchronously (503) while init is pending —
   // readiness must answer, never hang (ADR-0029).
+  //
+  // Fast path: once initialization settles successfully (`trafficGate.settled === true`),
+  // incoming requests invoke the handler directly, avoiding microtask
+  // continuation queuing (`Promise.resolve().then()`) on synchronous route returns.
+  // When pending or on initialization failure (`settled === false`), the gate
+  // continuation holds traffic or rejects with the 503 problem.
   const trafficGate: { gate: Promise<void>; settled: boolean } = { gate: Promise.resolve(), settled: true };
   const gateHandler = (
     handler: (request: Request) => Response | Promise<Response>,
   ): (request: Request) => Response | Promise<Response> => {
     return (request: Request): Response | Promise<Response> => {
+      if (trafficGate.settled) return handler(request);
       return Promise.resolve(trafficGate.gate).then(
         () => handler(request),
         () => problem(503, { title: "unavailable", status: 503, detail: "service initialization did not complete" }),
@@ -213,13 +220,20 @@ export function prepareApp<TServices>(config: {
   // pipeline — the synthetic route handler IS the upgrade decision, so
   // guards, schema slots, the traffic gate, and the error policy all apply
   // before the handshake. Raw event handlers register once per routeId.
-  const websocketHub: WebSocketHub = createWebSocketHub();
+  // The hub is created lazily on the first declared websocket descriptor,
+  // preserving `websocketHub: null` and zero allocations when absent.
+  let websocketHub: WebSocketHub | null = null;
+  const getWebSocketHub = (): WebSocketHub => {
+    if (websocketHub === null) websocketHub = createWebSocketHub();
+    return websocketHub;
+  };
   const compileWebSocketHandler = (routeId: string, descriptor: Record<string, unknown>): ((request: Request) => Response | Promise<Response>) => {
+    const hub = getWebSocketHub();
     const message = descriptor.message as WsRouteEntry["message"];
     const open = descriptor.open as WsRouteEntry["open"] | undefined;
     const close = descriptor.close as WsRouteEntry["close"] | undefined;
     const drain = descriptor.drain as WsRouteEntry["drain"] | undefined;
-    websocketHub.routes.set(routeId, {
+    hub.routes.set(routeId, {
       message,
       ...(open !== undefined ? { open } : {}),
       ...(close !== undefined ? { close } : {}),
@@ -230,7 +244,7 @@ export function prepareApp<TServices>(config: {
       params: descriptor.params,
       query: descriptor.query,
       headers: descriptor.headers,
-      handler: (context: PipelineContext): Response => performUpgrade(websocketHub, routeId, context),
+      handler: (context: PipelineContext): Response => performUpgrade(hub, routeId, context),
     };
     return compileLugasHandler(routeId, synthetic);
   };
@@ -645,7 +659,7 @@ export function prepareApp<TServices>(config: {
     budgets: budgetsCtx,
     cors: config.cors,
     logging: config.logging,
-    websocketHub: websocketHub.routes.size > 0 ? websocketHub : null,
+    websocketHub,
     secureHeaders: config.secureHeaders,
     health: config.health,
     telemetry: config.telemetry,

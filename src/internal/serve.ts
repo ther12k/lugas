@@ -66,16 +66,19 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
   });
   // Hold traffic until initialization settles; a startup failure answers
   // held requests with a redacted 503 problem (see prepareApp gateHandler).
-  prepared.trafficGate.gate = lifecycle.ready;
-  prepared.trafficGate.settled = false;
-  void lifecycle.ready.then(
-    () => {
-      prepared.trafficGate.settled = true;
-    },
-    () => {
-      prepared.trafficGate.settled = false; // startup failure: readiness stays 503
-    },
-  );
+  // When no lifecycle services are registered, the gate remains settled immediately.
+  if (prepared.lifecycleServices.length > 0) {
+    prepared.trafficGate.gate = lifecycle.ready;
+    prepared.trafficGate.settled = false;
+    void lifecycle.ready.then(
+      () => {
+        prepared.trafficGate.settled = true;
+      },
+      () => {
+        prepared.trafficGate.settled = false; // startup failure: readiness stays 503
+      },
+    );
+  }
 
   // M7-003: the ceiling is the explicitly configured serve-time
   // `maxRequestBodySize`. Above-ceiling budgets are rejected at startup;
