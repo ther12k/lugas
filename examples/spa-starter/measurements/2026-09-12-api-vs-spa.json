@@ -1,4 +1,6 @@
 {
+  "status": "SUPERSEDED by the CA-14 v2 remeasurement \u2014 the following metrics in this artifact are INVALID and must not be cited: readyMs (timer started at the readiness line, excluding launch/imports/init), idleRssMiB/afterWorkloadRssMiB (sampled the `bun run` script-runner process, not the server), shutdownExit (resolved exit code was discarded; '0' was hardcoded on normal resolution). Preserved as historical output only.",
+  "supersededBy": "measurements/*-api-vs-spa-v2.json (repaired harness: direct spawn of the pinned Bun executable, monotonic launch timer closed on a successful readiness response, server-process RSS, real exit code retained)",
   "measuredAt": "2026-09-12T17:38:20.155Z",
   "bun": "1.4.0",
   "lugasSource": "77a165e964ed46e6fdae9be266cf70a86af52506",

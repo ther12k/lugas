@@ -23,12 +23,20 @@ if (vite.exitCode !== 0) {
 }
 
 // 2. Regenerate the asset manifest from the Vite manifest.
-type ViteManifest = Record<string, { file: string; isEntry?: boolean; css?: string[] }>;
+// EVERY emitted output referenced by the manifest is mapped: entry files AND
+// their `css` arrays and `assets` arrays — a stylesheet listed only as a
+// reference (no standalone manifest entry) still gets an explicit mapping
+// (CA-14 review follow-up). The HTML shell is excluded: `spa.shell` owns it.
+type ViteManifest = Record<string, { file: string; isEntry?: boolean; css?: string[]; assets?: string[] }>;
 const manifest = JSON.parse(readFileSync(join(STARTER, "dist", ".vite", "manifest.json"), "utf8")) as ViteManifest;
-const lines: string[] = [];
+const emitted = new Set<string>();
 for (const entry of Object.values(manifest)) {
-  const file = entry.file;
-  if (!file.startsWith("assets/")) continue;
+  for (const file of [entry.file, ...(entry.css ?? []), ...(entry.assets ?? [])]) {
+    if (typeof file === "string" && !file.endsWith(".html")) emitted.add(file);
+  }
+}
+const lines: string[] = [];
+for (const file of [...emitted].sort()) {
   const url = `/${file}`;
   lines.push(`  [${JSON.stringify(url)}]: { path: resolve(process.cwd(), ${JSON.stringify(join("dist", file))}), cacheControl: "public, max-age=31536000, immutable" },`);
 }
