@@ -68,10 +68,12 @@ async function stageTarball(): Promise<Staged | null> {
   delete pkg.scripts["release:package:rehearse"];
   delete pkg.private;
   pkg.publishConfig = { access: "public" };
-  pkg.bin = { lugas: "./src/cli/main.ts" };
+  pkg.bin = { lugas: "./dist/cli/main.js" };
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
 
-  await buildBrowserClient(join(stagePkg, "build"));
+  const { buildDist } = await import("../../../scripts/release/build-dist");
+  await buildDist({ sourceRoot: stagePkg, version: BETA_VERSION });
+  await buildBrowserClient(join(stagePkg, "build"), stagePkg);
 
   try {
     const out = execSync("npm pack --json", { cwd: stagePkg, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });

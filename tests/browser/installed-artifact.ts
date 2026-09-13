@@ -57,11 +57,13 @@ export async function installArtifactPackage(): Promise<InstalledArtifact> {
   delete pkg.scripts["release:package:rehearse"];
   delete pkg.private;
   pkg.publishConfig = { access: "public" };
-  pkg.bin = { lugas: "./src/cli/main.ts" };
+  pkg.bin = { lugas: "./dist/cli/main.js" };
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
 
+  const { buildDist } = await import("../../scripts/release/build-dist");
+  await buildDist({ sourceRoot: stagePkg, version: BETA_VERSION });
   const { buildBrowserClient } = await import("../../scripts/release/build-browser-client");
-  await buildBrowserClient(join(stagePkg, "build"));
+  await buildBrowserClient(join(stagePkg, "build"), stagePkg);
 
   const out = execSync("npm pack --json", { cwd: stagePkg, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   const parsed = JSON.parse(out) as Array<{ filename: string }>;

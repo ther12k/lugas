@@ -144,22 +144,31 @@ describe("lugas/client export surface", () => {
     }
     const parsed = JSON.parse(listing) as Array<{ files?: Array<{ path: string }> }>;
     const paths = (parsed[0]?.files ?? []).map((f) => f.path);
-    expect(paths).toContain("src/client/index.ts");
-    expect(paths).toContain("src/index.ts");
+    expect(paths).toContain("dist/client/index.js");
+    expect(paths).toContain("dist/client/index.d.ts");
+    expect(paths).toContain("dist/index.js");
+    expect(paths).toContain("dist/index.d.ts");
     for (const path of paths) {
       expect(path.startsWith("benchmarks/")).toBe(false);
       expect(path.startsWith(".worktrees/")).toBe(false);
       expect(path.startsWith("tests/type-performance/")).toBe(false);
     }
     const declaredClientModules = [
-      "src/client/create-client.ts",
-      "src/client/errors.ts",
-      "src/client/index.ts",
-      "src/client/parse-response.ts",
-      "src/client/path.ts",
-      "src/client/query.ts",
-      "src/client/request.ts",
-      "src/client/types.ts",
+      "dist/client/create-client.js",
+      "dist/client/create-client.d.ts",
+      "dist/client/errors.js",
+      "dist/client/errors.d.ts",
+      "dist/client/index.js",
+      "dist/client/index.d.ts",
+      "dist/client/parse-response.js",
+      "dist/client/parse-response.d.ts",
+      "dist/client/path.js",
+      "dist/client/path.d.ts",
+      "dist/client/query.js",
+      "dist/client/query.d.ts",
+      "dist/client/request.js",
+      "dist/client/request.d.ts",
+      "dist/client/types.d.ts",
     ];
     for (const mod of declaredClientModules) {
       expect(paths).toContain(mod);

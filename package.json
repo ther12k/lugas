@@ -6,27 +6,30 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./client": {
-      "types": "./src/client/index.ts",
-      "default": "./src/client/index.ts"
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
     },
     "./client/browser": {
       "default": "./build/lugas-client.esm.js"
     },
     "./drizzle": {
-      "types": "./src/drizzle/index.ts",
-      "default": "./src/drizzle/index.ts"
+      "types": "./dist/drizzle/index.d.ts",
+      "default": "./dist/drizzle/index.js"
     },
     "./testing": {
-      "types": "./src/testing/index.ts",
-      "default": "./src/testing/index.ts"
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
     }
   },
+  "bin": {
+    "lugas": "./dist/cli/main.js"
+  },
   "files": [
-    "src",
+    "dist",
     "build",
     "README.md",
     "NOTICE",
@@ -35,9 +38,11 @@
   ],
   "scripts": {
     "versions": "bun --version && tsc --version",
+    "build:dist": "bun run scripts/release/build-dist.ts",
+    "build:browser-client": "bun run scripts/release/build-browser-client.ts",
+    "build": "bun run build:dist && bun run build:browser-client",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "build:browser-client": "bun run scripts/release/build-browser-client.ts",
     "verify:docs": "bun run scripts/verify-okf.ts",
     "verify": "bun run scripts/verify.ts",
     "release:package:rehearse": "bun run scripts/release/package-beta.ts",

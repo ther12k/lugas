@@ -9,6 +9,7 @@
  * Both commands use the safe subprocess import from load-app.ts.
  */
 import { loadAppManifest } from "./load-app";
+import { FRAMEWORK_VERSION } from "../internal/framework-version";
 
 const HELP = `Lugas CLI
 
@@ -17,11 +18,12 @@ Usage:
   lugas inspect <entry>      Output the full manifest as JSON
 
 Options:
+  --version, -v              Print framework version
   --timeout <ms>             Subprocess timeout (default: 5000)
 `;
 
 type CliArgs = {
-  command: "routes" | "inspect" | "help";
+  command: "routes" | "inspect" | "help" | "version";
   entry?: string;
   timeout?: number;
 };
@@ -31,6 +33,10 @@ function parseArgs(argv: string[]): CliArgs {
   let i = 0;
   while (i < argv.length) {
     const arg = argv[i]!;
+    if (arg === "--version" || arg === "-v") {
+      args.command = "version";
+      return args;
+    }
     if (arg === "--help" || arg === "-h") {
       args.command = "help";
       return args;
@@ -92,6 +98,11 @@ export function main(argv: string[]): void {
   switch (args.command) {
     case "help":
       console.log(HELP);
+      process.exit(0);
+      break;
+
+    case "version":
+      console.log(`lugas v${FRAMEWORK_VERSION}`);
       process.exit(0);
       break;
 

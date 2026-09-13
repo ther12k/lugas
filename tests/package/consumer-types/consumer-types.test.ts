@@ -69,6 +69,12 @@ function stageAndInstall(): { stageDir: string; consumerDir: string } {
   const stageDir = mkdtempSync(join(tmpdir(), "lugas-consumer-stage-"));
   cleanupDirs.push(stageDir);
   cpSync(join(ROOT, "src"), join(stageDir, "src"), { recursive: true });
+  if (existsSync(join(ROOT, "dist"))) {
+    cpSync(join(ROOT, "dist"), join(stageDir, "dist"), { recursive: true });
+  }
+  if (existsSync(join(ROOT, "build"))) {
+    cpSync(join(ROOT, "build"), join(stageDir, "build"), { recursive: true });
+  }
   for (const entry of ["package.json", "README.md", "NOTICE", "AGENTS.md"]) {
     cpSync(join(ROOT, entry), join(stageDir, entry));
   }
