@@ -21,6 +21,8 @@ jobs:
         with:
           bun-version: ${{ matrix.bun }}
       - run: bun install --frozen-lockfile
+      - name: Build library and browser artifacts
+        run: bun run build
       # M6-006-EH (#294): record the EXACT resolved Bun version and runner
       # identity per cell so "latest patch" has a concrete audited value.
       # Portable across bash/pwsh runners: write via the Actions expression,
