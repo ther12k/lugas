@@ -9,7 +9,7 @@
     "check": "tsc --noEmit",
     "start": "bun server/main.ts",
     "start:built": "bun dist-server/main.js",
-    "test": "bun test tests/starter.test.ts",
+    "test": "bun test tests/starter.test.ts tests/harness.test.ts",
     "measure": "bun scripts/measure.ts",
     "verify": "bun run setup && bun run build && bun run check && bun run test"
   },

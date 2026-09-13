@@ -112,7 +112,9 @@ describe.skipIf(GATE.skip)("spa-starter: installed package, built server", () =>
     if (ok.ok) expect(ok.data.greeting).toBe("Hello, Ada!");
 
     const invalid = await client.post("/api/greetings", {
-      // @ts-expect-error deliberately invalid for the runtime branch
+      // An empty string is type-legal input (framework failures are typed as
+      // OUTCOMES, not input exclusions — RF-3); the framework rejects it at
+      // runtime and the 422 branch below is part of the contract.
       body: { name: "" },
     });
     expect(invalid.ok).toBe(false);
@@ -167,12 +169,20 @@ describe.skipIf(GATE.skip)("spa-starter: installed package, built server", () =>
     const decoder = new TextDecoder();
     let text = "";
     const deadline = Date.now() + 8_000;
-    // Native async iteration over the response stream; the framing contract
-    // (3 ticks, then the 2s heartbeat) is asserted on the wire text.
-    for await (const chunk of res.body!) {
-      text += decoder.decode(chunk, { stream: true });
-      if (text.includes('"n":3}') && text.includes(": heartbeat")) break;
-      if (Date.now() > deadline) break;
+    // Explicit reader loop (for-await over ReadableStream is not portable
+    // across lib.dom versions); the framing contract (3 ticks, then the 2s
+    // heartbeat) is asserted on the wire text.
+    const reader = res.body!.getReader();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
+        if (text.includes('"n":3}') && text.includes(": heartbeat")) break;
+        if (Date.now() > deadline) break;
+      }
+    } finally {
+      await reader.cancel().catch(() => undefined);
     }
     expect(text).toContain("event: tick");
     expect(text).toContain('"n":1}');
