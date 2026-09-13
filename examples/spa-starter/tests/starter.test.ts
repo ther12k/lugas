@@ -4,11 +4,12 @@
  * lugas package — not repository sources. Covers: typed GET, validated
  * mutation (including the typed framework-422 branch), cookie auth,
  * multipart upload through formBody(), SSE stream, the production build
- * (shell + deep navigation + hashed assets), API/asset error
+ * (shell + deep navigation + hashed JS AND CSS assets), API/asset error
  * distinguishability, and graceful shutdown.
  *
- * Skips when the starter is not set up (`bun run verify` inside this
- * directory); LUGAS_REQUIRE_STARTER=1 turns the skip into a failure.
+ * Skips when the starter is not set up (development default);
+ * LUGAS_REQUIRE_STARTER=1 turns the skip into an explicit FAILURE — the
+ * gate decision is a pure function pinned by tests below (CA-14).
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
@@ -17,12 +18,47 @@ import { join } from "node:path";
 const STARTER = join(import.meta.dir, "..");
 type App = ReturnType<(typeof import("../server/app"))["createApp"]>;
 type API = import("lugas").AppContract<App>;
-const GATED =
+
+export type GateDecision = { readonly skip: boolean; readonly failMessage: string | null };
+
+/** Pure gate decision, pinned by the contract tests below (CA-14). */
+function starterGateDecision(options: { readonly required: boolean; readonly missing: boolean }): GateDecision {
+  if (!options.missing) return { skip: false, failMessage: null };
+  if (options.required) {
+    return {
+      skip: false,
+      failMessage:
+        "LUGAS_REQUIRE_STARTER=1 but the starter is not set up/built — run: cd examples/spa-starter && bun run setup && bun run build",
+    };
+  }
+  return { skip: true, failMessage: null };
+}
+
+const MISSING =
   !existsSync(join(STARTER, "node_modules", "lugas", "package.json")) ||
   !existsSync(join(STARTER, "dist", "index.html")) ||
   !existsSync(join(STARTER, "dist-server", "main.js"));
+const GATE = starterGateDecision({ required: process.env.LUGAS_REQUIRE_STARTER === "1", missing: MISSING });
 
-describe.skipIf(GATED)("spa-starter: installed package, built server", () => {
+describe("starter gating contract (CA-14)", () => {
+  test("not built, not required → documented skip", () => {
+    expect(starterGateDecision({ required: false, missing: true })).toEqual({ skip: true, failMessage: null });
+  });
+
+  test("not built, but REQUIRED → runs and fails with the setup message", () => {
+    const decision = starterGateDecision({ required: true, missing: true });
+    expect(decision.skip).toBe(false);
+    expect(decision.failMessage).toContain("LUGAS_REQUIRE_STARTER");
+    expect(decision.failMessage).toContain("bun run setup");
+  });
+
+  test("built → always runs regardless of the flag", () => {
+    expect(starterGateDecision({ required: false, missing: false }).skip).toBe(false);
+    expect(starterGateDecision({ required: true, missing: false }).skip).toBe(false);
+  });
+});
+
+describe.skipIf(GATE.skip)("spa-starter: installed package, built server", () => {
   let origin = "";
   let proc: Bun.Subprocess<"ignore", "pipe", "inherit"> | undefined;
   const clientOf = async () => {
@@ -55,6 +91,10 @@ describe.skipIf(GATED)("spa-starter: installed package, built server", () => {
   afterAll(async () => {
     proc?.kill("SIGTERM");
     await proc?.exited.catch(() => undefined);
+  });
+
+  test("gate satisfied: setup present (or explicit failure when REQUIRED but not built)", () => {
+    if (GATE.failMessage !== null) throw new Error(GATE.failMessage);
   });
 
   test("server up; typed GET through the installed client", async () => {
@@ -157,6 +197,17 @@ describe.skipIf(GATED)("spa-starter: installed package, built server", () => {
     expect(asset.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     expect(asset.headers.get("content-type")).toContain("javascript");
     expect((await asset.text()).length).toBeGreaterThan(0);
+
+    // Referenced CSS is mapped too (CA-14): a stylesheet that exists only as
+    // the entry's css[] reference still gets an explicit hashed mapping and
+    // serves with the immutable cache header and the right content type.
+    const cssHref = /href="(\/assets\/[^"]+\.css)"/.exec(shell)?.[1];
+    expect(cssHref).toBeTruthy();
+    const css = await fetch(`${origin}${cssHref}`);
+    expect(css.status).toBe(200);
+    expect(css.headers.get("content-type")).toContain("text/css");
+    expect(css.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    expect(await css.text()).toContain("#root button");
   });
 
   test("errors stay distinguishable: API miss is API 404; unknown path is not the shell", async () => {

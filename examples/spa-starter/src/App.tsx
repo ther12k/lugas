@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createClient, formBody } from "lugas/client";
 import type { AppContract } from "lugas";
 import type { createApp } from "../server/app";
+import "./App.css";
 
 type App = ReturnType<typeof createApp>;
 type API = AppContract<App>;

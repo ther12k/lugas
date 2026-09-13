@@ -14,5 +14,6 @@ import { resolve } from "node:path";
 export const DIST = resolve(process.cwd(), "dist");
 
 export const ASSET_FILES: Readonly<Record<string, { readonly path: string; readonly cacheControl: string }>> = {
-  ["/assets/index-Bie9a_TS.js"]: { path: resolve(process.cwd(), "dist/assets/index-Bie9a_TS.js"), cacheControl: "public, max-age=31536000, immutable" },
+  ["/assets/index-CWwWWwg_.css"]: { path: resolve(process.cwd(), "dist/assets/index-CWwWWwg_.css"), cacheControl: "public, max-age=31536000, immutable" },
+  ["/assets/index-DF6i6hjp.js"]: { path: resolve(process.cwd(), "dist/assets/index-DF6i6hjp.js"), cacheControl: "public, max-age=31536000, immutable" },
 };

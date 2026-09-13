@@ -1,0 +1,13 @@
+body {
+  margin: 0;
+  background: #f7f7f9;
+}
+
+#root button {
+  font: inherit;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid #c9c9d4;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}

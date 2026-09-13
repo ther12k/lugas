@@ -22,9 +22,19 @@ bun run start:built
 ```
 
 `bun run verify` runs the whole chain (setup → build → typecheck → tests).
-`bun run measure` records the API-only vs API-plus-SPA comparison
-(launch-to-readiness, idle RSS, RSS after an asset-request workload) into
-`measurements/` — measurements to establish, not promised savings.
+The tests skip when the starter is not set up; `LUGAS_REQUIRE_STARTER=1`
+turns that skip into an explicit failure (CI posture).
+
+`bun run measure` records the API-only vs API-plus-SPA comparison into
+`measurements/` with the repaired (v2) harness: a monotonic timer from
+before directly spawning the pinned Bun executable against the built
+server, closed on a successful readiness response; server-process RSS
+sampling; the real exit code; verified-and-consumed workload requests
+timed separately from settling; and artifact identity by hash (tarball,
+server bundle, frontend outputs, commit, dirty state, resolved deps).
+Measurements to establish, not promised savings. The initial (v1)
+artifact is marked SUPERSEDED — its readiness and RSS metrics are invalid
+(harness defects; see `docs/reports/issues/CA-14.md`).
 
 ## What it demonstrates
 
