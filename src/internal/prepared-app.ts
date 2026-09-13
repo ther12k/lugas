@@ -213,13 +213,20 @@ export function prepareApp<TServices>(config: {
   // pipeline — the synthetic route handler IS the upgrade decision, so
   // guards, schema slots, the traffic gate, and the error policy all apply
   // before the handshake. Raw event handlers register once per routeId.
-  const websocketHub: WebSocketHub = createWebSocketHub();
+  // The hub is created lazily on the first declared websocket descriptor,
+  // preserving `websocketHub: null` and zero allocations when absent.
+  let websocketHub: WebSocketHub | null = null;
+  const getWebSocketHub = (): WebSocketHub => {
+    if (websocketHub === null) websocketHub = createWebSocketHub();
+    return websocketHub;
+  };
   const compileWebSocketHandler = (routeId: string, descriptor: Record<string, unknown>): ((request: Request) => Response | Promise<Response>) => {
+    const hub = getWebSocketHub();
     const message = descriptor.message as WsRouteEntry["message"];
     const open = descriptor.open as WsRouteEntry["open"] | undefined;
     const close = descriptor.close as WsRouteEntry["close"] | undefined;
     const drain = descriptor.drain as WsRouteEntry["drain"] | undefined;
-    websocketHub.routes.set(routeId, {
+    hub.routes.set(routeId, {
       message,
       ...(open !== undefined ? { open } : {}),
       ...(close !== undefined ? { close } : {}),
@@ -230,7 +237,7 @@ export function prepareApp<TServices>(config: {
       params: descriptor.params,
       query: descriptor.query,
       headers: descriptor.headers,
-      handler: (context: PipelineContext): Response => performUpgrade(websocketHub, routeId, context),
+      handler: (context: PipelineContext): Response => performUpgrade(hub, routeId, context),
     };
     return compileLugasHandler(routeId, synthetic);
   };
@@ -645,7 +652,7 @@ export function prepareApp<TServices>(config: {
     budgets: budgetsCtx,
     cors: config.cors,
     logging: config.logging,
-    websocketHub: websocketHub.routes.size > 0 ? websocketHub : null,
+    websocketHub,
     secureHeaders: config.secureHeaders,
     health: config.health,
     telemetry: config.telemetry,

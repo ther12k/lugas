@@ -268,4 +268,21 @@ describe("serve-time conflict", () => {
       expect((err as { code?: string }).code).toBe("LUGAS_WS_002");
     }
   });
+
+  test("conditional hub: null when no websocket routes, instantiated when websocket route present", () => {
+    const plainApp = defineApp({
+      routes: {
+        "/hello": { GET: () => new Response("ok") },
+      },
+    });
+    expect(plainApp.prepared.websocketHub).toBeNull();
+
+    const wsApp = defineApp({
+      routes: {
+        "/ws": { GET: websocket({ message: () => {} }) },
+      },
+    });
+    expect(wsApp.prepared.websocketHub).not.toBeNull();
+    expect(wsApp.prepared.websocketHub?.routes.size).toBe(1);
+  });
 });
