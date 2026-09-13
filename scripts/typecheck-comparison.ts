@@ -97,12 +97,12 @@ const gitOf = (cwd: string): { commit: string; dirty: boolean } => {
 const loadNow = (): string =>
   new TextDecoder().decode(Bun.spawnSync(["cat", "/proc/loadavg"]).stdout).trim();
 
-// Interleaved cells (A,B,A,B,... per round): under sustained external load
-// (the owner's ga-m6-soak-72h was running during measurement), alternation
-// reduces ordering bias that sequential cells would suffer; it does NOT
-// guarantee equivalent CPU contention, frequency, or scheduling per
-// invocation, so paired deltas under load remain exploratory until a
-// quiet-host run confirms them.
+// Interleaved cells (A,B,A,B,... per round): concurrent external load was
+// recorded during measurement (its historical source is unconfirmed — see
+// the CA-12 attribution amendment). Alternation reduces ordering bias that
+// sequential cells would suffer; it does NOT guarantee equivalent CPU
+// contention, frequency, or scheduling per invocation, so paired deltas
+// under load remain exploratory until a quiet-host run confirms them.
 //
 // Each round visits both cells twice (A,B,A,B), so every cell accumulates
 // TEN samples per workload across five rounds — not five.
@@ -162,7 +162,7 @@ const environment = {
   memoryTotalMb,
   bunVersion: Bun.version,
   loadAverageAtStart: loadNow(),
-  externalLoadDisclosure: "The owner's ga-m6-soak-72h benchmark (started 2026-09-12 21:25 WIB, 72h duration) was running throughout this measurement; load averages of ~15-20 were recorded per run. Absolute medians are load-inflated relative to v2's quiet-host calibration; the INTERLEAVED design keeps the paired comparison valid under uniform external load. Quiet-host re-measurement is required before accepting any budget change.",
+  externalLoadDisclosure: "Concurrent host load was observed during the recorded samples (load ~15-20 per run). The historical source of that contention is UNCONFIRMED (see the CA-12 attribution amendment of 2026-09-13). Absolute medians are load-inflated relative to v2's quiet-host calibration; the INTERLEAVED design reduces ordering bias under concurrent load. Quiet-host re-measurement is required before accepting any budget change.",
   perWorktree: {
     earlier: {
       ...gitOf(resolve(earlierDir)),
