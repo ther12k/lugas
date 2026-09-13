@@ -2,6 +2,7 @@
 
 import { resolve } from "node:path";
 import { checkBunVersion } from "./check-bun-version";
+import { resolvePerfGatePlan } from "./perf-gate-plan";
 
 type CheckResult = { name: string; status: "PASS" | "FAIL" | "SKIP"; output: string };
 
@@ -67,20 +68,24 @@ async function main(): Promise<number> {
     console.log(`== ${name} ==\n${result.status}: ${result.output || "(no output)"}`);
   }
 
-  // Performance gate (M6R1-001): runs when benchmark results archive is present.
-  // SKIP on a clean checkout (no benchmarks run yet); FAIL when archive present but gate fails.
+  // Performance gate (M6R1-001, M6R2 #282): release verification
+  // (LUGAS_PERF_RELEASE=1, set by release tooling) invokes the checker
+  // UNCONDITIONALLY — the checker itself fails closed on missing or stale
+  // evidence in --release mode, so skipping here would weaken that contract
+  // (the release skip hole, CA-13). Development mode skips only when no
+  // benchmark archive exists at all.
   const perfGatePath = `${import.meta.dir}/check-performance-budget.ts`;
-  const perfGateArgv = [perfGatePath];
   const plainResultsPath = resolve(import.meta.dir, "..", "benchmarks", "results", "m5-plain", "results.json");
-  if (await Bun.file(plainResultsPath).exists()) {
-    // M6R2 #282: release verification invokes the gate in --release mode;
-    // LUGAS_PERF_RELEASE=1 is set by release tooling (#114 flow).
-    const perfArgs = process.env.LUGAS_PERF_RELEASE === "1" ? [...perfGateArgv, "--release"] : perfGateArgv;
-    const perfResult = await run("perf-gate", ["bun", "run", ...perfArgs]);
+  const plan = resolvePerfGatePlan({
+    release: process.env.LUGAS_PERF_RELEASE === "1",
+    hasPlainArchive: await Bun.file(plainResultsPath).exists(),
+  });
+  if (plan.run) {
+    const perfResult = await run("perf-gate", ["bun", "run", perfGatePath, ...plan.argv]);
     results.push(perfResult);
     console.log(`== perf-gate ==\n${perfResult.status}: ${perfResult.output || "(no output)"}`);
   } else {
-    const perfResult = { name: "perf-gate", status: "SKIP" as const, output: "no benchmark results archive — run benchmarks before release gate" };
+    const perfResult = { name: "perf-gate", status: "SKIP" as const, output: plan.skipReason };
     results.push(perfResult);
     console.log(`== perf-gate ==\nSKIP: ${perfResult.output}`);
   }
