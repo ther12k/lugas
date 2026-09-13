@@ -1,35 +1,21 @@
 {
   "format": "lugas-release-evidence-v2",
-  "packageSourceCommit": "373418fffe3ebb42bbe39f56e0c3c95e4f06dd00",
-  "attestationCommit": "373418fffe3ebb42bbe39f56e0c3c95e4f06dd00",
-  "measuredAt": "2026-09-10T19:35:41.287Z",
+  "packageSourceCommit": "6943f88d571266511ad53d826453bbf4413974cd",
+  "attestationCommit": "6943f88d571266511ad53d826453bbf4413974cd",
+  "measuredAt": "2026-09-13T15:59:12.280Z",
   "bunVersion": "1.4.0",
-  "plainStaticRps": 69538,
-  "plainJsonRps": 61621,
-  "validatedPostRps": 47639,
-  "typecheckMs": 1703,
-  "clientBundleBytes": 14900,
-  "tarballSha256": "6c31b49800b2a5e4be8dc273e89388b64cc90b15ba09f460746dd376a70b14d1",
-  "rawBunPlainStaticRps": 83901,
-  "rawBunValidatedPostRps": 50482,
-  "environment": {
-    "platform": "linux",
-    "arch": "x64",
-    "cpuModel": "13th Gen Intel(R) Core(TM) i5-13420H",
-    "bunVersion": "1.4.0"
-  },
-  "loadAverage": {
-    "before": [
-      5.46,
-      7.45,
-      7.23
-    ],
-    "after": [
-      5.78,
-      7.26,
-      7.18
-    ]
-  },
+  "perfGate": "deferred",
+  "deferralRef": "ODR-0020",
+  "plainStaticRps": null,
+  "plainJsonRps": null,
+  "validatedPostRps": null,
+  "typecheckMs": null,
+  "clientBundleBytes": null,
+  "tarballSha256": "50fd13565eab587329ee5674331a4d46539ad476db3666c7e6aecb2870da1732",
+  "rawBunPlainStaticRps": null,
+  "rawBunValidatedPostRps": null,
+  "environment": null,
+  "loadAverage": null,
   "blockingFailures": 0,
   "alerts": 0
 }
