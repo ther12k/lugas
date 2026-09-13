@@ -112,9 +112,16 @@ describe("checker deferral contract (--defer-perf, ODR-0020)", () => {
   }
 
   function runChecker(root: string, args: string[], env: Record<string, string>) {
+    // Strip outer perf-gate env: when this suite runs inside a release or
+    // deferred verify (the packet pipeline exports LUGAS_PERF_*), the outer
+    // variables must not leak into the sandboxed checker's contract tests.
+    const inherited = { ...process.env };
+    for (const key of ["LUGAS_PERF_RELEASE", "LUGAS_PERF_DEFERRED", "LUGAS_PERF_DEFERRAL_REF", "LUGAS_PACKAGE_SOURCE_SHA"]) {
+      delete inherited[key];
+    }
     const proc = Bun.spawnSync(["bun", "run", join(root, "scripts", "check-performance-budget.ts"), ...args], {
       cwd: root,
-      env: { ...process.env, ...env },
+      env: { ...inherited, ...env },
       stdout: "pipe",
       stderr: "pipe",
     });
