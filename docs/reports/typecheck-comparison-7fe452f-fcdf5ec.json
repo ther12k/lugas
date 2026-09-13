@@ -25,7 +25,7 @@
         "zod": "4.4.3"
       }
     },
-    "procedure": "Five timed runs per cell (1s settle between runs; 2s quiet before each cell), median reported. Diagnostics collected in separate runs (--extendedDiagnostics, --listFilesOnly). Full-repo runs use each revision's own tsconfig; the fixture is one identical file compiled with a pinned flag set mirroring the repo tsconfig minus DOM (--lib esnext --types bun), using only APIs present at both revisions."
+    "procedure": "Ten timed samples per cell per workload, interleaved round-robin (earlier, current, earlier, current per round x 5 rounds) with a 750ms settle before every invocation; conventional median (mean of the two central order statistics for even counts). Diagnostics collected in separate runs (--extendedDiagnostics, --listFilesOnly). Full-repo runs use each revision's own tsconfig; the fixture is one identical file compiled with a pinned flag set mirroring the repo tsconfig minus DOM (--lib esnext --types bun), using only APIs present at both revisions."
   },
   "earlier": {
     "label": "earlier (v2 calibration source)",
@@ -43,7 +43,7 @@
         2876,
         2597
       ],
-      "medianMs": 2876
+      "medianMs": 2873.5
     },
     "fixture": {
       "runsMs": [
@@ -58,7 +58,7 @@
         381,
         258
       ],
-      "medianMs": 272
+      "medianMs": 271
     },
     "loadSamples": [
       "16.58 16.56 16.93 15/3433 1581467",
@@ -107,7 +107,7 @@
         2480,
         2103
       ],
-      "medianMs": 2451
+      "medianMs": 2447
     },
     "fixture": {
       "runsMs": [
@@ -153,6 +153,44 @@
     "fixtureDiagnostics": {
       "fileCount": 383,
       "extended": "Files:             383\nLines:          116034\nIdentifiers:     97478\nSymbols:         94762\nTypes:           34091\nInstantiations:  61413\nMemory used:    81861K\nMemory allocs:  407260\nParse time:     0.072s\nBind time:      0.027s\nCheck time:     0.092s\nEmit time:      0.000s\nTotal time:     0.194s"
+    }
+  },
+  "amendment": {
+    "amendedAt": "2026-09-13T01:29:55.439Z",
+    "reason": "Owner review of #415: the recorded medians used the upper-middle order statistic (sorted[floor(n/2)]) instead of the conventional median, and the original procedure text described five sequential runs with a 1s settle, which did not match the executed interleaved loop. Raw runsMs samples, load samples, and diagnostics are UNCHANGED; only derived medians, the procedure string, and this amendment block were updated.",
+    "medianMethod": "conventional: even counts average the two central order statistics of the sorted samples",
+    "correctedMedians": {
+      "earlier.fullRepo": {
+        "from": 2876,
+        "to": 2873.5
+      },
+      "earlier.fixture": {
+        "from": 272,
+        "to": 271
+      },
+      "current.fullRepo": {
+        "from": 2451,
+        "to": 2447
+      },
+      "current.fixture": {
+        "from": 351,
+        "to": 351
+      }
+    },
+    "originalProcedure": "Five timed runs per cell (1s settle between runs; 2s quiet before each cell), median reported. Diagnostics collected in separate runs (--extendedDiagnostics, --listFilesOnly). Full-repo runs use each revision's own tsconfig; the fixture is one identical file compiled with a pinned flag set mirroring the repo tsconfig minus DOM (--lib esnext --types bun), using only APIs present at both revisions.",
+    "provenance": {
+      "earlierCell": {
+        "recordedCommit": "7fe452f6c5b2d96fceb504ec7ae0bf69c4275cde (detached worktree CA-12-base)",
+        "dirtyAtMeasurement": true,
+        "note": "The executed procedure placed an identical consumer fixture (sha256 440a2b70939101b9f4bbbec669e16dc5f3f64bbe75e83636e81dcb5576926990) in both worktrees as an untracked file. The base worktree's fixture has since been removed, so its presence and content at measurement time cannot be re-verified post hoc; the exact dirty delta for this cell is therefore a recorded limitation and the comparison remains exploratory evidence."
+      },
+      "currentCell": {
+        "recordedCommit": "0922f8fb4ae3841258aad78ee98521314caee8de",
+        "notFcdf5ecBecause": "0922f8f = fcdf5ec + one commit touching only benchmarks/baselines/m5-accepted.json (the withdrawn v3 proposal) and docs/reports/issues/CA-12.md. git diff fcdf5ec 0922f8f --stat shows no compiler-relevant input (src/, tests/, tsconfig*.json, package.json) changed; those paths are also byte-identical at the amended branch (empty git diff --stat fcdf5ec 9fffe22 -- src tests tsconfig.json tsconfig.*.json package.json).",
+        "dirtyAtMeasurement": true,
+        "dirtyDelta": "untracked consumer-fixture.ts (sha256 440a2b70939101b9f4bbbec669e16dc5f3f64bbe75e83636e81dcb5576926990), now tracked at 9fffe22"
+      },
+      "identity": "This artifact is an exploratory loaded-host comparison of 7fe452f(+identical untracked fixture) vs 0922f8f(+identical untracked fixture), not a clean two-commit comparison."
     }
   }
 }

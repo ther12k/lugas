@@ -9,8 +9,12 @@
  *   both revisions; compiled with a pinned flag set mirroring the repo
  *   tsconfig minus DOM: --lib esnext --types bun)
  *
- * Five timed runs per cell (median reported); diagnostics collected
- * separately (--extendedDiagnostics, --listFilesOnly file counts).
+ * Ten timed samples per cell per workload, collected round-robin
+ * (earlier, current, earlier, current — per round × 5 rounds) with a
+ * 750 ms settle before every invocation; conventional median reported
+ * (mean of the two central order statistics for even sample counts).
+ * Diagnostics collected separately (--extendedDiagnostics,
+ * --listFilesOnly file counts).
  *
  * Usage:
  *   bun run scripts/typecheck-comparison.ts <earlier-worktree> <current-worktree> <out.json>
@@ -51,7 +55,13 @@ async function timedRun(args: readonly string[], cwd: string): Promise<number> {
   return Math.round(ms);
 }
 
-const median = (values: readonly number[]): number => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]!;
+// Conventional median: for even sample counts, the mean of the two central
+// order statistics (the previous upper-middle selection biased medians high).
+const median = (values: readonly number[]): number => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+};
 
 async function fiveTimedRuns(args: readonly string[], cwd: string): Promise<{ runsMs: number[]; medianMs: number }> {
   const runs: number[] = [];
@@ -87,9 +97,15 @@ const gitOf = (cwd: string): { commit: string; dirty: boolean } => {
 const loadNow = (): string =>
   new TextDecoder().decode(Bun.spawnSync(["cat", "/proc/loadavg"]).stdout).trim();
 
-// Interleaved cells (A,B,A,B,...): under sustained external load (the
-// owner's ga-m6-soak-72h was running during measurement), alternation
-// cancels load drift between cells; sequential cells would be order-biased.
+// Interleaved cells (A,B,A,B,... per round): under sustained external load
+// (the owner's ga-m6-soak-72h was running during measurement), alternation
+// reduces ordering bias that sequential cells would suffer; it does NOT
+// guarantee equivalent CPU contention, frequency, or scheduling per
+// invocation, so paired deltas under load remain exploratory until a
+// quiet-host run confirms them.
+//
+// Each round visits both cells twice (A,B,A,B), so every cell accumulates
+// TEN samples per workload across five rounds — not five.
 const cell = (label: string, dir: string) => ({
   label,
   worktree: resolve(dir),
@@ -164,7 +180,7 @@ const environment = {
     },
   },
   procedure:
-    "Five timed runs per cell (1s settle between runs; 2s quiet before each cell), median reported. Diagnostics collected in separate runs (--extendedDiagnostics, --listFilesOnly). Full-repo runs use each revision's own tsconfig; the fixture is one identical file compiled with a pinned flag set mirroring the repo tsconfig minus DOM (--lib esnext --types bun), using only APIs present at both revisions.",
+    "Ten timed samples per cell per workload, interleaved round-robin (earlier, current, earlier, current per round x 5 rounds) with a 750ms settle before every invocation; conventional median (mean of the two central order statistics for even counts). Diagnostics collected in separate runs (--extendedDiagnostics, --listFilesOnly). Full-repo runs use each revision's own tsconfig; the fixture is one identical file compiled with a pinned flag set mirroring the repo tsconfig minus DOM (--lib esnext --types bun), using only APIs present at both revisions.",
 };
 
 const report = { environment, earlier, current };
