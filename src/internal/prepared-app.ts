@@ -167,11 +167,18 @@ export function prepareApp<TServices>(config: {
   // a startup failure answers held requests with a redacted 503 problem.
   // `settled` lets /ready answer synchronously (503) while init is pending —
   // readiness must answer, never hang (ADR-0029).
+  //
+  // Fast path: once initialization settles successfully (`trafficGate.settled === true`),
+  // incoming requests invoke the handler directly, avoiding microtask
+  // continuation queuing (`Promise.resolve().then()`) on synchronous route returns.
+  // When pending or on initialization failure (`settled === false`), the gate
+  // continuation holds traffic or rejects with the 503 problem.
   const trafficGate: { gate: Promise<void>; settled: boolean } = { gate: Promise.resolve(), settled: true };
   const gateHandler = (
     handler: (request: Request) => Response | Promise<Response>,
   ): (request: Request) => Response | Promise<Response> => {
     return (request: Request): Response | Promise<Response> => {
+      if (trafficGate.settled) return handler(request);
       return Promise.resolve(trafficGate.gate).then(
         () => handler(request),
         () => problem(503, { title: "unavailable", status: 503, detail: "service initialization did not complete" }),
