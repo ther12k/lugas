@@ -1,0 +1,158 @@
+{
+  "environment": {
+    "measuredAt": "2026-09-13T01:13:18.604Z",
+    "host": "user@kiranitrov15",
+    "cpuModel": "13th Gen Intel(R) Core(TM) i5-13420H",
+    "memoryTotalMb": 15692,
+    "bunVersion": "1.4.0",
+    "loadAverageAtStart": "19.26 17.56 17.26 14/3343 1584614",
+    "externalLoadDisclosure": "The owner's ga-m6-soak-72h benchmark (started 2026-09-12 21:25 WIB, 72h duration) was running throughout this measurement; load averages of ~15-20 were recorded per run. Absolute medians are load-inflated relative to v2's quiet-host calibration; the INTERLEAVED design keeps the paired comparison valid under uniform external load. Quiet-host re-measurement is required before accepting any budget change.",
+    "perWorktree": {
+      "earlier": {
+        "commit": "7fe452f6c5b2d96fceb504ec7ae0bf69c4275cde",
+        "dirty": true,
+        "tscExecutable": "/home/ther12k/Workspace/Learning/lugas/.worktrees/CA-12-base/node_modules/.bin/tsc",
+        "typescript": "7.0.2",
+        "atTypesBun": "1.4.0",
+        "zod": "4.4.3"
+      },
+      "current": {
+        "commit": "0922f8fb4ae3841258aad78ee98521314caee8de",
+        "dirty": true,
+        "tscExecutable": "/home/ther12k/Workspace/Learning/lugas/.worktrees/CA-12/node_modules/.bin/tsc",
+        "typescript": "7.0.2",
+        "atTypesBun": "1.4.0",
+        "zod": "4.4.3"
+      }
+    },
+    "procedure": "Five timed runs per cell (1s settle between runs; 2s quiet before each cell), median reported. Diagnostics collected in separate runs (--extendedDiagnostics, --listFilesOnly). Full-repo runs use each revision's own tsconfig; the fixture is one identical file compiled with a pinned flag set mirroring the repo tsconfig minus DOM (--lib esnext --types bun), using only APIs present at both revisions."
+  },
+  "earlier": {
+    "label": "earlier (v2 calibration source)",
+    "worktree": "/home/ther12k/Workspace/Learning/lugas/.worktrees/CA-12-base",
+    "fullRepo": {
+      "runsMs": [
+        2936,
+        3152,
+        2529,
+        2961,
+        3175,
+        2409,
+        2677,
+        2871,
+        2876,
+        2597
+      ],
+      "medianMs": 2876
+    },
+    "fixture": {
+      "runsMs": [
+        343,
+        266,
+        270,
+        339,
+        419,
+        253,
+        272,
+        240,
+        381,
+        258
+      ],
+      "medianMs": 272
+    },
+    "loadSamples": [
+      "16.58 16.56 16.93 15/3433 1581467",
+      "16.58 16.56 16.93 23/3434 1581492",
+      "17.74 16.80 17.01 9/3485 1581802",
+      "17.74 16.80 17.01 16/3485 1581826",
+      "17.63 16.81 17.01 11/3405 1582043",
+      "17.63 16.81 17.01 13/3405 1582086",
+      "17.90 16.87 17.03 25/3385 1582301",
+      "17.90 16.87 17.03 19/3385 1582325",
+      "18.92 17.13 17.11 18/3506 1582757",
+      "18.92 17.13 17.11 17/3509 1582785",
+      "18.77 17.12 17.11 11/3502 1582981",
+      "18.77 17.12 17.11 12/3510 1583013",
+      "18.64 17.15 17.12 13/3476 1583226",
+      "18.64 17.15 17.12 11/3428 1583252",
+      "19.71 17.40 17.20 13/3386 1583560",
+      "19.71 17.40 17.20 11/3386 1583586",
+      "20.59 17.67 17.29 13/3478 1583840",
+      "20.59 17.67 17.29 24/3458 1583864",
+      "20.47 17.69 17.30 10/3428 1584115",
+      "20.47 17.69 17.30 14/3421 1584148"
+    ],
+    "fullRepoDiagnostics": {
+      "fileCount": 1624,
+      "extended": "Files:             1624\nLines:           201106\nIdentifiers:     276950\nSymbols:         868570\nTypes:           491137\nInstantiations: 2187950\nMemory used:    586941K\nMemory allocs:  5940305\nConfig time:     0.004s\nParse time:      0.228s\nBind time:       0.057s\nCheck time:      2.220s\nEmit time:       0.001s\nTotal time:      2.514s"
+    },
+    "fixtureDiagnostics": {
+      "fileCount": 380,
+      "extended": "Files:             380\nLines:          115297\nIdentifiers:     96440\nSymbols:         91892\nTypes:           32772\nInstantiations:  58070\nMemory used:    79949K\nMemory allocs:  394144\nParse time:     0.118s\nBind time:      0.027s\nCheck time:     0.140s\nEmit time:      0.000s\nTotal time:     0.288s"
+    }
+  },
+  "current": {
+    "label": "current (proposed v3 calibration source)",
+    "worktree": "/home/ther12k/Workspace/Learning/lugas/.worktrees/CA-12",
+    "fullRepo": {
+      "runsMs": [
+        2451,
+        2407,
+        2431,
+        2626,
+        2443,
+        2484,
+        2559,
+        2177,
+        2480,
+        2103
+      ],
+      "medianMs": 2451
+    },
+    "fixture": {
+      "runsMs": [
+        402,
+        351,
+        344,
+        351,
+        251,
+        291,
+        489,
+        884,
+        260,
+        358
+      ],
+      "medianMs": 351
+    },
+    "loadSamples": [
+      "16.58 16.56 16.93 24/3480 1581623",
+      "17.74 16.80 17.01 25/3503 1581671",
+      "17.60 16.78 17.00 16/3468 1581941",
+      "17.60 16.78 17.00 14/3478 1581976",
+      "17.63 16.81 17.01 15/3382 1582161",
+      "17.90 16.87 17.03 16/3397 1582203",
+      "18.39 16.99 17.07 29/3390 1582436",
+      "18.39 16.99 17.07 15/3416 1582504",
+      "18.77 17.12 17.11 13/3517 1582901",
+      "18.77 17.12 17.11 9/3517 1582926",
+      "18.87 17.17 17.12 17/3503 1583129",
+      "18.87 17.17 17.12 16/3479 1583159",
+      "18.64 17.15 17.12 16/3401 1583386",
+      "19.71 17.40 17.20 30/3408 1583430",
+      "20.21 17.54 17.25 15/3375 1583630",
+      "20.21 17.54 17.25 14/3390 1583707",
+      "20.47 17.69 17.30 12/3458 1583999",
+      "20.47 17.69 17.30 14/3458 1584030",
+      "19.95 17.63 17.28 19/3398 1584211",
+      "19.95 17.63 17.28 16/3377 1584235"
+    ],
+    "fullRepoDiagnostics": {
+      "fileCount": 1642,
+      "extended": "Files:             1642\nLines:           204258\nIdentifiers:     282806\nSymbols:         684876\nTypes:           359115\nInstantiations: 1667139\nMemory used:    470995K\nMemory allocs:  4629066\nConfig time:     0.004s\nParse time:      0.247s\nBind time:       0.054s\nCheck time:      1.768s\nEmit time:       0.001s\nTotal time:      2.083s"
+    },
+    "fixtureDiagnostics": {
+      "fileCount": 383,
+      "extended": "Files:             383\nLines:          116034\nIdentifiers:     97478\nSymbols:         94762\nTypes:           34091\nInstantiations:  61413\nMemory used:    81861K\nMemory allocs:  407260\nParse time:     0.072s\nBind time:      0.027s\nCheck time:     0.092s\nEmit time:      0.000s\nTotal time:     0.194s"
+    }
+  }
+}
