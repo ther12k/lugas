@@ -6,7 +6,7 @@
     "memoryTotalMb": 15692,
     "bunVersion": "1.4.0",
     "loadAverageAtStart": "19.26 17.56 17.26 14/3343 1584614",
-    "externalLoadDisclosure": "The owner's ga-m6-soak-72h benchmark (started 2026-09-12 21:25 WIB, 72h duration) was running throughout this measurement; load averages of ~15-20 were recorded per run. Absolute medians are load-inflated relative to v2's quiet-host calibration; the INTERLEAVED design keeps the paired comparison valid under uniform external load. Quiet-host re-measurement is required before accepting any budget change.",
+    "externalLoadDisclosure": "Concurrent host load was observed during the recorded samples (load ~15-20 per sample). This record originally attributed that load to the ga-m6-soak-72h soak workload, but that attribution was not independently established. A subsequent host inspection (2026-09-13 09:08 WIB) found no active matching soak workload. The historical source of the contention remains unconfirmed. The measurements remain exploratory, and their disposition is unchanged.",
     "perWorktree": {
       "earlier": {
         "commit": "7fe452f6c5b2d96fceb504ec7ae0bf69c4275cde",
@@ -191,6 +191,13 @@
         "dirtyDelta": "untracked consumer-fixture.ts (sha256 440a2b70939101b9f4bbbec669e16dc5f3f64bbe75e83636e81dcb5576926990), now tracked at 9fffe22"
       },
       "identity": "This artifact is an exploratory loaded-host comparison of 7fe452f(+identical untracked fixture) vs 0922f8f(+identical untracked fixture), not a clean two-commit comparison."
-    }
+    },
+    "attributionAmendment": {
+      "amendedAt": "2026-09-13T02:25:39.449Z",
+      "reason": "Owner-directed correction: the soak attribution was not independently established; a subsequent host inspection found no active matching soak workload. Raw samples, load samples, diagnostics, and provenance limitations are UNCHANGED. environment.externalLoadDisclosure was replaced with the corrected wording; the original string is preserved in amendment.originalExternalLoadDisclosure.",
+      "correctedWording": "Concurrent host load was observed during the recorded samples (load ~15-20 per sample). This record originally attributed that load to the ga-m6-soak-72h soak workload, but that attribution was not independently established. A subsequent host inspection (2026-09-13 09:08 WIB) found no active matching soak workload. The historical source of the contention remains unconfirmed. The measurements remain exploratory, and their disposition is unchanged.",
+      "inspectionNote": "Host inspection 2026-09-13 09:08 WIB: no soak/benchmark process found (name sweeps, /tmp artifacts, crontab, scheduled automations); load 3.46/4.41/8.11 (1/5/15-min, 12 threads) declining, attributed to desktop/agent processes and recently finished measurement work. Finding no matching soak now does not prove none ran during the historical samples; it means the asserted attribution is not established by current inspection."
+    },
+    "originalExternalLoadDisclosure": "The owner's ga-m6-soak-72h benchmark (started 2026-09-12 21:25 WIB, 72h duration) was running throughout this measurement; load averages of ~15-20 were recorded per run. Absolute medians are load-inflated relative to v2's quiet-host calibration; the INTERLEAVED design keeps the paired comparison valid under uniform external load. Quiet-host re-measurement is required before accepting any budget change."
   }
 }
