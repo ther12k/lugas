@@ -107,9 +107,12 @@ describe("ownership table: the SPA shell", () => {
 });
 
 describe("SPA misses stay distinguishable", () => {
+  // Native dirs mounts are Linux-only (ADR-0018 amendment): the app carries
+  // the mount only where it can be validated, so the describe constructs on
+  // every platform; the asset-owned-prefix test is Linux-only (below).
   const app3 = defineApp({
     routes: {},
-    assets: { dirs: { "/assets/*": join(DIST, "assets") } },
+    assets: process.platform === "linux" ? { dirs: { "/assets/*": join(DIST, "assets") } } : {},
     spa: { shell: join(DIST, "index.html"), navigations: ["/", "/app/*"] },
   });
   const server = createTestServer(app3);
@@ -134,7 +137,13 @@ describe("fail-closed ownership and config validation", () => {
     const shell = join(DIST, "index.html");
     expect(errCode(() => defineApp({ routes: { "/app": { GET: route({ handler: () => json(200, {}) }) } }, spa: { shell, navigations: ["/app"] } }))).toBe("LUGAS_SPA_002");
     expect(errCode(() => defineApp({ assets: { files: { "/app.js": join(DIST, "robots.txt") } }, spa: { shell, navigations: ["/app.js"] } }))).toBe("LUGAS_SPA_002");
-    expect(errCode(() => defineApp({ assets: { dirs: { "/app/*": join(DIST, "assets") } }, spa: { shell, navigations: ["/app/*"] } }))).toBe("LUGAS_SPA_002");
+    // dirs mounts are Linux-only (ADR-0018 amendment): on non-Linux the
+    // platform gate rejects the mount before SPA ownership validation, so the
+    // documented fail-closed code there is LUGAS_ASSET_004 (see
+    // assets-config.test.ts); on Linux the SPA_002 ownership collision fires.
+    expect(
+      errCode(() => defineApp({ assets: { dirs: { "/app/*": join(DIST, "assets") } }, spa: { shell, navigations: ["/app/*"] } })),
+    ).toBe(process.platform === "linux" ? "LUGAS_SPA_002" : "LUGAS_ASSET_004");
     expect(errCode(() => defineApp({ health: true, spa: { shell, navigations: ["/health"] } }))).toBe("LUGAS_SPA_002");
     expect(errCode(() => defineApp({ openapi: { document: { title: "t", version: "1" } }, spa: { shell, navigations: ["/openapi.json"] } }))).toBe("LUGAS_SPA_002");
     expect(errCode(() => defineApp({ spa: { shell, navigations: ["/app/x", "/app/*"] } }))).toBe("LUGAS_SPA_002"); // exact inside a declared prefix
