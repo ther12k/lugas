@@ -33,6 +33,19 @@ describe("verify perf-gate plan (truth table)", () => {
     const plan = resolvePerfGatePlan({ release: true, hasPlainArchive: true });
     expect(plan).toEqual({ run: true, argv: ["--release"] });
   });
+
+  test("release + deferred → run --release --defer-perf regardless of archives (ODR-0020)", () => {
+    const plan = resolvePerfGatePlan({ release: true, hasPlainArchive: false, deferred: true });
+    expect(plan).toEqual({ run: true, argv: ["--release", "--defer-perf"] });
+    const withArchive = resolvePerfGatePlan({ release: true, hasPlainArchive: true, deferred: true });
+    expect(withArchive).toEqual({ run: true, argv: ["--release", "--defer-perf"] });
+  });
+
+  test("deferred without release is inert (development mode keeps dev-mode plan)", () => {
+    const plan = resolvePerfGatePlan({ release: false, hasPlainArchive: false, deferred: true });
+    expect(plan.run).toBe(false);
+    if (!plan.run) expect(plan.skipReason).toContain("development mode");
+  });
 });
 
 describe("checker fails closed in release mode without archives", () => {
@@ -67,6 +80,92 @@ describe("checker fails closed in release mode without archives", () => {
       const out = `${new TextDecoder().decode(proc.stdout)}${new TextDecoder().decode(proc.stderr)}`;
       expect(proc.exitCode).not.toBe(0); // release mode + no archives must FAIL, never SKIP
       expect(out).toContain("release mode fails closed");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("checker deferral contract (--defer-perf, ODR-0020)", () => {
+  /** Sandbox: checker + identity module + baselines + rehearsal tarball. */
+  function makeSandbox(): string {
+    const root = mkdtempSync(join(tmpdir(), "lugas-deferperf-"));
+    mkdirSync(join(root, "scripts", "release"), { recursive: true });
+    mkdirSync(join(root, "benchmarks", "baselines"), { recursive: true });
+    mkdirSync(join(root, "benchmarks", "results"), { recursive: true });
+    mkdirSync(join(root, "docs", "releases", "beta"), { recursive: true });
+    const src = readFileSync(join(ROOT, "scripts", "check-performance-budget.ts"), "utf8");
+    writeFileSync(
+      join(root, "scripts", "check-performance-budget.ts"),
+      src.replace('const ROOT = resolve(import.meta.dir, "..");', "const ROOT = import.meta.dir + \"/..\";"),
+    );
+    writeFileSync(
+      join(root, "scripts", "release", "candidate-version.ts"),
+      readFileSync(join(ROOT, "scripts", "release", "candidate-version.ts"), "utf8"),
+    );
+    writeFileSync(
+      join(root, "benchmarks", "baselines", "m5-accepted.json"),
+      readFileSync(join(ROOT, "benchmarks", "baselines", "m5-accepted.json"), "utf8"),
+    );
+    writeFileSync(join(root, "docs", "releases", "beta", "lugas-0.1.0-beta.5.tgz"), "tarball-bytes");
+    return root;
+  }
+
+  function runChecker(root: string, args: string[], env: Record<string, string>) {
+    const proc = Bun.spawnSync(["bun", "run", join(root, "scripts", "check-performance-budget.ts"), ...args], {
+      cwd: root,
+      env: { ...process.env, ...env },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const out = `${new TextDecoder().decode(proc.stdout)}${new TextDecoder().decode(proc.stderr)}`;
+    return { exitCode: proc.exitCode, out };
+  }
+
+  test("deferral without an authorizing decision reference is rejected", () => {
+    const root = makeSandbox();
+    try {
+      const { exitCode, out } = runChecker(root, ["--release", "--defer-perf"], {});
+      expect(exitCode).not.toBe(0);
+      expect(out).toContain("LUGAS_PERF_DEFERRAL_REF");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("--defer-perf without --release is rejected", () => {
+    const root = makeSandbox();
+    try {
+      const { exitCode, out } = runChecker(root, ["--defer-perf"], { LUGAS_PERF_DEFERRAL_REF: "ODR-0020" });
+      expect(exitCode).not.toBe(0);
+      expect(out).toContain("only valid with --release");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("referenced deferral writes evidence with perfGate=deferred, null measurements, bound tarball", () => {
+    const root = makeSandbox();
+    try {
+      const { exitCode, out } = runChecker(
+        root,
+        ["--release", "--defer-perf", "--package-source-sha", "abc123"],
+        { LUGAS_PERF_DEFERRAL_REF: "ODR-0020" },
+      );
+      expect(exitCode).toBe(0);
+      expect(out).toContain("DEFERRED");
+      expect(out).toContain("not passed");
+      const evidence = JSON.parse(readFileSync(join(root, "docs", "releases", "beta", "release-evidence.json"), "utf8"));
+      expect(evidence.perfGate).toBe("deferred");
+      expect(evidence.deferralRef).toBe("ODR-0020");
+      expect(evidence.packageSourceCommit).toBe("abc123");
+      expect(evidence.plainStaticRps).toBeNull();
+      expect(evidence.typecheckMs).toBeNull();
+      expect(evidence.clientBundleBytes).toBeNull();
+      expect(evidence.environment).toBeNull();
+      expect(evidence.tarballSha256).not.toBeNull();
+      expect(evidence.blockingFailures).toBe(0);
+      expect(evidence.alerts).toBe(0);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

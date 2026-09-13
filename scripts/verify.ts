@@ -80,6 +80,7 @@ async function main(): Promise<number> {
   const plan = resolvePerfGatePlan({
     release: process.env.LUGAS_PERF_RELEASE === "1",
     hasPlainArchive: await Bun.file(plainResultsPath).exists(),
+    deferred: process.env.LUGAS_PERF_DEFERRED === "1",
   });
   if (plan.run) {
     const perfResult = await run("perf-gate", ["bun", "run", perfGatePath, ...plan.argv]);

@@ -13,6 +13,9 @@
  * - release, stale archives         → run --release (checker fails closed)
  * - release, current complete       → run --release (checks decide)
  * - development, archive present    → run (development-mode checks)
+ * - release + LUGAS_PERF_DEFERRED=1 → run --release --defer-perf (ODR-0020:
+ *   the checker records an explicit, referenced deferral in the release
+ *   evidence instead of evaluating budgets — never a silent skip)
  */
 
 export type PerfGatePlan =
@@ -22,7 +25,11 @@ export type PerfGatePlan =
 export function resolvePerfGatePlan(options: {
   readonly release: boolean;
   readonly hasPlainArchive: boolean;
+  readonly deferred?: boolean;
 }): PerfGatePlan {
+  if (options.release && options.deferred) {
+    return { run: true, argv: ["--release", "--defer-perf"] };
+  }
   if (options.release) {
     return { run: true, argv: ["--release"] };
   }

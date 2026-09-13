@@ -19,6 +19,12 @@
  *   unbound client archives are never used. Anything missing or stale FAILs.
  * - PASS is printed only when every scenario was actually compared (release
  *   mode) or compared with zero failures otherwise.
+ * - `--defer-perf` (release mode only, ODR-0020): records an explicit
+ *   performance-gate DEFERRAL in the release evidence instead of evaluating
+ *   budgets. Requires LUGAS_PERF_DEFERRAL_REF to name the authorizing owner
+ *   decision; without it the flag is rejected. Deferral is never a pass: the
+ *   evidence carries `perfGate: "deferred"`, null measurements, and no
+ *   measurement is recorded that a loaded host would invalidate.
  */
 import { CANDIDATE_VERSION } from "./release/candidate-version";
 import { execSync } from "node:child_process";
@@ -30,6 +36,7 @@ const BASELINES_PATH = resolve(ROOT, "benchmarks", "baselines", "m5-accepted.jso
 const RESULTS_DIR = resolve(ROOT, "benchmarks", "results");
 
 const RELEASE_MODE = process.argv.includes("--release");
+const DEFER_PERF = process.argv.includes("--defer-perf");
 /**
  * M6R5 two-identity model:
  *  - attestationCommit: HEAD where the gate runs (this checkout).
@@ -44,6 +51,7 @@ function argValue(name: string): string | undefined {
 }
 const PACKAGE_SOURCE_SHA =
   argValue("--package-source-sha") ?? process.env.LUGAS_PACKAGE_SOURCE_SHA ?? null;
+const DEFERRAL_REF = process.env.LUGAS_PERF_DEFERRAL_REF ?? null;
 /** Expected independent runs per archived sample set, matching the runners. */
 const EXPECTED_RUNS = 5;
 
@@ -181,6 +189,59 @@ function main() {
   if (RELEASE_MODE && process.env.LUGAS_BENCH_NO_ARCHIVE === "1") {
     console.error("✗ LUGAS_BENCH_NO_ARCHIVE=1 is invalid in --release mode — release runs must archive evidence");
     process.exit(1);
+  }
+
+  // ODR-0020 deferral: explicit, referenced, and never a pass. The deferral
+  // exists only in release mode and must name the owner decision authorizing
+  // it; the evidence binds the candidate (commits + rehearsal tarball hash)
+  // while every budget-derived measurement stays null.
+  if (DEFER_PERF) {
+    if (!RELEASE_MODE) {
+      console.error("✗ --defer-perf is only valid with --release — there is nothing to defer in development mode");
+      process.exit(1);
+    }
+    if (DEFERRAL_REF === null || DEFERRAL_REF.length === 0) {
+      console.error("✗ --defer-perf requires LUGAS_PERF_DEFERRAL_REF — a deferral must name the owner decision that authorizes it");
+      process.exit(1);
+    }
+    console.log(`=== Performance Budget Check (RELEASE MODE — DEFERRED) ===\n`);
+    console.log(`Performance gate DEFERRED by ${DEFERRAL_REF}: budgets not evaluated, no measurement recorded.`);
+    const tgz = resolve(ROOT, "docs", "releases", "beta", `lugas-${CANDIDATE_VERSION}.tgz`);
+    if (!existsSync(tgz)) {
+      console.error(`✗ deferred evidence requires the rehearsal tarball: ${tgz} — run 'bun run release:package:rehearse' first`);
+      process.exit(1);
+    }
+    const { createHash } = require("node:crypto") as typeof import("node:crypto");
+    const tarballHash = createHash("sha256").update(readFileSync(tgz)).digest("hex");
+    const evidence = {
+      format: "lugas-release-evidence-v2",
+      packageSourceCommit: PACKAGE_SOURCE_SHA,
+      attestationCommit: headCommit() || null,
+      measuredAt: new Date().toISOString(),
+      bunVersion: process.versions.bun,
+      perfGate: "deferred" as const,
+      deferralRef: DEFERRAL_REF,
+      plainStaticRps: null,
+      plainJsonRps: null,
+      validatedPostRps: null,
+      typecheckMs: null,
+      clientBundleBytes: null,
+      tarballSha256: tarballHash,
+      rawBunPlainStaticRps: null,
+      rawBunValidatedPostRps: null,
+      environment: null,
+      loadAverage: null,
+      blockingFailures: 0,
+      alerts: 0,
+    };
+    mkdirSync(resolve(ROOT, "docs", "releases", "beta"), { recursive: true });
+    writeFileSync(
+      resolve(ROOT, "docs", "releases", "beta", "release-evidence.json"),
+      JSON.stringify(evidence, null, 2) + "\n",
+    );
+    console.log(`DEFERRED: 0 blocking failure(s), 0 alert(s) — gate not executed, not passed (${DEFERRAL_REF})`);
+    console.log(`Release evidence written to docs/releases/beta/release-evidence.json`);
+    return;
   }
 
   console.log(`=== Performance Budget Check ${RELEASE_MODE ? "(RELEASE MODE)" : "(development mode)"} ===\n`);
