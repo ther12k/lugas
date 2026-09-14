@@ -2,15 +2,21 @@
   "name": "lugas",
   "private": true,
   "version": "0.0.0",
-  "description": "LugasJS — small, explicit, Bun-native TypeScript framework (pre-release workspace)",
+  "description": "LugasJS \u2014 small, explicit, Bun-native TypeScript framework (pre-release workspace)",
   "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "lugas-dist": "./dist/index.js",
+      "bun": "./src/index.ts",
+      "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./client": {
       "types": "./dist/client/index.d.ts",
+      "lugas-dist": "./dist/client/index.js",
+      "bun": "./src/client/index.ts",
+      "import": "./dist/client/index.js",
       "default": "./dist/client/index.js"
     },
     "./client/browser": {
@@ -18,10 +24,16 @@
     },
     "./drizzle": {
       "types": "./dist/drizzle/index.d.ts",
+      "lugas-dist": "./dist/drizzle/index.js",
+      "bun": "./src/drizzle/index.ts",
+      "import": "./dist/drizzle/index.js",
       "default": "./dist/drizzle/index.js"
     },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
+      "lugas-dist": "./dist/testing/index.js",
+      "bun": "./src/testing/index.ts",
+      "import": "./dist/testing/index.js",
       "default": "./dist/testing/index.js"
     }
   },
@@ -29,6 +41,7 @@
     "lugas": "./dist/cli/main.js"
   },
   "files": [
+    "src",
     "dist",
     "build",
     "README.md",
