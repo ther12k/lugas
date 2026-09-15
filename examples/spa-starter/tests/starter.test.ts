@@ -230,6 +230,77 @@ describe.skipIf(GATE.skip)("spa-starter: installed package, built server", () =>
     expect(await nowhere.text()).not.toContain('id="root"');
   });
 
+  test("tasks walkthrough: empty state, validated create, typed 422, protected mutation, delete", async () => {
+    const client = await clientOf();
+
+    // Fresh server → typed GET with the empty state the UI renders.
+    const empty = await client.get("/api/tasks");
+    expect(empty.status).toBe(200);
+    if (empty.ok) expect(empty.data.tasks).toEqual([]);
+
+    // Validated mutation: 201 with the created task echoed.
+    const created = await client.post("/api/tasks", { body: { title: "write the tutorial" } });
+    expect(created.status).toBe(201);
+    let id = "";
+    if (created.ok) {
+      expect(created.data.title).toBe("write the tutorial");
+      expect(created.data.completed).toBe(false);
+      id = created.data.id;
+    }
+
+    // Same input shape, empty title: the framework 422 branch carries
+    // issues[] the form displays inline (see src/App.tsx).
+    const invalid = await client.post("/api/tasks", { body: { title: "" } });
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) {
+      expect(invalid.status).toBe(422);
+      expect(invalid.error.code).toBe("VALIDATION_FAILED");
+      expect((invalid.error.issues ?? []).length).toBeGreaterThan(0);
+    }
+
+    // Protected operation: 401 before login (NO_SESSION).
+    const denied = await client.post("/api/tasks/:id/complete", { params: { id } });
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) {
+      expect(denied.status).toBe(401);
+      expect(denied.error.code).toBe("NO_SESSION");
+    }
+
+    // After login, complete succeeds and unknown ids stay typed 404s. The
+    // authenticated calls use raw fetch with the cookie passed explicitly —
+    // the test is not a browser; in the app, same-origin fetch carries the
+    // httpOnly cookie automatically (see the sign-in flow in src/App.tsx).
+    const login = await fetch(`${origin}/api/login`, { method: "POST" });
+    expect(login.status).toBe(200);
+    const cookie = /lugas_session=[^;]+/.exec(login.headers.get("set-cookie") ?? "")?.[0] ?? "";
+    expect(cookie).not.toBe("");
+
+    const done = await fetch(`${origin}/api/tasks/${id}/complete`, {
+      method: "POST",
+      headers: { cookie },
+    });
+    expect(done.status).toBe(200);
+    expect(((await done.json()) as { completed: boolean }).completed).toBe(true);
+
+    const missing = await fetch(`${origin}/api/tasks/00000000-0000-0000-0000-000000000000/complete`, {
+      method: "POST",
+      headers: { cookie },
+    });
+    expect(missing.status).toBe(404);
+
+    // Delete: 204 with no body; the list no longer contains the task.
+    const removed = await fetch(`${origin}/api/tasks/${id}`, {
+      method: "DELETE",
+      headers: { cookie },
+    });
+    expect(removed.status).toBe(204);
+    expect(await removed.text()).toBe("");
+
+    const after = await client.get("/api/tasks");
+    expect(after.status).toBe(200);
+    if (after.ok) expect(after.data.tasks.map((task) => task.id)).not.toContain(id);
+  });
+
   test("graceful shutdown: SIGTERM drains to exit 0 (ADR-0020)", async () => {
     proc!.kill("SIGTERM");
     const exitCode = await Promise.race([

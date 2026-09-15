@@ -12,9 +12,13 @@
 import { cookie, defineApp, form, guard, json, problem, route, sse } from "lugas";
 import { z } from "zod";
 import { ASSET_FILES, DIST } from "./asset-manifest";
+import { TaskCreateSchema, completeTask, createTask, deleteTask, listTasks } from "./tasks";
 
 const SESSION_COOKIE = "lugas_session";
 const sessions = new Set<string>();
+
+// Declared path params → validated, fully typed ctx.params at the handler.
+const taskIdParams = z.object({ id: z.string() });
 
 const requireSession = guard({
   name: "requireSession",
@@ -37,6 +41,42 @@ export function createApp() {
     secureHeaders: true,
     routes: {
       "/api/ready": { GET: route({ handler: () => json(200, { ready: true }) }) },
+      "/api/tasks": {
+        // Onboarding walkthrough: list is open (empty state = 200 + []).
+        GET: route({ handler: () => json(200, { tasks: listTasks() }) }),
+        // Declared schema → framework-validated body; the 422 branch is part
+        // of the typed client contract, not an exception path.
+        POST: route({
+          body: TaskCreateSchema,
+          handler: (ctx) => json(201, createTask(ctx.body)),
+        }),
+      },
+      "/api/tasks/:id/complete": {
+        // Protected mutation: 401 before login (NO_SESSION), 404 for unknown
+        // ids — three typed outcomes the UI renders distinctly. Browsers
+        // carry the session cookie automatically (same-origin default), so
+        // no header slot is declared.
+        POST: route({
+          before: [requireSession],
+          params: taskIdParams,
+          handler: (ctx) => {
+            const outcome = completeTask(ctx.params.id);
+            return outcome.ok
+              ? json(200, outcome.task)
+              : problem(404, { title: "Task Not Found", status: 404, code: "TASK_NOT_FOUND" });
+          },
+        }),
+      },
+      "/api/tasks/:id": {
+        DELETE: route({
+          before: [requireSession],
+          params: taskIdParams,
+          handler: (ctx) =>
+            deleteTask(ctx.params.id)
+              ? new Response(null, { status: 204 })
+              : problem(404, { title: "Task Not Found", status: 404, code: "TASK_NOT_FOUND" }),
+        }),
+      },
       "/api/hello": {
         GET: route({ handler: () => json(200, { message: "hello from lugas" }) }),
       },
