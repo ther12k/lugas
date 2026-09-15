@@ -1,0 +1,25 @@
+{
+  "format": "lugas-typecheck-calibration-v1",
+  "candidate": "0.1.0-beta.5",
+  "packageSourceCommit": "6943f88d571266511ad53d826453bbf4413974cd",
+  "measuredAt": "2026-09-15T03:38:00+07:00",
+  "procedure": "standalone node_modules/.bin/tsc --noEmit runs in the candidate-identity worktree after 'bun run build' (the gate's own build-before-typecheck ordering); wall-clock ms per run",
+  "typescript": "7.0.2",
+  "bun": "1.4.0",
+  "budgetMs": 2500,
+  "samples": [1906, 1965, 2159, 2176, 1790, 2085, 1860],
+  "sampleCount": 7,
+  "medianMs": 1965,
+  "headroomMs": 535,
+  "allSamplesExitCodeZero": true,
+  "invalidFirstAttempt": {
+    "discarded": true,
+    "reason": "7 samples (1676/1847/1952/1732/1750/1806/1536 ms, exit 1) taken before 'bun run build'; the package's self-referencing exports point at ./dist, which does not exist in a fresh checkout, so tsc failed on examples/* module resolution. Durations invalid as calibration; rerun after build mirrors the gate environment.",
+    "samplesMs": [1676, 1847, 1952, 1732, 1750, 1806, 1536]
+  },
+  "loadAverage": {
+    "before": [5.10, 3.99, 3.42],
+    "after": [5.61, 4.15, 3.49],
+    "note": "1-minute figures include the measurement's own multi-core tsc processes; ambient (5-minute) drifted 3.0 to 4.1 across the session. No competing soak/build/test workload returned during samples."
+  }
+}
