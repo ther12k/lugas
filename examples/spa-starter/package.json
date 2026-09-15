@@ -8,10 +8,13 @@
     "build": "bun scripts/build.ts",
     "check": "tsc --noEmit",
     "start": "bun server/main.ts",
+    "start:raw": "bun server/main.ts",
+    "start:dist": "bun --conditions=lugas-dist server/main.ts",
     "start:built": "bun dist-server/main.js",
     "test": "bun test tests/starter.test.ts tests/harness.test.ts",
     "measure": "bun scripts/measure.ts",
-    "verify": "bun run setup && bun run build && bun run check && bun run test"
+    "verify:modes": "bun scripts/verify-modes.ts",
+    "verify": "bun run setup && bun run build && bun run check && bun run test && bun run verify:modes"
   },
   "dependencies": {
     "lugas": "file:lugas-starter.tgz",
