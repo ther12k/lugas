@@ -80,8 +80,9 @@ function resolveSession(token: string | null | undefined, via: string) {
   }
   const row = sqlite
     .query("SELECT id, name FROM users WHERE id = ?")
-    .get(userId) as { id: number; name: string } | undefined;
-  if (row === undefined) {
+    .get(userId) as { id: number; name: string } | null | undefined;
+  // Bun's sqlite .get() resolves null (not undefined) when no row matched.
+  if (row === null || row === undefined) {
     return json(401, { error: "session user no longer exists" });
   }
   return { user: { id: row.id, name: row.name, token } };
@@ -153,8 +154,11 @@ export const app = defineApp({
         handler: async (ctx) => {
           const row = sqlite
             .query("SELECT id, name FROM users WHERE name = ?")
-            .get(ctx.body.name) as { id: number; name: string } | undefined;
-          if (row === undefined) {
+            .get(ctx.body.name) as { id: number; name: string } | null | undefined;
+          // Bun's sqlite .get() resolves null (not undefined) when no row
+          // matched — the dead `=== undefined` branch was found by the
+          // CA-25 smoke (unknown-user login crashed to 500).
+          if (row === null || row === undefined) {
             return problem(404, {
               title: "Unknown user",
               detail: `No user named ${ctx.body.name}`,
@@ -273,7 +277,9 @@ export const app = defineApp({
           const updated = await database.all<{ id: number }>(
             sql`UPDATE users SET name = ${ctx.body.name} WHERE id = ${ctx.params.id} RETURNING id`,
           );
-          return updated === undefined
+          // .all() resolves [] (never undefined) when no row matched — the
+          // dead `=== undefined` branch was found by the CA-25 smoke.
+          return updated.length === 0
             ? problem(404, { title: "User not found" })
             : json(200, { id: ctx.params.id, name: ctx.body.name });
         },
@@ -288,7 +294,7 @@ export const app = defineApp({
           const deleted = await database.all<{ id: number }>(
             sql`DELETE FROM users WHERE id = ${ctx.params.id} RETURNING id`,
           );
-          return deleted === undefined
+          return deleted.length === 0
             ? problem(404, { title: "User not found" })
             : json(200, { deleted: ctx.params.id });
         },

@@ -57,6 +57,13 @@ Two accuracy notes. The `lugas-dist` condition comes from the dual-distribution 
 
 ## Test coverage
 
-The client example runs as a self-contained smoke check that prints `EXAMPLE-SMOKE-OK` on success and is covered by `bun test tests/integration/server-client/`.
+Every example ships a smoke script that automates its README checks against the exported app on an ephemeral port (`examples/<name>/smoke.ts`, CA-25). Run one directly — each prints `<name>-SMOKE-OK` on success — or run them all:
 
-`proof-api` and `realworld` are exercised end-to-end by `bun test tests/integration/proof-api.test.ts` and `bun test tests/integration/realworld.test.ts`; `realworld` also ships a typed-client smoke (`bun run examples/realworld/client.ts` → `REALWORLD-CLIENT-OK`). `spa-starter` carries its own suite (`cd examples/spa-starter && bun test`), including the guided task-list walkthrough and distribution-mode parity.
+```bash
+bun examples/basic/smoke.ts        # → basic-SMOKE-OK
+bun test tests/integration/examples/   # all 14 sequentially, via the gate
+```
+
+The gate also keeps the older coverage: the client example's self-contained smoke (`EXAMPLE-SMOKE-OK`, `bun test tests/integration/server-client/`), the end-to-end `proof-api` and `realworld` integration tests (`bun test tests/integration/proof-api.test.ts`, `bun test tests/integration/realworld.test.ts`), `realworld`'s typed-client smoke (`bun run examples/realworld/client.ts` → `REALWORLD-CLIENT-OK`), and `spa-starter`'s own suite (`cd examples/spa-starter && bun run verify`: 24 tests plus `verify:modes` distribution parity).
+
+`verify:modes` compares **every** AppContract route in both distribution modes — list, create (valid + 422), complete (401 + authed), delete (authed + unknown-id 404), ready, hello, greetings (valid + 422), uploads (multipart), me (401), events (first SSE frame), login (body + HttpOnly cookie identity), the SPA shell, and the `/app/*` fallback — asserting identical statuses, content types, and bodies (payload *shape* where values are generated, e.g. task ids).
