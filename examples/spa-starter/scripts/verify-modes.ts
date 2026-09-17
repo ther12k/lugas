@@ -21,6 +21,8 @@ import { raceWithTimer, readinessOrigin, stopServer, type ManagedProcess } from 
 
 const STARTER = join(import.meta.dir, "..");
 const LUGAS_PKG = join(STARTER, "node_modules", "lugas");
+/** Must match server/app.ts (parity asserts the cookie's identity). */
+const SESSION_COOKIE = "lugas_session";
 
 function fail(message: string): never {
   console.error(`MODES-PARITY-FAIL ${message}`);
@@ -151,6 +153,136 @@ async function main(): Promise<void> {
       await request(`${dist.origin}/`, { headers: { accept: "text/html" } }),
     );
     checks.push("GET / → identical shell bytes");
+
+    // --- Full contract parity (CA-25): every remaining AppContract route. ---
+
+    expectEqual(
+      "GET /api/ready",
+      await request(`${raw.origin}/api/ready`),
+      await request(`${dist.origin}/api/ready`),
+    );
+    checks.push("GET /api/ready → identical body");
+
+    expectEqual(
+      "GET /api/hello",
+      await request(`${raw.origin}/api/hello`),
+      await request(`${dist.origin}/api/hello`),
+    );
+    checks.push("GET /api/hello → identical body");
+
+    const greet = (origin: string, name: string) =>
+      request(`${origin}/api/greetings`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+    expectEqual("POST /api/greetings valid", await greet(raw.origin, "Parity"), await greet(dist.origin, "Parity"));
+    expectEqual("POST /api/greetings invalid (422)", await greet(raw.origin, ""), await greet(dist.origin, ""));
+    checks.push("POST /api/greetings → valid + 422 identical");
+
+    const upload = (origin: string) => {
+      const form = new FormData();
+      form.append("note", "parity");
+      form.append("file", new Blob([new TextEncoder().encode("parity bytes")], { type: "text/plain" }), "parity.txt");
+      return request(`${origin}/api/uploads`, { method: "POST", body: form });
+    };
+    expectEqual("POST /api/uploads (multipart)", await upload(raw.origin), await upload(dist.origin));
+    checks.push("POST /api/uploads → identical multipart report");
+
+    expectEqual(
+      "GET /api/me anonymous (401 NO_SESSION)",
+      await request(`${raw.origin}/api/me`),
+      await request(`${dist.origin}/api/me`),
+    );
+    checks.push("GET /api/me → 401 identical");
+
+    // SSE: compare the first delivered frame (deterministic tick #1).
+    const firstSseFrame = async (origin: string) => {
+      const res = await fetch(`${origin}/api/events`);
+      const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        const boundary = buffer.indexOf("\n\n");
+        if (boundary >= 0) {
+          const frame = buffer.slice(0, boundary);
+          await reader.cancel();
+          return `${res.status}|${res.headers.get("content-type")}|${frame}`;
+        }
+      }
+      await reader.cancel();
+      return `${res.status}|${res.headers.get("content-type")}|<no frame>`;
+    };
+    const sseRaw = await firstSseFrame(raw.origin);
+    const sseDist = await firstSseFrame(dist.origin);
+    if (sseRaw !== sseDist) {
+      fail(`GET /api/events first SSE frame differs between modes\n  raw : ${sseRaw}\n  dist: ${sseDist}`);
+    }
+    checks.push("GET /api/events → identical first SSE frame");
+
+    // Login: body must be byte-identical; the cookie token is random, so
+    // assert its identity (name + HttpOnly) rather than its value.
+    const login = async (origin: string): Promise<string> => {
+      const res = await fetch(`${origin}/api/login`, { method: "POST" });
+      const body = await res.text();
+      const setCookie = res.headers.getSetCookie()[0] ?? fail(`login set no cookie (${origin})`);
+      if (!setCookie.startsWith(`${SESSION_COOKIE}=`)) fail(`login cookie name: ${setCookie}`);
+      if (!/httponly/i.test(setCookie)) fail(`login cookie not HttpOnly: ${setCookie}`);
+      if (body !== JSON.stringify({ ok: true })) fail(`login body: ${body}`);
+      return setCookie.split(";")[0]!;
+    };
+    const cookieRaw = await login(raw.origin);
+    const cookieDist = await login(dist.origin);
+    checks.push("POST /api/login → {ok:true} + HttpOnly session cookie in both");
+
+    // Authenticated lifecycle per mode (symmetric stores): create →
+    // complete → delete → re-delete 404.
+    const withCookie = (origin: string, cookie: string) => ({ headers: { cookie } });
+    const create = async (origin: string, cookie: string) => {
+      const res = await fetch(`${origin}/api/tasks`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ title: "lifecycle parity" }),
+      });
+      if (res.status !== 201) fail(`authed create status ${res.status}`);
+      return (await res.json()) as { id: string; completed: boolean };
+    };
+    const taskRaw = await create(raw.origin, cookieRaw);
+    const taskDist = await create(dist.origin, cookieDist);
+    if (taskRaw.completed !== taskDist.completed) fail("created task state differs");
+
+    const completeAuthed = async (origin: string, cookie: string, id: string) =>
+      request(`${origin}/api/tasks/${id}/complete`, { method: "POST", headers: { cookie } });
+    const doneRaw = await completeAuthed(raw.origin, cookieRaw, taskRaw.id);
+    const doneDist = await completeAuthed(dist.origin, cookieDist, taskDist.id);
+    if (doneRaw.status !== 200 || doneDist.status !== 200) fail(`complete status ${doneRaw.status}/${doneDist.status}`);
+    const normalize = (r: Reply) => { const t = JSON.parse(r.body) as Record<string, unknown>; return { completed: t.completed }; };
+    if (JSON.stringify(normalize(doneRaw)) !== JSON.stringify(normalize(doneDist))) fail("completed task state differs");
+    checks.push("POST /api/tasks/:id/complete (authed) → 200 with completed=true in both");
+
+    const del = async (origin: string, cookie: string, id: string) =>
+      request(`${origin}/api/tasks/${id}`, { method: "DELETE", headers: { cookie } });
+    const goneRaw = await del(raw.origin, cookieRaw, taskRaw.id);
+    const goneDist = await del(dist.origin, cookieDist, taskDist.id);
+    if (goneRaw.status !== 204 || goneDist.status !== 204) fail(`delete status ${goneRaw.status}/${goneDist.status}`);
+    checks.push("DELETE /api/tasks/:id (authed) → 204 in both");
+
+    expectEqual(
+      "DELETE /api/tasks/:id unknown (404 TASK_NOT_FOUND)",
+      await del(raw.origin, cookieRaw, taskRaw.id),
+      await del(dist.origin, cookieDist, taskDist.id),
+    );
+    checks.push("DELETE unknown id → identical 404 Problem Details");
+
+    expectEqual(
+      "GET /app/tasks (SPA navigation fallback)",
+      await request(`${raw.origin}/app/tasks`, { headers: { accept: "text/html" } }),
+      await request(`${dist.origin}/app/tasks`, { headers: { accept: "text/html" } }),
+    );
+    checks.push("GET /app/* → identical fallback shell bytes");
   } finally {
     const stoppedRaw = await stopServer(raw.proc).catch(() => undefined);
     const stoppedDist = await stopServer(dist.proc).catch(() => undefined);

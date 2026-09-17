@@ -37,7 +37,7 @@ const app = defineApp({
   },
 });
 
-const server = app.serve({ port: 3000, development: false });
+const server = app.serve({ port: Number(process.env.PORT ?? 3000), development: false });
 
 console.log(`drizzle example listening on ${server.url}`);
 console.log(`  curl ${server.url}users`);
