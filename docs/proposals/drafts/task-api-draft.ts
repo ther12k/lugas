@@ -11,6 +11,13 @@
  * artifact for the core-and-middleware boundary proposal, not part of the
  * examples catalog, and it is not covered by the repo test gate.
  *
+ * Evidence scope: imports go through the SOURCE entry point (../../src
+ * — public root-export symbols, but not installed-package resolution or
+ * the distributed JS/declaration entry points). The 16/16 scratch-check
+ * result reported in the proposal is author-reported source-level
+ * composition evidence, not installed-package, browser, or release
+ * acceptance.
+ *
  * Session model is deliberately demo-grade (in-memory token set), matching
  * the realworld reference: first-party auth products are a standing
  * non-goal; real applications bring their own session store or Better
