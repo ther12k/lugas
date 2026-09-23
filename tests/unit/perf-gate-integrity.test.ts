@@ -224,14 +224,27 @@ describe("perf gate integrity (M6R2)", () => {
   test("below-target-but-above-alert is reported as missed target (#282)", () => {
     const sb = buildSandbox();
     try {
-      const midRps = 45000; // plain-static target 60k, alert 40k
+      // Fixture magnitudes derive from the sandbox baselines so the scenario
+      // holds under any accepted baseline set (v2 laptop, v3 Halotec, …):
+      // plain-static sits strictly between alert and target; the other lanes
+      // sit above target so only the missed-target lane reports.
+      const bl = JSON.parse(
+        readFileSync(join(sb.root, "benchmarks", "baselines", "m5-accepted.json"), "utf8"),
+      ) as {
+        thresholds: Record<string, { releaseBlockMinRps: number; alertMinRps: number; targetRps: number }>;
+      };
+      const midRps = Math.round(
+        (bl.thresholds["plain-static"]!.alertMinRps + bl.thresholds["plain-static"]!.targetRps) / 2,
+      );
+      const aboveJson = Math.round(bl.thresholds["plain-json"]!.targetRps * 1.2);
+      const aboveValidated = Math.round(bl.thresholds["validated-post"]!.targetRps * 1.2);
       const mid = { rps: midRps, p50us: 20, p95us: 30, p99us: 40 };
       const rd = join(sb.root, "benchmarks", "results");
       writePlainArchive(rd, [
         { scenario: "plain-static", framework: "lugas", samples: Array(5).fill(mid) },
-        { scenario: "plain-json", framework: "lugas", samples: Array(5).fill({ rps: 50000, p50us: 18, p95us: 28, p99us: 38 }) },
+        { scenario: "plain-json", framework: "lugas", samples: Array(5).fill({ rps: aboveJson, p50us: 18, p95us: 28, p99us: 38 }) },
       ]);
-      writeValidatedArchive(rd, 35000);
+      writeValidatedArchive(rd, aboveValidated);
       const proc = Bun.spawnSync(["bun", "run", sb.checkerPath], {
         cwd: sb.root, stdout: "pipe", stderr: "pipe",
       });

@@ -1,31 +1,31 @@
 {
-  "version": 2,
+  "version": 3,
   "environment": {
     "bunVersion": "1.4.0",
     "platform": "linux",
     "arch": "x64",
-    "cpuModel": "13th Gen Intel(R) Core(TM) i5-13420H",
-    "memoryTotalMb": 15360,
-    "commit": "d4e87c3"
+    "cpuModel": "Intel(R) Xeon(R) Platinum 8163 CPU @ 2.50GHz",
+    "memoryTotalMb": 16039,
+    "commit": "134f163"
   },
   "thresholds": {
     "plain-static": {
-      "releaseBlockMinRps": 30000,
-      "alertMinRps": 40000,
-      "targetRps": 60000
+      "releaseBlockMinRps": 19500,
+      "alertMinRps": 21100,
+      "targetRps": 23000
     },
     "plain-json": {
-      "releaseBlockMinRps": 25000,
-      "alertMinRps": 35000,
-      "targetRps": 50000
+      "releaseBlockMinRps": 15750,
+      "alertMinRps": 17050,
+      "targetRps": 18500
     },
     "validated-post": {
-      "releaseBlockMinRps": 15000,
-      "alertMinRps": 20000,
-      "targetRps": 30000
+      "releaseBlockMinRps": 10550,
+      "alertMinRps": 11400,
+      "targetRps": 12400
     }
   },
-  "typecheckBudgetMs": 2500,
+  "typecheckBudgetMs": 5400,
   "clientBundleMaxBytes": 25000,
-  "notes": "Thresholds derived from M5-002/003/004/005 measured evidence. Baseline updates require PR review. v2 (beta.4 attestation, 2026-09-11): typecheckBudgetMs 2000→2500 only — throughput thresholds and client bundle cap unchanged. The 2000ms budget was calibrated at M5-007 (316b854) before the M6–M9 batteries (assets, budgets, CORS, logging, OpenAPI, drizzle, cookies, WebSockets, health, multipart, telemetry, compression, rate-limit) grew the checked tree, and before @opentelemetry/api (M9-006 devDependency) resolved its types. Re-measured on the baseline host 2026-09-11 at 7fe452f: tsc --noEmit 1.98/2.18/2.27/2.19/2.32 s (median 2.19 s) — scope growth, not a regression; 2500ms preserves ~14% headroom and stays binding."
+  "notes": "v3 (beta.6 Halotec re-baseline, 2026-09-23): owner ruling 2026-09-22 moved the qualification baseline off the laptop (i5-13420H, v2) to the Halotec 4-vCPU co-tenant slice; laptop HOLD cycle was host readiness, not a Lugas defect. Derived from single-session medians of 5 runs at 134f163 with bun 1.4.0 / node v24.21.0 (unofficial-builds glibc-217; host glibc 2.27 cannot run official Node 24 binaries): plain-static 22,983 / plain-json 18,543 / validated-post 12,413 rps; tsc --noEmit median 4,667 ms. Margin method: releaseBlock = 0.85x median, alert = 0.92x median, target = median rounded to nearest 100; typecheckBudget = median + ~15% headroom (v2 precedent x1.14); margins sized to observed same-host variance (same-day beta.5-anchor session moved raw-bun comparator -2.8%, lugas plain-json -11.7%), not to v2 absolute values. clientBundleMaxBytes unchanged (host-independent bytes). Absolute RPS is host-relative and NOT comparable to v2 laptop numbers. Baseline updates require PR review."
 }
