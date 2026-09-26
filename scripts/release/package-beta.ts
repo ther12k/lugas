@@ -270,6 +270,68 @@ console.log("SERVER-CONSUMER-OK format=" + app.manifest.format + " fw=" + app.ma
     `version=${installedPkg.version ?? "missing"} engines.bun=${installedPkg.engines?.bun ?? "missing"} repository=${installedPkg.repository?.url ?? "missing"} bugs=${installedPkg.bugs?.url ?? "missing"} homepage=${installedPkg.homepage ?? "missing"} keywords=${installedPkg.keywords?.length ?? 0}`,
   );
 
+  // ------------------------------------------------------------------
+  // Dual-distribution resolution (CA-20): the export map exposes raw
+  // TypeScript under the "bun" condition (default on Bun), emitted
+  // JavaScript under the explicit "lugas-dist" condition, and dist as the
+  // fallback for tools that do not select Bun's condition. One version
+  // identity must hold in every mode.
+  // ------------------------------------------------------------------
+  const resolveDefault = run(
+    'bun -e \'console.log(Bun.resolveSync("lugas", process.cwd()))\'',
+    serverConsumer,
+  );
+  check(
+    "installed resolution: default Bun execution → src/index.ts (bun condition)",
+    resolveDefault.code === 0 && resolveDefault.stdout.trim().endsWith("src/index.ts"),
+    resolveDefault.stdout.trim() || resolveDefault.stderr.slice(0, 200),
+  );
+  const resolveDist = run(
+    'bun --conditions=lugas-dist -e \'console.log(Bun.resolveSync("lugas", process.cwd()))\'',
+    serverConsumer,
+  );
+  check(
+    "installed resolution: --conditions=lugas-dist → dist/index.js",
+    resolveDist.code === 0 && resolveDist.stdout.trim().endsWith("dist/index.js"),
+    resolveDist.stdout.trim() || resolveDist.stderr.slice(0, 200),
+  );
+  const resolveClientDist = run(
+    'bun --conditions=lugas-dist -e \'console.log(Bun.resolveSync("lugas/client", process.cwd()))\'',
+    serverConsumer,
+  );
+  check(
+    "installed resolution: subpath ./client honors the same condition policy",
+    resolveClientDist.code === 0 && resolveClientDist.stdout.trim().endsWith("dist/client/index.js"),
+    resolveClientDist.stdout.trim() || resolveClientDist.stderr.slice(0, 200),
+  );
+  const resolveNode = run(
+    'node -e "console.log(require.resolve(\'lugas\'))"',
+    serverConsumer,
+  );
+  check(
+    "installed resolution: non-Bun tooling (Node require) → dist fallback",
+    resolveNode.code === 0 && resolveNode.stdout.trim().endsWith("dist/index.js"),
+    resolveNode.stdout.trim() || resolveNode.stderr.slice(0, 200),
+  );
+  const compiledRun = run("bun --conditions=lugas-dist run app.ts", serverConsumer);
+  check(
+    "server consumer runs from tarball in compiled mode (lugas-dist → dist)",
+    compiledRun.code === 0 &&
+      compiledRun.stdout.includes(`SERVER-CONSUMER-OK format=lugas-manifest-v1 fw=${BETA_VERSION}`),
+    compiledRun.code === 0 ? compiledRun.stdout.trim() : compiledRun.stderr.slice(0, 200),
+  );
+  const srcStamp = readFileSync(
+    join(serverConsumer, "node_modules", "lugas", "src", "internal", "framework-version.ts"),
+    "utf8",
+  );
+  check(
+    "shipped src tree carries the candidate version stamp (raw-default identity)",
+    srcStamp.includes(`FRAMEWORK_VERSION = ${JSON.stringify(BETA_VERSION)}`),
+    srcStamp.includes(`FRAMEWORK_VERSION = ${JSON.stringify(BETA_VERSION)}`)
+      ? `src stamped to ${BETA_VERSION}`
+      : `expected ${BETA_VERSION}, shipped src constant mismatch`,
+  );
+
   // Consumer B: browser-bundled client.
   const clientConsumer = makeConsumer("consumer-client");
   writeFileSync(
@@ -486,6 +548,14 @@ export default defineApp({ routes: { "/x": { GET: route({ handler: () => text(20
   const forbiddenPrefixes = ["benchmarks/", ".worktrees/", "tests/", "spikes/", "scripts/release/", ".env"];
   const violations = inventory.files.filter((f) => forbiddenPrefixes.some((p) => f.startsWith(p)));
   check("no forbidden paths inside beta tarball", violations.length === 0, violations.length === 0 ? "clean" : violations.join(", "));
+  // Dual distribution (CA-20): both representations ship from one package.
+  const shipsSrc = inventory.files.some((f) => f === "src/index.ts");
+  const shipsDist = inventory.files.some((f) => f === "dist/index.js");
+  check(
+    "tarball ships both representations (src/index.ts + dist/index.js)",
+    shipsSrc && shipsDist,
+    `src/index.ts=${shipsSrc ? "present" : "MISSING"} dist/index.js=${shipsDist ? "present" : "MISSING"}`,
+  );
   const hasLicense = inventory.files.some((f) => f === "LICENSE");
   check("license file ships in tarball", hasLicense, hasLicense ? "LICENSE present (Apache-2.0)" : "MISSING");
   const hasNotice = inventory.files.some((f) => f === "NOTICE");

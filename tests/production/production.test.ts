@@ -254,6 +254,33 @@ describe("health endpoints", () => {
     ).toThrow();
   });
 
+  // Generated framework owners validate against each other too: a health path
+  // and an OpenAPI/UI path may never claim the same URL — before this fix the
+  // later mount silently won and the manifest recorded the path twice.
+  // The OpenAPI section mounts first and validates against health's compiled
+  // paths, so every direction surfaces as LUGAS_OPENAPI_002.
+  test("health/openapi path collisions fail closed in both directions", () => {
+    const openapi = { document: { title: "t", version: "1" } };
+    for (const bad of [
+      { openapi: { ...openapi, path: "/health" }, health: true },
+      { openapi: { ...openapi }, health: { livenessPath: "/openapi.json" } },
+      { openapi: { ...openapi, ui: true }, health: { readinessPath: "/docs" } },
+    ] as never[]) {
+      try {
+        defineApp(bad);
+        expect.unreachable();
+      } catch (err) {
+        expect((err as { code?: string }).code).toBe("LUGAS_OPENAPI_002");
+      }
+    }
+    // Sanity: distinct paths compose (both features mount; manifest rows unique)
+    const app = defineApp({ health: true, openapi: { ...openapi } });
+    const rows = (app.manifest.routes as ReadonlyArray<{ path: string; method: string }>).filter(
+      (r) => r.path === "/health" || r.path === "/ready" || r.path === "/openapi.json",
+    );
+    expect(rows).toHaveLength(3);
+  });
+
   test("LUGAS_HEALTH_001 on invalid configuration", () => {
     for (const bad of [{ livenessPath: "nope" }, { readinessPath: "*" }, { livenessPath: "/same", readinessPath: "/same" }, "yes"] as never[]) {
       try {

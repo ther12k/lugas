@@ -334,6 +334,110 @@ describe("M7-004 service lifecycle", () => {
     expect(capture(() => service({ name: "x", value: 1, init: 42 as never }))).toBe("LUGAS_LIFECYCLE_001");
   });
 
+  // The handler view is keyed by the services-map key; `name` is identity
+  // only. Before this fix the resolved value was filed under `name`, so an
+  // alias like { database: service({ name: "db", … }) } stranded the value:
+  // ctx.services.database was undefined and a ghost `db` key appeared.
+  test("resolved value lands under the map key when it differs from name", async () => {
+    const app = defineApp({
+      services: {
+        database: service({ name: "db", value: { tag: "live" }, init: () => undefined }),
+      },
+      routes: {
+        "/probe": {
+          GET: route({
+            handler: (ctx) => {
+              const services = ctx.services as { database?: { tag: string }; db?: { tag: string } };
+              return json(200, {
+                atKey: services.database?.tag ?? null,
+                atName: services.db?.tag ?? null,
+              });
+            },
+          }),
+        },
+      },
+    });
+    const server: LugasServer = app.serve({ port: 0 });
+    try {
+      await server.lugasLifecycle.ready;
+      const response = await fetch(`${new URL(server.url).origin}/probe`);
+      expect(await response.json()).toEqual({ atKey: "live", atName: null });
+    } finally {
+      await server.lugasLifecycle.shutdown();
+    }
+  });
+
+  // A rejected serve() must fail closed BEFORE initialization: budgets above
+  // the ceiling throw LUGAS_BODY_003 without running (or leaking) any init.
+  test("serve() validation failures run before any service init", async () => {
+    let inits = 0;
+    let disposes = 0;
+    const schema = { "~standard": { version: 1, vendor: "test", validate: (v: unknown) => ({ value: v }) } };
+    const app = defineApp({
+      services: {
+        svc: service({
+          name: "svc",
+          value: {},
+          init: () => {
+            inits += 1;
+          },
+          dispose: () => {
+            disposes += 1;
+          },
+        }),
+      },
+      bodyBudget: 128,
+      routes: {
+        "/": { POST: route({ body: schema as never, handler: () => json(200, {}) }) },
+      },
+    });
+    let code = "no-throw";
+    try {
+      app.serve({ port: 0, maxRequestBodySize: 64 });
+    } catch (error) {
+      code = (error as { code?: string }).code ?? "no-code";
+    }
+    expect(code).toBe("LUGAS_BODY_003");
+    expect(inits).toBe(0);
+    await Bun.sleep(20); // any erroneously-started init would land here
+    expect(inits).toBe(0);
+    expect(disposes).toBe(0);
+  });
+
+  // The prepared graph (handlers, service slots, traffic gate) is shared by
+  // every serve() of one app. A second serve must not re-hold an
+  // already-serving server behind its own initialization: a settled gate is
+  // never reset (a failed one may be replaced by a retry serve).
+  test("a second serve() never re-holds a ready server behind its own init", async () => {
+    const app = defineApp({
+      services: {
+        svc: service({ name: "svc", value: {}, init: async () => { await Bun.sleep(400); } }),
+      },
+      routes: { "/ping": { GET: route({ handler: () => json(200, { ok: true }) }) } },
+    });
+    const first: LugasServer = app.serve({ port: 0 });
+    try {
+      await first.lugasLifecycle.ready;
+      const second: LugasServer = app.serve({ port: 0 });
+      try {
+        // While the second server initializes (400ms), the first must answer
+        // immediately — before the settled-gate guard it gated on the second
+        // server's pending init and hung/failing starts 503'd it permanently.
+        const during = await Promise.race([
+          fetch(`${new URL(first.url).origin}/ping`).then((r) => r.status),
+          Bun.sleep(150).then(() => "timeout"),
+        ]);
+        expect(during).toBe(200);
+        await second.lugasLifecycle.ready;
+        expect((await fetch(`${new URL(first.url).origin}/ping`)).status).toBe(200);
+      } finally {
+        await second.lugasLifecycle.shutdown();
+      }
+    } finally {
+      await first.lugasLifecycle.shutdown();
+    }
+  });
+
   test("opt-in SIGTERM drives the same shutdown path (subprocess)", async () => {
     const child = Bun.spawn([process.execPath, join(ROOT, "tests/lifecycle/fixtures/signal-child.ts")], {
       stdout: "pipe",

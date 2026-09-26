@@ -12,4 +12,4 @@
  * Changing this constant IS a candidate-input change: commit it (clean tree)
  * before running the rehearsal, per the release checklist.
  */
-export const CANDIDATE_VERSION = "0.1.0-beta.5";
+export const CANDIDATE_VERSION = "0.1.0-beta.6";

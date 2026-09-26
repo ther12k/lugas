@@ -9,6 +9,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { resolvePerfGatePlan } from "../../scripts/perf-gate-plan";
+import { CANDIDATE_VERSION } from "../../scripts/release/candidate-version";
 
 const ROOT = resolve(import.meta.dir, "..", "..");
 
@@ -107,7 +108,7 @@ describe("checker deferral contract (--defer-perf, ODR-0020)", () => {
       join(root, "benchmarks", "baselines", "m5-accepted.json"),
       readFileSync(join(ROOT, "benchmarks", "baselines", "m5-accepted.json"), "utf8"),
     );
-    writeFileSync(join(root, "docs", "releases", "beta", "lugas-0.1.0-beta.5.tgz"), "tarball-bytes");
+    writeFileSync(join(root, "docs", "releases", "beta", `lugas-${CANDIDATE_VERSION}.tgz`), "tarball-bytes");
     return root;
   }
 

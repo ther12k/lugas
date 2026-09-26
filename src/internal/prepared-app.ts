@@ -157,7 +157,7 @@ export function prepareApp<TServices>(config: {
     for (const [key, value] of Object.entries(config.services as Record<string, unknown>)) {
       if (isServiceDescriptor(value)) {
         serviceSlots[key] = undefined;
-        lifecycleServices.push({ name: value.name, value: value.value, init: value.init, dispose: value.dispose });
+        lifecycleServices.push({ name: value.name, slot: key, value: value.value, init: value.init, dispose: value.dispose });
       }
     }
   }
@@ -173,7 +173,13 @@ export function prepareApp<TServices>(config: {
   // continuation queuing (`Promise.resolve().then()`) on synchronous route returns.
   // When pending or on initialization failure (`settled === false`), the gate
   // continuation holds traffic or rejects with the 503 problem.
-  const trafficGate: { gate: Promise<void>; settled: boolean } = { gate: Promise.resolve(), settled: true };
+  // With lifecycle services the gate starts UNsettled: the first serve()
+  // installs its init promise; a settled gate is never reset afterwards (see
+  // serveApp), so a second serve cannot re-hold a ready server.
+  const trafficGate: { gate: Promise<void>; settled: boolean } = {
+    gate: Promise.resolve(),
+    settled: lifecycleServices.length === 0,
+  };
   const gateHandler = (
     handler: (request: Request) => Response | Promise<Response>,
   ): (request: Request) => Response | Promise<Response> => {
@@ -520,6 +526,13 @@ export function prepareApp<TServices>(config: {
     if (config.assets?.files) {
       for (const f of Object.keys(config.assets.files)) existingPaths.add(f);
     }
+    // Generated owners validate against each other too (health mounts later,
+    // but its compiled paths are known here): two framework-owned endpoints
+    // may never claim one path — the last mount would silently win.
+    if (config.health !== undefined) {
+      existingPaths.add(config.health.livenessPath);
+      existingPaths.add(config.health.readinessPath);
+    }
     if (existingPaths.has(docPath)) {
       throw diagnostic("LUGAS_OPENAPI_002", `defineApp(): openapi.path '${docPath}' collides with an existing route or asset`, {
         hint: "configure a different path: openapi: { path: '/api-docs.json' }",
@@ -577,6 +590,13 @@ export function prepareApp<TServices>(config: {
     const existingPaths = new Set(declarationsByPath.keys());
     if (config.assets?.files) {
       for (const f of Object.keys(config.assets.files)) existingPaths.add(f);
+    }
+    // OpenAPI endpoints are mounted above but share this ownership check:
+    // a health path that shadows (or is shadowed by) /openapi.json or the
+    // Scalar UI path fails closed here (LUGAS_OPENAPI_002 covers its side).
+    if (config.openapi !== undefined) {
+      existingPaths.add(config.openapi.path);
+      if (config.openapi.uiPath !== null) existingPaths.add(config.openapi.uiPath);
     }
     for (const [label, path] of [["liveness", config.health.livenessPath], ["readiness", config.health.readinessPath]] as const) {
       if (existingPaths.has(path)) {

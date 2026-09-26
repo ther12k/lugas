@@ -14,7 +14,14 @@
 import type { ServiceDescriptor } from "../core/service";
 
 export type LifecycleService = {
+  /** Stable identity for outcomes/diagnostics (the `service()` name). */
   readonly name: string;
+  /**
+   * Services-map key whose slot receives the resolved value. The handler view
+   * is keyed by the map key, so filling by `name` would strand the value when
+   * the two differ (`services: { database: service({ name: "db", … }) })`).
+   */
+  readonly slot: string;
   readonly value: unknown;
   readonly init: ((value: unknown) => void | Promise<void>) | undefined;
   readonly dispose: ((value: unknown) => void | Promise<void>) | undefined;
@@ -95,7 +102,7 @@ export function startLifecycle(input: CoordinatorInput): LugasLifecycle {
         initialized = []; // rolled back; a later shutdown must not dispose twice
         throw error;
       }
-      slots[svc.name] = svc.value;
+      slots[svc.slot] = svc.value;
       initialized = initialized.concat(svc);
     }
   })();

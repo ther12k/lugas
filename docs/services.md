@@ -81,7 +81,7 @@ export default defineApp({
 
 | Key | Purpose |
 |---|---|
-| `name` | Stable identity (must match the map key's intent; appears in diagnostics). |
+| `name` | Stable identity for lifecycle outcomes and diagnostics. The resolved value lands under the **map key**, not the name — `services: { database: service({ name: "db", … }) }` exposes `ctx.services.database`. |
 | `value` | The live dependency itself — the exact instance your code uses. |
 | `init` | Async setup, run at **serve time** in declaration order (map key order). |
 | `dispose` | Async teardown, run at shutdown in **reverse** order. |
@@ -92,6 +92,7 @@ export default defineApp({
 
 - A startup failure disposes already-initialized services in reverse and surfaces through `server.lugasLifecycle.ready` (a rejected promise) plus a redacted `503` on held routes. Failures fail closed and leave no half-initialized app.
 - `await server.lugasLifecycle.ready` in your entrypoint when you want to gate readiness explicitly.
+- Serving the same app twice shares the prepared graph: service instances, slots, and the settled traffic gate. A second `serve()` re-runs `init` on the same values but never re-holds a ready server behind it; one app with lifecycle services is designed for one primary server.
 
 ## Shutdown: drain, then dispose
 

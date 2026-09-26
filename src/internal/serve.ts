@@ -55,34 +55,23 @@ function safeNotFound(
 export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}): LugasServer {
   const userFetch = options.fetch;
   const serverRef: { current: Bun.Server<unknown> | undefined } = { current: undefined };
-  const lifecycle = startLifecycle({
-    serverRef,
-    services: prepared.lifecycleServices,
-    serviceSlots: prepared.serviceSlots,
-    options: options.shutdown,
-    onStartupFailure: (error) => {
-      console.error(`[lugas] service initialization failed: ${error instanceof Error ? error.message : String(error)}`);
-    },
-  });
-  // Hold traffic until initialization settles; a startup failure answers
-  // held requests with a redacted 503 problem (see prepareApp gateHandler).
-  // When no lifecycle services are registered, the gate remains settled immediately.
-  if (prepared.lifecycleServices.length > 0) {
-    prepared.trafficGate.gate = lifecycle.ready;
-    prepared.trafficGate.settled = false;
-    void lifecycle.ready.then(
-      () => {
-        prepared.trafficGate.settled = true;
-      },
-      () => {
-        prepared.trafficGate.settled = false; // startup failure: readiness stays 503
-      },
-    );
+
+  // M9-003 (ADR-0028): one Bun websocket handler multiplexes every websocket
+  // route through the upgrade data key. An application-supplied `websocket`
+  // option would shadow the compiled routes, so the conflict fails closed.
+  const wsHub = prepared.websocketHub;
+  if (wsHub !== null && options.websocket !== undefined) {
+    throw diagnostic("LUGAS_WS_002", "serve(): custom 'websocket' option conflicts with declared websocket() routes", {
+      hint: "websocket routes are served by Lugas; handle sockets in the route's message/open/close/drain handlers",
+      context: { routes: wsHub.routes.size },
+    });
   }
 
   // M7-003: the ceiling is the explicitly configured serve-time
-  // `maxRequestBodySize`. Above-ceiling budgets are rejected at startup;
+  // maxRequestBodySize. Above-ceiling budgets are rejected at startup;
   // otherwise the ceiling slot enables clamping during enforcement.
+  // Both fail-closed checks run BEFORE the lifecycle starts, so a rejected
+  // serve() never initializes services it would then have to roll back.
   const ceiling = options.maxRequestBodySize;
   if (typeof ceiling === "number") {
     const over: string[] = [];
@@ -99,6 +88,35 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
       });
     }
     prepared.budgets.ceilingRef.current = ceiling;
+  }
+
+  const lifecycle = startLifecycle({
+    serverRef,
+    services: prepared.lifecycleServices,
+    serviceSlots: prepared.serviceSlots,
+    options: options.shutdown,
+    onStartupFailure: (error) => {
+      console.error(`[lugas] service initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+  // Hold traffic until initialization settles; a startup failure answers
+  // held requests with a redacted 503 problem (see prepareApp gateHandler).
+  // When no lifecycle services are registered, the gate remains settled immediately.
+  // A settled gate is never reset: the prepared graph (handlers, service slots)
+  // is shared by every serve() of one app, so a second serve must not re-hold
+  // an already-serving server behind its own initialization. A failed gate may
+  // be replaced (a retry serve re-runs initialization and can recover it).
+  if (prepared.lifecycleServices.length > 0 && !prepared.trafficGate.settled) {
+    prepared.trafficGate.gate = lifecycle.ready;
+    prepared.trafficGate.settled = false;
+    void lifecycle.ready.then(
+      () => {
+        prepared.trafficGate.settled = true;
+      },
+      () => {
+        prepared.trafficGate.settled = false; // startup failure: readiness stays 503
+      },
+    );
   }
 
   // M8-001 (ADR-0022): the CORS policy also covers the fetch fallback —
@@ -127,23 +145,21 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
   const loggedFetch = prepared.logging !== undefined ? wrapLogFallback(prepared.logging, baseFetch) : baseFetch;
   const fetchHandler = prepared.cors !== undefined ? corsWrapFallback(prepared.cors, loggedFetch) : loggedFetch;
 
-  // M9-003 (ADR-0028): one Bun websocket handler multiplexes every websocket
-  // route through the upgrade data key. An application-supplied `websocket`
-  // option would shadow the compiled routes, so the conflict fails closed.
-  const wsHub = prepared.websocketHub;
-  if (wsHub !== null && options.websocket !== undefined) {
-    throw diagnostic("LUGAS_WS_002", "serve(): custom 'websocket' option conflicts with declared websocket() routes", {
-      hint: "websocket routes are served by Lugas; handle sockets in the route's message/open/close/drain handlers",
-      context: { routes: wsHub.routes.size },
-    });
+  let server: Bun.Server<unknown>;
+  try {
+    server = Bun.serve({
+      ...options,
+      routes: prepared.bunRoutes,
+      fetch: fetchHandler,
+      ...(wsHub !== null ? { websocket: wsHub.bunHandler() } : {}),
+    } as Bun.Serve.Options<any>) as Bun.Server<unknown>;
+  } catch (error) {
+    // The listener never came up, but initialization may already be running:
+    // roll services back through the ordinary shutdown path (drain is trivial
+    // — no server ever accepted), then surface the native failure untouched.
+    void lifecycle.shutdown("serve-failure").catch(() => undefined);
+    throw error;
   }
-
-  const server = Bun.serve({
-    ...options,
-    routes: prepared.bunRoutes,
-    fetch: fetchHandler,
-    ...(wsHub !== null ? { websocket: wsHub.bunHandler() } : {}),
-  } as Bun.Serve.Options<any>) as Bun.Server<unknown>;
   if (wsHub !== null) wsHub.serverRef.current = server;
   serverRef.current = server;
 
