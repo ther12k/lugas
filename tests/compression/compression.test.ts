@@ -241,6 +241,79 @@ describe("etag", () => {
     }
   });
 
+  test("weak validators revalidate: the emitted W/\"…\" round-trips to 304 (RFC 9110 weak comparison)", async () => {
+    const server = createTestServer(app({ etag: { weak: true } }));
+    try {
+      const first = await server.fetch("/data");
+      const weakTag = first.headers.get("etag")!;
+      expect(weakTag.startsWith('W/"')).toBe(true);
+      const conditional = await server.fetch("/data", { headers: { "if-none-match": weakTag } });
+      expect(conditional.status).toBe(304);
+      expect(conditional.headers.get("etag")).toBe(weakTag);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("304 preserves the 200's cache metadata (Cache-Control/Vary), drops body headers", async () => {
+    const cached = defineApp({
+      etag: true,
+      routes: {
+        "/cached": {
+          GET: route({
+            handler: () =>
+              json(200, { payload: REPEAT }, { headers: { "cache-control": "private, max-age=60", vary: "Origin" } }),
+          }),
+        },
+      },
+    });
+    const server = createTestServer(cached);
+    try {
+      const first = await server.fetch("/cached");
+      const conditional = await server.fetch("/cached", { headers: { "if-none-match": first.headers.get("etag")! } });
+      expect(conditional.status).toBe(304);
+      expect(conditional.headers.get("cache-control")).toBe("private, max-age=60");
+      expect(conditional.headers.get("vary")).toBe("Origin");
+      expect(conditional.headers.get("content-length")).toBeNull();
+      expect(conditional.headers.get("content-type")).toBeNull();
+      expect(await conditional.text()).toBe("");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("SSE responses carry no framework etag and stream untouched (etag enabled)", async () => {
+    const sseApp = defineApp({
+      etag: true,
+      routes: {
+        "/events": {
+          GET: route({
+            handler: () =>
+              sse({
+                start: (writer) => {
+                  writer.send({ data: { n: 1 } });
+                  writer.close();
+                },
+              }),
+          }),
+        },
+      },
+    });
+    const server = createTestServer(sseApp);
+    try {
+      // Before the text/event-stream skip, applyEtag buffered the stream:
+      // the response did not arrive until the writer closed (or never, for
+      // long-lived streams). It must arrive immediately and stay unvalidated.
+      const res = await server.fetch("/events", { headers: { "accept-encoding": "gzip" } });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/event-stream");
+      expect(res.headers.get("etag")).toBeNull();
+      expect(await res.text()).toContain("data:");
+    } finally {
+      await server.stop();
+    }
+  });
+
   test("composes with secureHeaders on one response", async () => {
     const server = createTestServer(app({ compression: true, etag: true, secureHeaders: true }));
     try {

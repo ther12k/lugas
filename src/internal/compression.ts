@@ -205,15 +205,19 @@ export function compileEtag(config: EtagConfig): CompiledEtag {
   return { weak: config.weak === true };
 }
 
-/** RFC 9110 If-None-Match match: quoted tokens, comma lists, `*`. */
+/** RFC 9110 If-None-Match match: quoted tokens, comma lists, `*`.
+ * If-None-Match uses weak comparison: the `W/` prefix on either side is
+ * insignificant, so an emitted `W/"…"` matches a request carrying that exact
+ * weak validator (and vice versa). */
 function ifNoneMatchMatches(header: string | null, etag: string): boolean {
   if (header === null) return false;
   const trimmed = header.trim();
   if (trimmed === "*") return true;
+  const opaque = (token: string): string => (token.startsWith("W/") ? token.slice(2) : token);
+  const etagTag = opaque(etag);
   return trimmed.split(",").some((candidate) => {
-    let token = candidate.trim();
-    if (token.startsWith("W/")) token = token.slice(2);
-    return token === etag || token === "*";
+    const token = candidate.trim();
+    return token === "*" || opaque(token) === etagTag;
   });
 }
 
@@ -232,6 +236,12 @@ export async function applyEtag(
   if (method !== "GET" && method !== "HEAD") return response;
   if (BODYLESS_STATUSES.has(response.status)) return response;
   if (response.headers.has("etag")) return response; // application validator wins
+  const contentType = response.headers.get("content-type");
+  if (contentType !== null && contentType.split(";")[0]!.trim().toLowerCase() === "text/event-stream") {
+    // SSE must never be buffered (the compression skip's twin): awaiting
+    // arrayBuffer() would hold the stream open until the writer closes.
+    return response;
+  }
   if (response.body === null) return response;
 
   let bytes: Uint8Array<ArrayBuffer>;
@@ -245,8 +255,16 @@ export async function applyEtag(
   const etag = `${compiled.weak ? 'W/' : ''}"${hasher.digest("hex")}"`;
 
   if (ifNoneMatchMatches(request.headers.get("if-none-match"), etag)) {
+    // RFC 9110 §15.4.5: a 304 sends the validators/cache metadata the 200
+    // would have carried (Cache-Control, Content-Location, Expires, Vary);
+    // body-descriptive headers (length, type, encoding) are dropped with the
+    // body. Date is added by the server layer.
     const headers = new Headers();
     headers.set("etag", etag);
+    for (const name of ["cache-control", "content-location", "expires", "vary"]) {
+      const value = response.headers.get(name);
+      if (value !== null) headers.set(name, value);
+    }
     return new Response(null, { status: 304, headers });
   }
   const headers = new Headers(response.headers);
