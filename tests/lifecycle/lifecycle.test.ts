@@ -376,6 +376,37 @@ describe("M7-004 service lifecycle", () => {
     }
   });
 
+  test("new handshakes keep working on an earlier listener after a later one stops", async () => {
+    const app = defineApp({
+      routes: {
+        "/chat": { GET: websocket({ message: (ws, message) => { ws.send(message); } }) },
+      },
+    });
+    const first: LugasServer = app.serve({ port: 0, shutdown: { drainDeadlineMs: 250 } });
+    try {
+      // The upgrade previously resolved through the hub's single server
+      // reference, which the later listener overwrote: once it stopped,
+      // handshakes to this still-running listener answered a non-101
+      // response. The receiving server must perform the upgrade.
+      const second: LugasServer = app.serve({ port: 0, shutdown: { drainDeadlineMs: 250 } });
+      await second.lugasLifecycle.shutdown();
+
+      const socket = new WebSocket(`ws://${new URL(first.url).host}/chat`);
+      await new Promise<void>((resolve, reject) => {
+        socket.addEventListener("open", () => resolve(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("socket failed to open")), { once: true });
+      });
+      const reply = new Promise<string>((resolve) => {
+        socket.addEventListener("message", (event) => resolve(String(event.data)), { once: true });
+      });
+      socket.send("first-still-accepts");
+      expect(await reply).toBe("first-still-accepts");
+      socket.close();
+    } finally {
+      await first.lugasLifecycle.shutdown();
+    }
+  });
+
   test.skipIf(process.platform === "win32")("SIGTERM closes WebSockets and disposes services once (subprocess)", async () => {
     const child = Bun.spawn([process.execPath, join(ROOT, "tests/lifecycle/fixtures/signal-child.ts")], {
       stdout: "pipe",

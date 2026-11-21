@@ -19,7 +19,7 @@ Changes intended for `0.1.0-beta.6`. The candidate is not yet attested or publis
 - Generated `304 Not Modified` responses retain current cache metadata and the relevant `Vary` fields without carrying a body or running compression.
 - `If-None-Match` comparison is weak per RFC 9110: replaying a generated `W/"…"` validator matches, failure-status responses carry no framework validator (so no conditional can mask an error with `304`), and a wildcard counts only when `*` is the entire field value — a quoted tag containing commas is never mistaken for one.
 - A wildcard conditional on an open event stream or a bodyless success answers `304` without buffering or hashing.
-- Shutting down one listener of a multiply-served app closes only that listener's WebSocket sockets.
+- Shutting down one listener of a multiply-served app closes only that listener's WebSocket sockets, and new handshakes keep working on the surviving listener (each listener performs its own upgrades).
 - The browser-test harness skips cleanly when no Chromium executable exists instead of crashing at import time (`LUGAS_REQUIRE_BROWSER=1` still fails with the documented message), and a `LUGAS_BROWSER_EXECUTABLE` command name is still resolved through `PATH`.
 
 ## [0.1.0-beta.5] — published 2026-09-13

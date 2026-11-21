@@ -101,7 +101,7 @@ const server = app.serve({ port: 3000, shutdown: { signals: true } });
 // on shutdown, every client observes: close 1001 "server shutting down"
 ```
 
-New upgrades are refused once shutdown begins (the server stops accepting), and the rest of the lifecycle — drain deadline, reverse-order disposal, distinct outcomes — behaves exactly as documented in [services](./services.md). Close is scoped per listener: serving the same app from two `serve()` calls and shutting one down leaves the other listener's sockets untouched.
+New upgrades are refused once shutdown begins (the server stops accepting), and the rest of the lifecycle — drain deadline, reverse-order disposal, distinct outcomes — behaves exactly as documented in [services](./services.md). Close is scoped per listener: serving the same app from two `serve()` calls and shutting one down leaves the other listener's sockets untouched, and new handshakes keep working on the surviving listener — each listener performs its own upgrades, so a stopped sibling never leaves a stale upgrade target behind.
 
 ## Manifest and CLI
 

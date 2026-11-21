@@ -29,7 +29,7 @@ export type WsRouteEntry = {
 export type WebSocketHub = {
   /** routeId (`"${method} ${path}"`) → raw event handlers. Registered at prepare time. */
   readonly routes: Map<string, WsRouteEntry>;
-  /** Filled by serveApp once `Bun.serve` returns; the compiled upgrade handler resolves the server lazily. */
+  /** Filled by serveApp once `Bun.serve` returns; fallback upgrade target for requests whose receiving server was not recorded (see `noteUpgradeServer`). */
   readonly serverRef: { current: Bun.Server<unknown> | undefined };
   /** Open Lugas sockets, for shutdown close-1001. */
   readonly sockets: Set<Bun.ServerWebSocket<unknown>>;
@@ -91,6 +91,21 @@ export function createWebSocketHub(): WebSocketHub {
 }
 
 /**
+ * The receiving server for each in-flight upgrade request. Bun hands the
+ * native route handler the server that actually accepted the connection as
+ * its second argument; compiled routes are app-level and shared by every
+ * `serve()` of one prepared app, so the upgrade must resolve the receiving
+ * server per request — a hub-level `serverRef` would always point at the
+ * most recent listener and its `upgrade()` fails once that listener stops.
+ */
+const UPGRADE_SERVERS = new WeakMap<Request, Bun.Server<unknown>>();
+
+/** Records the server that received `request` (called by the compiled route boundary). */
+export function noteUpgradeServer(request: Request, server: Bun.Server<unknown>): void {
+  UPGRADE_SERVERS.set(request, server);
+}
+
+/**
  * The request-time upgrade decision, used as the synthetic route handler for
  * websocket descriptors. Validation and guards have already run (this is the
  * pipeline's "handler"); a successful upgrade hijacks the request and Bun
@@ -98,7 +113,7 @@ export function createWebSocketHub(): WebSocketHub {
  * satisfied with an unsent `204`. A non-upgrade request gets `426`.
  */
 export function performUpgrade(hub: WebSocketHub, routeId: string, context: PipelineContext): Response {
-  const server = hub.serverRef.current;
+  const server = UPGRADE_SERVERS.get(context.request) ?? hub.serverRef.current;
   if (server === undefined) {
     return problem(503, { title: "Unavailable", status: 503, detail: "server is not accepting upgrades" });
   }
