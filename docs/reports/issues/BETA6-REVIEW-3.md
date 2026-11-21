@@ -92,6 +92,9 @@ independently (`7cafdf9`, `002dca0`). Findings and disposition:
 - Package rehearsal re-run at the final candidate commit so the tarball
   binds to it: 34/34 checks, `package-rehearsal.json` records
   `packageSourceCommit` = `834c2c1`; publication still dry-run only.
+- After the round-4 polish (`85c755b`), the same strict gate ran again:
+  exit 0 — 996 passed, 6 skipped, 0 failed across 1002 tests — and the
+  rehearsal re-ran 34/34 with `packageSourceCommit` = `85c755b`.
 
 ## Fourth review pass (round 4)
 
