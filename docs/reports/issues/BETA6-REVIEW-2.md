@@ -67,9 +67,16 @@ limitation of the WebSocket hub is unchanged (see BETA6-REVIEW-FIXES).
   `PATH` and `LUGAS_BROWSER_EXECUTABLE=<command name>`, discovery selects
   the override; with a nonexistent command name it falls through to the
   next candidate without throwing.
-- Full `bun run verify` (strict browser flag) in a clean clone of the
-  revised branch: recorded in the follow-up docs commit alongside this
-  revision, matching the first round's reporting order.
+- Full `bun run verify` in a clean clone of `7cafdf9` with the starter set
+  up and built (`bun run setup && bun run build` in
+  `examples/spa-starter`) and strict flags
+  (`LUGAS_REQUIRE_BROWSER=1 LUGAS_REQUIRE_STARTER=1`): exit 0 — 991
+  passed, 6 skipped, 0 failed across 997 tests; build, typecheck, docs,
+  agent-docs, and diff all PASS. The 6 skips are the same pre-existing
+  platform-conditional suite entries as the first round. The development
+  perf-gate skip (no benchmark archive) is expected; a first pass without
+  the starter build reproduced the documented clean-checkout skip of the
+  starter lane (980 pass / 18 skip / 0 fail, exit 0).
 
 ## Boundaries and working tree
 
