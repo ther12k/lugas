@@ -221,21 +221,48 @@ export function compileEtag(config: EtagConfig): CompiledEtag {
   return { weak: config.weak === true };
 }
 
-/** RFC 9110 If-None-Match match: quoted tokens, comma lists, `*`. */
-function ifNoneMatchMatches(header: string | null, etag: string): boolean {
+/** RFC 9110 §8.8.3.2 weak comparison: only the opaque tag participates, never a `W/` prefix. */
+function opaqueTag(token: string): string {
+  return token.startsWith("W/") ? token.slice(2) : token;
+}
+
+/** RFC 9110 If-None-Match match (weak comparison): quoted tokens, comma lists, `*`. */
+function ifNoneMatchMatches(header: string | null, etag: string, wildcardEligible: boolean): boolean {
   if (header === null) return false;
   const trimmed = header.trim();
-  if (trimmed === "*") return true;
+  if (trimmed === "*") return wildcardEligible;
   return trimmed.split(",").some((candidate) => {
-    let token = candidate.trim();
-    if (token.startsWith("W/")) token = token.slice(2);
-    return token === etag || token === "*";
+    const token = candidate.trim();
+    if (token === "*") return wildcardEligible;
+    return opaqueTag(token) === opaqueTag(etag);
   });
+}
+
+/** True when the request carries the `*` wildcard (RFC 9110 §13.1.2). */
+function isWildcardConditional(header: string | null): boolean {
+  return header !== null && header.split(",").some((token) => token.trim() === "*");
 }
 
 // RFC 9110 §15.4.5 and RFC 9111 §4.3.4: update caches with current metadata,
 // not the discarded body's framing headers. ETag is generated below.
 const NOT_MODIFIED_HEADERS = ["cache-control", "content-location", "date", "expires", "vary"] as const;
+
+/** A bodyless 304 carrying the response's current cache metadata. */
+function notModifiedResponse(
+  response: Response,
+  etag: string | null,
+  compression: CompiledCompression | undefined,
+): Response {
+  const headers = new Headers();
+  for (const name of NOT_MODIFIED_HEADERS) {
+    const value = response.headers.get(name);
+    if (value !== null) headers.set(name, value);
+  }
+  if (etag !== null) headers.set("etag", etag);
+  // Compression skips the 304 itself, but caches still need its variant key.
+  if (compression !== undefined && variesByEncoding(compression, response)) addEncodingVary(headers);
+  return new Response(null, { status: 304, headers });
+}
 
 /**
  * Applies the etag policy: computes a strong (or configured-weak) validator
@@ -253,8 +280,18 @@ export async function applyEtag(
   if (BODYLESS_STATUSES.has(response.status)) return response;
   if (response.headers.has("etag")) return response; // application validator wins
   if (response.body === null) return response;
+  // A wildcard asks whether a representation EXISTS (RFC 9110 §13.1.2): it
+  // matches only a successful response and never requires hashing the body.
+  const wildcardEligible =
+    isWildcardConditional(request.headers.get("if-none-match")) && response.status >= 200 && response.status < 300;
   const contentType = response.headers.get("content-type");
-  if (contentType !== null && mediaTypeOf(contentType) === SSE_MEDIA_TYPE) return response;
+  if (contentType !== null && mediaTypeOf(contentType) === SSE_MEDIA_TYPE) {
+    if (!wildcardEligible) return response; // stream through untouched — never buffer
+    // The stream is discarded, never hashed: cancel it so the exactly-once
+    // cleanup runs. This 304 carries current metadata but no framework ETag.
+    void response.body.cancel().catch(() => undefined);
+    return notModifiedResponse(response, null, compression);
+  }
 
   let bytes: Uint8Array<ArrayBuffer>;
   try {
@@ -266,16 +303,8 @@ export async function applyEtag(
   hasher.update(bytes);
   const etag = `${compiled.weak ? 'W/' : ''}"${hasher.digest("hex")}"`;
 
-  if (ifNoneMatchMatches(request.headers.get("if-none-match"), etag)) {
-    const headers = new Headers();
-    for (const name of NOT_MODIFIED_HEADERS) {
-      const value = response.headers.get(name);
-      if (value !== null) headers.set(name, value);
-    }
-    headers.set("etag", etag);
-    // Compression skips the 304 itself, but caches still need its variant key.
-    if (compression !== undefined && variesByEncoding(compression, response)) addEncodingVary(headers);
-    return new Response(null, { status: 304, headers });
+  if (ifNoneMatchMatches(request.headers.get("if-none-match"), etag, wildcardEligible)) {
+    return notModifiedResponse(response, etag, compression);
   }
   const headers = new Headers(response.headers);
   headers.set("etag", etag);

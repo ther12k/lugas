@@ -8,7 +8,7 @@
  * absent; it stays out of the package runtime and out of the dependency
  * graph entirely.
  */
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -30,9 +30,17 @@ const CANDIDATES = [
 
 export function findBrowserExecutable(): string | null {
   for (const candidate of CANDIDATES) {
-    if (!candidate) continue;
-    const probe = Bun.spawnSync([candidate, "--version"], { stdout: "pipe", stderr: "pipe" });
-    if (probe.exitCode === 0) return candidate;
+    // Missing candidates are normal (the list spans per-OS paths): skip them
+    // without throwing, so optional lanes skip and LUGAS_REQUIRE_BROWSER=1
+    // fails with the documented browser-env message instead of an import
+    // crash (Bun's spawnSync throws ENOENT for a nonexistent executable).
+    if (!candidate || !existsSync(candidate)) continue;
+    try {
+      const probe = Bun.spawnSync([candidate, "--version"], { stdout: "pipe", stderr: "pipe" });
+      if (probe.exitCode === 0) return candidate;
+    } catch {
+      // Unusable candidate (permissions, exec format): try the next path.
+    }
   }
   return null;
 }

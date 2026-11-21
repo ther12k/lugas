@@ -55,14 +55,30 @@ function safeNotFound(
 export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}): LugasServer {
   const userFetch = options.fetch;
   const wsHub = prepared.websocketHub;
+  // Per-server socket view: shutting down one listener of a multiply-served
+  // app must close only that listener's sockets (ADR-0028 close semantics),
+  // never a sibling's.
+  const serverSockets = new Set<Bun.ServerWebSocket<unknown>>();
   const serverRef: { current: Bun.Server<unknown> | undefined } = { current: undefined };
   const lifecycle = startLifecycle({
     serverRef,
     services: prepared.lifecycleServices,
     serviceSlots: prepared.serviceSlots,
     options: options.shutdown,
-    // ADR-0028: close open sockets before draining; they do not finish on their own.
-    onStopAccepting: wsHub === null ? undefined : () => wsHub.closeAll(1001, "server shutting down"),
+    // ADR-0028: close open sockets before draining; they do not finish on
+    // their own. Scoped to this server's connections, not the shared hub.
+    onStopAccepting: wsHub === null
+      ? undefined
+      : () => {
+          for (const ws of serverSockets) {
+            try {
+              ws.close(1001, "server shutting down");
+            } catch {
+              // Already closed by the peer — best-effort close-with-reason.
+            }
+          }
+          serverSockets.clear();
+        },
     onStartupFailure: (error) => {
       console.error(`[lugas] service initialization failed: ${error instanceof Error ? error.message : String(error)}`);
     },
@@ -144,7 +160,7 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
     ...options,
     routes: prepared.bunRoutes,
     fetch: fetchHandler,
-    ...(wsHub !== null ? { websocket: wsHub.bunHandler() } : {}),
+    ...(wsHub !== null ? { websocket: wsHub.bunHandler(serverSockets) } : {}),
   } as Bun.Serve.Options<any>) as Bun.Server<unknown>;
   if (wsHub !== null) wsHub.serverRef.current = server;
   serverRef.current = server;

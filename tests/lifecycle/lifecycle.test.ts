@@ -9,7 +9,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
-import { defineApp, json, route, service } from "../../src";
+import { defineApp, json, route, service, websocket } from "../../src";
 import type { LugasServer } from "../../src/internal/serve";
 import type { ShutdownOutcome } from "../../src/internal/lifecycle";
 
@@ -332,6 +332,48 @@ describe("M7-004 service lifecycle", () => {
     };
     expect(capture(() => service({ name: "", value: 1 }))).toBe("LUGAS_LIFECYCLE_001");
     expect(capture(() => service({ name: "x", value: 1, init: 42 as never }))).toBe("LUGAS_LIFECYCLE_001");
+  });
+
+  test("shutdown closes only the stopping server's sockets (one app, two listeners)", async () => {
+    const app = defineApp({
+      routes: {
+        "/chat": { GET: websocket({ message: (ws, message) => { ws.send(message); } }) },
+      },
+    });
+    const openSocket = async (server: LugasServer) => {
+      const ws = new WebSocket(`ws://${new URL(server.url).host}/chat`);
+      const closed = new Promise<{ code: number; reason: string }>((resolve) => {
+        ws.addEventListener("close", (event) => resolve({ code: event.code, reason: event.reason }), { once: true });
+      });
+      await new Promise<void>((resolve, reject) => {
+        ws.addEventListener("open", () => resolve(), { once: true });
+        ws.addEventListener("error", () => reject(new Error("socket failed to open")), { once: true });
+      });
+      const echo = async (text: string): Promise<string> => {
+        const reply = new Promise<string>((resolve) => {
+          ws.addEventListener("message", (event) => resolve(String(event.data)), { once: true });
+        });
+        ws.send(text);
+        return reply;
+      };
+      return { ws, closed, echo };
+    };
+    const first: LugasServer = app.serve({ port: 0, shutdown: { drainDeadlineMs: 250 } });
+    const a = await openSocket(first);
+    // A second listener of the SAME app shares the hub's route table; its
+    // sockets must survive the first server's shutdown.
+    const second: LugasServer = app.serve({ port: 0, shutdown: { drainDeadlineMs: 250 } });
+    const b = await openSocket(second);
+    try {
+      expect(await b.echo("second-up")).toBe("second-up"); // both live before shutdown
+      await first.lugasLifecycle.shutdown();
+      expect(await a.closed).toEqual({ code: 1001, reason: "server shutting down" });
+      expect(await b.echo("still-up")).toBe("still-up"); // the sibling keeps its connection
+    } finally {
+      await second.lugasLifecycle.shutdown();
+      expect(await b.closed).toEqual({ code: 1001, reason: "server shutting down" });
+      a.ws.close();
+    }
   });
 
   test.skipIf(process.platform === "win32")("SIGTERM closes WebSockets and disposes services once (subprocess)", async () => {

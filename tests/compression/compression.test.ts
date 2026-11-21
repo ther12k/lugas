@@ -175,7 +175,7 @@ describe("etag", () => {
     }));
     try {
       const res = await server.fetch("/events", {
-        headers: { "accept-encoding": "gzip", "if-none-match": "*" },
+        headers: { "accept-encoding": "gzip", "if-none-match": '"no-such-tag"' },
         signal: AbortSignal.timeout(2_000),
       });
       expect(res.status).toBe(200);
@@ -194,6 +194,82 @@ describe("etag", () => {
       expect(frame).toBe("data: first\n\n");
     } finally {
       writer?.close();
+      await server.stop();
+    }
+  });
+
+  test("wildcard conditional on an open SSE stream answers 304 without buffering; cleanup runs once", async () => {
+    let writer: SseWriter | undefined;
+    let cleanups = 0;
+    const server = createTestServer(defineApp({
+      etag: true,
+      compression: true,
+      routes: {
+        "/events": {
+          GET: route({
+            handler: () =>
+              sse({
+                start: (stream) => {
+                  writer = stream;
+                  stream.send({ data: "first" });
+                  return () => {
+                    cleanups += 1;
+                  };
+                },
+              }),
+          }),
+        },
+      },
+    }));
+    try {
+      const res = await server.fetch("/events", { headers: { "if-none-match": "*" }, signal: AbortSignal.timeout(2_000) });
+      expect(res.status).toBe(304); // the stream exists — answered without hashing it
+      expect(await res.text()).toBe("");
+      expect(res.headers.get("etag")).toBeNull(); // never hashed, so no framework validator
+      expect(res.headers.get("cache-control")).toBe("no-cache"); // metadata still updates caches
+      await Bun.sleep(50);
+      expect(cleanups).toBe(1); // discarding the stream runs its exactly-once cleanup
+      writer?.close();
+      await Bun.sleep(50);
+      expect(cleanups).toBe(1);
+    } finally {
+      writer?.close();
+      await server.stop();
+    }
+  });
+
+  test("wildcard conditional never masks a failure status", async () => {
+    const missing = defineApp({
+      etag: true,
+      routes: {
+        "/gone": { GET: route({ handler: () => json(404, { error: "missing" }) }) },
+      },
+    });
+    const server = createTestServer(missing);
+    try {
+      const plain = await server.fetch("/gone");
+      expect(plain.status).toBe(404);
+
+      const conditional = await server.fetch("/gone", { headers: { "if-none-match": "*" } });
+      expect(conditional.status).toBe(404); // no current representation → the wildcard does not match
+      expect(((await conditional.json()) as { error: string }).error).toBe("missing");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("weak validators compare opaquely: replaying the generated W/\"…\" returns 304", async () => {
+    const server = createTestServer(app({ etag: { weak: true }, compression: true }));
+    try {
+      const first = await server.fetch("/data");
+      const etag = first.headers.get("etag");
+      expect(etag).toMatch(/^W\/"[0-9a-f]{40}"$/);
+      await first.text();
+
+      const conditional = await server.fetch("/data", { headers: { "if-none-match": etag! } });
+      expect(conditional.status).toBe(304);
+      expect(conditional.headers.get("etag")).toBe(etag); // the weak form is echoed, not strengthened
+    } finally {
       await server.stop();
     }
   });

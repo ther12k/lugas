@@ -34,7 +34,7 @@ export type WebSocketHub = {
   /** Open Lugas sockets, for shutdown close-1001. */
   readonly sockets: Set<Bun.ServerWebSocket<unknown>>;
   /** The single Bun `websocket` handler object dispatching per route. */
-  readonly bunHandler: () => Bun.WebSocketHandler<WsData>;
+  readonly bunHandler: (serverSockets?: Set<Bun.ServerWebSocket<unknown>>) => Bun.WebSocketHandler<WsData>;
   /** Close every tracked socket; returns how many were open. */
   readonly closeAll: (code: number, reason: string) => number;
 };
@@ -47,18 +47,23 @@ export function createWebSocketHub(): WebSocketHub {
   const resolve = (ws: Bun.ServerWebSocket<WsData>): WsRouteEntry | undefined =>
     routes.get(ws.data?.[ROUTE_KEY] ?? "");
 
-  const bunHandler = (): Bun.WebSocketHandler<WsData> => ({
+  // serverSockets (when given) is the calling server's own socket view: every
+  // serve() of one prepared app shares this hub's route table, but graceful
+  // close must reach only the stopping server's connections.
+  const bunHandler = (serverSockets?: Set<Bun.ServerWebSocket<unknown>>): Bun.WebSocketHandler<WsData> => ({
     message: (ws, message) => {
       const route = resolve(ws);
       return route?.message(ws, message as string | Uint8Array, ws.data[CONTEXT_KEY]);
     },
     open: (ws) => {
       sockets.add(ws);
+      serverSockets?.add(ws as Bun.ServerWebSocket<unknown>);
       const route = resolve(ws);
       return route?.open?.(ws, ws.data[CONTEXT_KEY]);
     },
     close: (ws, code, reason) => {
       sockets.delete(ws);
+      serverSockets?.delete(ws as Bun.ServerWebSocket<unknown>);
       const route = resolve(ws);
       return route?.close?.(ws, code, reason, ws.data[CONTEXT_KEY]);
     },
