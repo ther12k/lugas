@@ -17,6 +17,10 @@ Changes intended for `0.1.0-beta.6`. The candidate is not yet attested or publis
 - ETag generation no longer buffers server-sent events; the first event can arrive while the stream is still open.
 - Opt-in `SIGINT` and `SIGTERM` handling now closes Lugas-managed WebSockets with code `1001` before draining, just like explicit shutdown.
 - Generated `304 Not Modified` responses retain current cache metadata and the relevant `Vary` fields without carrying a body or running compression.
+- `If-None-Match` comparison is weak per RFC 9110: replaying a generated `W/"…"` validator matches, and a wildcard `*` never turns a failure status into `304`.
+- A wildcard conditional on an open event stream answers `304` without buffering the stream.
+- Shutting down one listener of a multiply-served app closes only that listener's WebSocket sockets.
+- The browser-test harness skips cleanly when no Chromium executable exists instead of crashing at import time (`LUGAS_REQUIRE_BROWSER=1` still fails with the documented message).
 
 ## [0.1.0-beta.5] — published 2026-09-13
 
