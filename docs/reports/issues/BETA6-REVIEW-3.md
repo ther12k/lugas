@@ -93,6 +93,38 @@ independently (`7cafdf9`, `002dca0`). Findings and disposition:
   binds to it: 34/34 checks, `package-rehearsal.json` records
   `packageSourceCommit` = `834c2c1`; publication still dry-run only.
 
+## Fourth review pass (round 4)
+
+The round-3 commits (`600a9ea`, `834c2c1`) received an independent pass:
+no blockers, no should-fix defects; the forwarding chain, upgrade-boundary
+coverage, shutdown-slot ordering, and validator ordering all verified
+clean. Two P3 polish items on the websocket failure path were applied:
+
+1. `isWebSocketHandshake` validated a 24-char key by length, which
+   misclassifies in both directions (24 chars can decode to 17/18 bytes;
+   the unpadded 22-char encoding of a genuine 16-byte key was rejected).
+   It now implements RFC 6455 §4.2.1 directly: GET, `Upgrade: websocket`,
+   version `13`, and a `Sec-WebSocket-Key` that base64-decodes to exactly
+   16 bytes (padding-normalized).
+2. The `426` response carried no `Upgrade` header, which RFC 9110 §10.2.1
+   requires. `problem()`'s init argument now supplies `Upgrade: websocket`.
+
+The pass also recorded one pre-existing observation outside its scope:
+OpenAPI doc/ui endpoints do not receive the secure-headers policy while
+health and SPA handlers apply it manually — flagged for an ADR-0029
+intent check as a follow-up, deliberately untouched here.
+
+## Local compatibility cell
+
+The six-cell OS/Bun matrix is CI-only, but the `ubuntu-latest` / Bun
+`1.4.0` cell was replicated locally on Bun 1.4.0, following the
+compatibility workflow's step list exactly: `bun run build`,
+`verify:compatibility-report` PASS, `bun run typecheck` exit 0,
+`bun test tests/unit/ tests/conformance/ tests/static/` 400 pass / 5 skip
+/ 0 fail, `bun test tests/cli/` 17 pass / 0 fail, and
+`bun test tests/security/` 0 fail. The other five cells remain CI work;
+this is supplementary evidence, not a matrix attestation.
+
 ## Boundaries and working tree
 
 The pre-existing single-`serverRef` limitation is closed by this round;

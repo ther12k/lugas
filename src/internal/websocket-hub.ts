@@ -106,17 +106,26 @@ export function noteUpgradeServer(request: Request, server: Bun.Server<unknown>)
 }
 
 /**
- * Whether the request carries the headers of a well-formed RFC 6455 opening
- * handshake. Bun's `upgrade()` collapses "not a handshake" and "handshake
- * failed server-side" into one `false`, so this decides which truth the
- * client gets: a non-handshake is the client's mistake (`426`), while a
- * well-formed handshake that cannot complete (listener stopping mid-flight)
- * is the server's state (`503`).
+ * Whether the request carries a well-formed RFC 6455 §4.2.1 opening
+ * handshake: GET, `Upgrade: websocket`, version `13`, and a `Sec-WebSocket-
+ * Key` that base64-decodes to exactly 16 bytes (padding-normalized, so the
+ * unpadded 22-char form validates too). Bun's `upgrade()` collapses "not a
+ * handshake" and "handshake failed server-side" into one `false`, so this
+ * decides which truth the client gets: a non-handshake is the client's
+ * mistake (`426`), while a well-formed handshake that cannot complete
+ * (listener stopping mid-flight) is the server's state (`503`).
  */
 function isWebSocketHandshake(request: Request): boolean {
+  if (request.method.toUpperCase() !== "GET") return false;
   if ((request.headers.get("upgrade") ?? "").trim().toLowerCase() !== "websocket") return false;
   if ((request.headers.get("sec-websocket-version") ?? "").trim() !== "13") return false;
-  return (request.headers.get("sec-websocket-key") ?? "").trim().length === 24; // base64 of 16 bytes
+  const raw = (request.headers.get("sec-websocket-key") ?? "").trim();
+  if (raw.length === 0 || raw.length % 4 === 1) return false;
+  try {
+    return atob(raw + "=".repeat((4 - (raw.length % 4)) % 4)).length === 16;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -124,8 +133,9 @@ function isWebSocketHandshake(request: Request): boolean {
  * websocket descriptors. Validation and guards have already run (this is the
  * pipeline's "handler"); a successful upgrade hijacks the request and Bun
  * discards the returned Response, so the pipeline's Response contract is
- * satisfied with an unsent `204`. A non-handshake request gets `426`; a
- * well-formed handshake the server cannot complete gets `503`.
+ * satisfied with an unsent `204`. A non-handshake request gets `426` with
+ * the RFC 9110 §10.2.1 `Upgrade` header; a well-formed handshake the server
+ * cannot complete gets `503`.
  */
 export function performUpgrade(hub: WebSocketHub, routeId: string, context: PipelineContext): Response {
   const server = UPGRADE_SERVERS.get(context.request) ?? hub.serverRef.current;
@@ -143,5 +153,5 @@ export function performUpgrade(hub: WebSocketHub, routeId: string, context: Pipe
     title: "Upgrade Required",
     status: 426,
     detail: "websocket routes accept only WebSocket handshake requests (GET with Upgrade: websocket)",
-  });
+  }, { headers: { upgrade: "websocket" } });
 }
