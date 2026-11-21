@@ -53,10 +53,13 @@ this branch.
   — the test pins the defect, not just the new behavior.
 - `bun test tests/lifecycle tests/websockets`: 24 passed, 0 failed,
   including both multi-listener tests (close scoping and upgrade target).
-- Full `bun run verify` in a clean clone of the branch with the starter
-  set up and built and strict flags
-  (`LUGAS_REQUIRE_BROWSER=1 LUGAS_REQUIRE_STARTER=1`): recorded in the
-  follow-up docs commit alongside this revision.
+- Full `bun run verify` in a clean clone of `002dca0` with the starter set
+  up and built and strict flags
+  (`LUGAS_REQUIRE_BROWSER=1 LUGAS_REQUIRE_STARTER=1`): exit 0 — 992
+  passed, 6 skipped, 0 failed across 998 tests; build, typecheck, docs,
+  agent-docs, and diff all PASS. The 6 skips are the same pre-existing
+  platform-conditional suite entries as the previous rounds. The
+  development perf-gate skip (no benchmark archive) is expected.
 
 ## Boundaries and working tree
 
