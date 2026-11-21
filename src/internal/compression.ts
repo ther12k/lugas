@@ -7,8 +7,9 @@
  * with structural skips (SSE must never be buffered; pre-encoded, ranged,
  * tiny, and non-compressible responses pass through untouched) and
  * `Vary: Accept-Encoding` on every compressible response; `etag` computes
- * strong-by-default SHA-1 validators over the UNCOMPRESSED body and answers
- * matching If-None-Match with a 304 short-circuit. Etag evaluates before
+ * strong-by-default SHA-1 validators over the UNCOMPRESSED body of successful
+ * responses and answers matching If-None-Match with a 304 short-circuit.
+ * Etag evaluates before
  * compression: the validator is encoding-independent and a 304 never pays
  * the encode cost.
  */
@@ -231,16 +232,15 @@ function ifNoneMatchMatches(header: string | null, etag: string, wildcardEligibl
   if (header === null) return false;
   const trimmed = header.trim();
   if (trimmed === "*") return wildcardEligible;
-  return trimmed.split(",").some((candidate) => {
-    const token = candidate.trim();
-    if (token === "*") return wildcardEligible;
-    return opaqueTag(token) === opaqueTag(etag);
-  });
+  return trimmed.split(",").some((candidate) => opaqueTag(candidate.trim()) === opaqueTag(etag));
 }
 
-/** True when the request carries the `*` wildcard (RFC 9110 §13.1.2). */
+/** True when the request's condition is the sole-value `*` wildcard (RFC 9110 §13.1.2). */
 function isWildcardConditional(header: string | null): boolean {
-  return header !== null && header.split(",").some((token) => token.trim() === "*");
+  // `*` is only valid as the entire field value; a bare `*` inside a comma
+  // list is part of a quoted tag (tags may contain commas) or malformed
+  // input — neither is a wildcard.
+  return header !== null && header.trim() === "*";
 }
 
 // RFC 9110 §15.4.5 and RFC 9111 §4.3.4: update caches with current metadata,
@@ -266,8 +266,9 @@ function notModifiedResponse(
 
 /**
  * Applies the etag policy: computes a strong (or configured-weak) validator
- * over the uncompressed body of GET/HEAD responses and short-circuits a
- * matching If-None-Match with 304. Skipped responses pass through untouched.
+ * over the uncompressed body of successful GET/HEAD responses and
+ * short-circuits a matching If-None-Match with 304. Skipped responses pass
+ * through untouched.
  */
 export async function applyEtag(
   compiled: CompiledEtag,
@@ -278,12 +279,19 @@ export async function applyEtag(
   const method = request.method.toUpperCase();
   if (method !== "GET" && method !== "HEAD") return response;
   if (BODYLESS_STATUSES.has(response.status)) return response;
+  // Framework validators describe the selected representation, which only a
+  // successful response carries: error payloads cross untouched, so a
+  // conditional can never mask a failure status (RFC 9110 §3.2, §13.1.2).
+  if (response.status < 200 || response.status >= 300) return response;
   if (response.headers.has("etag")) return response; // application validator wins
+  const wildcardEligible = isWildcardConditional(request.headers.get("if-none-match"));
+  if (wildcardEligible && response.body === null) {
+    // A wildcard asks whether a representation EXISTS (RFC 9110 §13.1.2). A
+    // bodyless success (a HEAD-style handler) has one, so answer 304 without
+    // hashing — there is no body to cancel and no validator to echo.
+    return notModifiedResponse(response, null, compression);
+  }
   if (response.body === null) return response;
-  // A wildcard asks whether a representation EXISTS (RFC 9110 §13.1.2): it
-  // matches only a successful response and never requires hashing the body.
-  const wildcardEligible =
-    isWildcardConditional(request.headers.get("if-none-match")) && response.status >= 200 && response.status < 300;
   const contentType = response.headers.get("content-type");
   if (contentType !== null && mediaTypeOf(contentType) === SSE_MEDIA_TYPE) {
     if (!wildcardEligible) return response; // stream through untouched — never buffer

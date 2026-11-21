@@ -258,6 +258,104 @@ describe("etag", () => {
     }
   });
 
+  test("failure responses carry no framework validator and can never be masked by one", async () => {
+    const server = createTestServer(defineApp({
+      etag: { weak: true },
+      routes: {
+        "/gone": { GET: route({ handler: () => json(404, { error: "missing" }) }) },
+      },
+    }));
+    try {
+      // The selected representation exists only for a success (RFC 9110 §3.2):
+      // error payloads cross untouched, so no validator is minted over them
+      // and replaying any conditional keeps the full failure response.
+      const first = await server.fetch("/gone");
+      expect(first.status).toBe(404);
+      expect(first.headers.get("etag")).toBeNull();
+
+      const conditional = await server.fetch("/gone", { headers: { "if-none-match": '"any-tag"' } });
+      expect(conditional.status).toBe(404);
+      expect(((await conditional.json()) as { error: string }).error).toBe("missing");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("a quoted tag containing commas is never mistaken for the wildcard", async () => {
+    let writer: SseWriter | undefined;
+    const server = createTestServer(defineApp({
+      etag: true,
+      routes: {
+        "/data": { GET: route({ handler: () => json(200, { payload: REPEAT }) }) },
+        "/events": {
+          GET: route({
+            handler: () =>
+              sse({
+                start: (stream) => {
+                  writer = stream;
+                  stream.send({ data: "first" });
+                },
+              }),
+          }),
+        },
+      },
+    }));
+    try {
+      // RFC 9110 §13.1.2: `*` is the condition only as the ENTIRE field value.
+      // "\"rev,*,next\"" is one quoted opaque tag whose bytes contain a comma
+      // and an asterisk — not a wildcard, so nothing matches and nothing is
+      // discarded.
+      const conditional = await server.fetch("/data", { headers: { "if-none-match": '"rev,*,next"' } });
+      expect(conditional.status).toBe(200); // unknown tag → full response with a fresh validator
+      expect(conditional.headers.get("etag")).toMatch(/^"[0-9a-f]{40}"$/);
+      await conditional.arrayBuffer();
+
+      const streamed = await server.fetch("/events", {
+        headers: { "if-none-match": '"rev,*,next"' },
+        signal: AbortSignal.timeout(2_000),
+      });
+      expect(streamed.status).toBe(200); // the stream is live, not cancelled into a 304
+      expect(streamed.headers.get("content-type")).toContain("text/event-stream");
+      const reader = streamed.body!.getReader();
+      const decoder = new TextDecoder();
+      let frame = "";
+      while (!frame.endsWith("\n\n")) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        frame += decoder.decode(value, { stream: true });
+      }
+      expect(frame).toBe("data: first\n\n");
+    } finally {
+      writer?.close();
+      await server.stop();
+    }
+  });
+
+  test("a bodyless success answers a wildcard conditional with 304", async () => {
+    const server = createTestServer(defineApp({
+      etag: true,
+      routes: {
+        "/head-style": {
+          GET: route({
+            handler: () => new Response(null, { status: 200, headers: { "cache-control": "max-age=60" } }),
+          }),
+        },
+      },
+    }));
+    try {
+      // The route answered successfully, so a current representation exists
+      // even though this response carries no body: the wildcard is evaluated
+      // before the nothing-to-hash guard.
+      const conditional = await server.fetch("/head-style", { headers: { "if-none-match": "*" } });
+      expect(conditional.status).toBe(304);
+      expect(await conditional.text()).toBe("");
+      expect(conditional.headers.get("etag")).toBeNull(); // nothing was hashed
+      expect(conditional.headers.get("cache-control")).toBe("max-age=60"); // metadata still updates caches
+    } finally {
+      await server.stop();
+    }
+  });
+
   test("weak validators compare opaquely: replaying the generated W/\"…\" returns 304", async () => {
     const server = createTestServer(app({ etag: { weak: true }, compression: true }));
     try {

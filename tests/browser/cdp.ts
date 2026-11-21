@@ -30,16 +30,19 @@ const CANDIDATES = [
 
 export function findBrowserExecutable(): string | null {
   for (const candidate of CANDIDATES) {
-    // Missing candidates are normal (the list spans per-OS paths): skip them
-    // without throwing, so optional lanes skip and LUGAS_REQUIRE_BROWSER=1
-    // fails with the documented browser-env message instead of an import
-    // crash (Bun's spawnSync throws ENOENT for a nonexistent executable).
-    if (!candidate || !existsSync(candidate)) continue;
+    // Missing hard-coded paths are normal (the list spans per-OS installs):
+    // skip them without spawning. A non-absolute value (the
+    // LUGAS_BROWSER_EXECUTABLE override may be a bare command name) is left
+    // to the probe — Bun's spawnSync resolves it through PATH, and its ENOENT
+    // throw moves to the next candidate, so optional lanes skip and
+    // LUGAS_REQUIRE_BROWSER=1 fails with the documented browser-env message
+    // instead of an import crash.
+    if (!candidate || (candidate.startsWith("/") && !existsSync(candidate))) continue;
     try {
       const probe = Bun.spawnSync([candidate, "--version"], { stdout: "pipe", stderr: "pipe" });
       if (probe.exitCode === 0) return candidate;
     } catch {
-      // Unusable candidate (permissions, exec format): try the next path.
+      // Unusable candidate (missing from PATH, permissions, exec format): try the next.
     }
   }
   return null;
