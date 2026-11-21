@@ -300,3 +300,33 @@ describe("serve-time conflict", () => {
     }
   });
 });
+
+describe("performUpgrade error semantics", () => {
+  test("426 for a non-handshake request; 503 when a genuine handshake cannot complete", () => {
+    const hub = wsHubModule.createWebSocketHub();
+    // upgrade() collapses "not a handshake" and "handshake failed
+    // server-side" into one false — the request headers decide which truth
+    // the client gets (the listener-stopping-mid-flight case).
+    hub.serverRef.current = { upgrade: () => false } as unknown as Bun.Server<unknown>;
+    const context = (request: Request): Parameters<typeof wsHubModule.performUpgrade>[2] =>
+      ({ request }) as Parameters<typeof wsHubModule.performUpgrade>[2];
+
+    const plain = wsHubModule.performUpgrade(hub, "GET /ws", context(new Request("http://localhost/ws")));
+    expect(plain.status).toBe(426); // no handshake headers → the client's mistake
+
+    const genuine = wsHubModule.performUpgrade(
+      hub,
+      "GET /ws",
+      context(
+        new Request("http://localhost/ws", {
+          headers: {
+            upgrade: "websocket",
+            "sec-websocket-version": "13",
+            "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==", // 24 chars: base64 of 16 bytes
+          },
+        }),
+      ),
+    );
+    expect(genuine.status).toBe(503); // server-side failure, retryable
+  });
+});

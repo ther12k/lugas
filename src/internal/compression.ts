@@ -284,6 +284,10 @@ export async function applyEtag(
   // conditional can never mask a failure status (RFC 9110 §3.2, §13.1.2).
   if (response.status < 200 || response.status >= 300) return response;
   if (response.headers.has("etag")) return response; // application validator wins
+  // A ranged response validates only its slice, not the selected
+  // representation (RFC 9110 §8.8.1, §14.4): like compression, the etag
+  // pass leaves it untouched. An application may set its own validator.
+  if (response.headers.has("content-range")) return response;
   const wildcardEligible = isWildcardConditional(request.headers.get("if-none-match"));
   if (wildcardEligible && response.body === null) {
     // A wildcard asks whether a representation EXISTS (RFC 9110 §13.1.2). A

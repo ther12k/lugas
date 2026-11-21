@@ -32,9 +32,10 @@ export function findBrowserExecutable(): string | null {
   for (const candidate of CANDIDATES) {
     // Missing hard-coded paths are normal (the list spans per-OS installs):
     // skip them without spawning. A non-absolute value (the
-    // LUGAS_BROWSER_EXECUTABLE override may be a bare command name) is left
-    // to the probe — Bun's spawnSync resolves it through PATH, and its ENOENT
-    // throw moves to the next candidate, so optional lanes skip and
+    // LUGAS_BROWSER_EXECUTABLE override may be a bare command name, resolved
+    // through PATH; a slash-containing relative path is cwd-resolved) is
+    // left to the probe — Bun's spawnSync throws ENOENT for a missing
+    // executable, moving to the next candidate, so optional lanes skip and
     // LUGAS_REQUIRE_BROWSER=1 fails with the documented browser-env message
     // instead of an import crash.
     if (!candidate || (candidate.startsWith("/") && !existsSync(candidate))) continue;

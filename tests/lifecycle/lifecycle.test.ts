@@ -407,6 +407,56 @@ describe("M7-004 service lifecycle", () => {
     }
   });
 
+  test("upgrades keep their receiving server behind every policy wrap (one app, two listeners)", async () => {
+    // Every outer wrap (cors, secureHeaders, logging, telemetry) previously
+    // forwarded only the request, dropping Bun's server argument: with any
+    // policy configured, the per-request receiving-server record never
+    // happened and the hub's stale serverRef answered the upgrade.
+    const app = defineApp({
+      cors: { origin: "*" },
+      secureHeaders: true,
+      logging: { access: true },
+      telemetry: { onRequestStart() {}, onRequestEnd() {} },
+      routes: {
+        "/chat": { GET: websocket({ message: (ws, message) => { ws.send(message); } }) },
+      },
+    });
+    const first: LugasServer = app.serve({ port: 0, shutdown: { drainDeadlineMs: 250 } });
+    try {
+      const second: LugasServer = app.serve({ port: 0, shutdown: { drainDeadlineMs: 250 } });
+      // While both are live, the hub's fallback target is the second
+      // listener: this handshake must still be performed by the first.
+      const socket = new WebSocket(`ws://${new URL(first.url).host}/chat`);
+      await new Promise<void>((resolve, reject) => {
+        socket.addEventListener("open", () => resolve(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("socket failed to open")), { once: true });
+      });
+      const reply = new Promise<string>((resolve) => {
+        socket.addEventListener("message", (event) => resolve(String(event.data)), { once: true });
+      });
+      socket.send("through-the-wraps");
+      expect(await reply).toBe("through-the-wraps");
+      socket.close();
+
+      await second.lugasLifecycle.shutdown();
+      // After the newest listener stopped, a fresh handshake to the
+      // surviving listener must still succeed.
+      const socket2 = new WebSocket(`ws://${new URL(first.url).host}/chat`);
+      await new Promise<void>((resolve, reject) => {
+        socket2.addEventListener("open", () => resolve(), { once: true });
+        socket2.addEventListener("error", () => reject(new Error("handshake to the surviving listener failed")), { once: true });
+      });
+      const reply2 = new Promise<string>((resolve) => {
+        socket2.addEventListener("message", (event) => resolve(String(event.data)), { once: true });
+      });
+      socket2.send("survivor");
+      expect(await reply2).toBe("survivor");
+      socket2.close();
+    } finally {
+      await first.lugasLifecycle.shutdown();
+    }
+  });
+
   test.skipIf(process.platform === "win32")("SIGTERM closes WebSockets and disposes services once (subprocess)", async () => {
     const child = Bun.spawn([process.execPath, join(ROOT, "tests/lifecycle/fixtures/signal-child.ts")], {
       stdout: "pipe",

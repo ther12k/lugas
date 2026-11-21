@@ -133,16 +133,19 @@ export function createTelemetryRegistry(): TelemetryRegistry {
  * Wraps a compiled handler with telemetry events. Outermost of the policy
  * wraps (inside CORS): start fires before anything else observes the
  * request; end fires when the response exists and tracked work settled.
+ * The optional server argument is Bun's route-handler contract and must
+ * reach the wrapped handler (websocket upgrades resolve the receiving
+ * server through it).
  */
 export function wrapTelemetryHandler(
   compiled: CompiledTelemetry,
   registry: TelemetryRegistry,
   route: string,
   makeRequestId: (() => string | undefined) | undefined,
-  handler: (request: Request) => Response | Promise<Response>,
-): (request: Request) => Response | Promise<Response> {
+  handler: (request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response>,
+): (request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response> {
   if (compiled.onRequestStart === undefined && compiled.onRequestEnd === undefined) return handler;
-  return (request: Request): Response | Promise<Response> => {
+  return (request: Request, server?: Bun.Server<unknown>): Response | Promise<Response> => {
     const requestId = makeRequestId !== undefined ? makeRequestId() : undefined;
     const state: TelemetryRequestState = {
       started: performance.now(),
@@ -162,7 +165,7 @@ export function wrapTelemetryHandler(
       route: state.route,
       requestId,
     });
-    return Promise.resolve(handler(request)).then((response) => {
+    return Promise.resolve(handler(request, server)).then((response) => {
       state.response = response instanceof Response ? response : new Response(null, { status: 500 });
       // Stamp the id before the access-log wrapper reads it (one identity
       // source, ADR-0032): logging prefers an existing x-request-id.

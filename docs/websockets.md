@@ -71,7 +71,7 @@ GET: websocket({
 })
 ```
 
-Requests that reach the upgrade decision without WebSocket handshake headers return **`426 Upgrade Required`** — honest HTTP for an honest mistake (a browser navigating to `ws://…`'s http twin, say), never a hang.
+Requests that reach the upgrade decision without WebSocket handshake headers return **`426 Upgrade Required`** — honest HTTP for an honest mistake (a browser navigating to `ws://…`'s http twin, say), never a hang. A well-formed handshake that the server cannot complete (a listener stopping mid-flight) answers **`503`** instead — a retryable server-side state, not a client mistake.
 
 ## What Lugas does not do
 
@@ -101,7 +101,7 @@ const server = app.serve({ port: 3000, shutdown: { signals: true } });
 // on shutdown, every client observes: close 1001 "server shutting down"
 ```
 
-New upgrades are refused once shutdown begins (the server stops accepting), and the rest of the lifecycle — drain deadline, reverse-order disposal, distinct outcomes — behaves exactly as documented in [services](./services.md). Close is scoped per listener: serving the same app from two `serve()` calls and shutting one down leaves the other listener's sockets untouched, and new handshakes keep working on the surviving listener — each listener performs its own upgrades, so a stopped sibling never leaves a stale upgrade target behind.
+New upgrades are refused once shutdown begins (the server stops accepting), and the rest of the lifecycle — drain deadline, reverse-order disposal, distinct outcomes — behaves exactly as documented in [services](./services.md). Close is scoped per listener: serving the same app from two `serve()` calls and shutting one down leaves the other listener's sockets untouched, and new handshakes keep working on the surviving listener — each listener performs its own upgrades regardless of which response policies (CORS, secure headers, logging, telemetry) are configured, so a stopped sibling never leaves a stale upgrade target behind.
 
 ## Manifest and CLI
 

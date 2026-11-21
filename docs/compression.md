@@ -54,10 +54,10 @@ export default defineApp({
 ```
 
 - **Strong by default**: SHA-1 over the **uncompressed** body — encoding-independent, so the same validator matches a gzip-encoded response and a plain one, and survives proxy re-encoding.
-- **Successful GET/HEAD only** (`If-None-Match` semantics); POST/PUT/PATCH and failure-status responses carry no framework etag, so no conditional can ever mask an error with `304`.
+- **Successful GET/HEAD only** (`If-None-Match` semantics); POST/PUT/PATCH, failure-status, and ranged (`Content-Range`) responses carry no framework etag — a validator must describe the selected representation, so no conditional can mask an error or bless a slice with `304`.
+- **Application etags own the whole conditional contract** (fill-if-absent): a handler that sets its own `ETag` (version numbers, immutable-content hashes) is never overwritten, and Lugas never evaluates an application validator against `If-None-Match` — replaying one receives the full `200` with identical content, which is always RFC-permitted.
 - **`If-None-Match` per RFC 9110**: quoted tokens and comma lists match → **`304`** with the same `ETag` and no body. Comparison is weak (opaque tags), so replaying a generated `W/"…"` validator matches. A wildcard counts only when `*` is the **entire** field value (a quoted tag may itself contain commas and asterisks); it matches successful responses — including a bodyless success and an open event stream, which is answered without being buffered (that `304` carries current metadata but no framework `ETag`, since nothing is hashed).
 - **SSE is passed through without buffering**: `text/event-stream` responses do not get a framework-generated `ETag`, so events still arrive while the stream is open, even with both policies enabled.
-- **Application etags win** (fill-if-absent): a handler that sets its own `ETag` (version numbers, immutable-content hashes) is never overwritten.
 - A `304` short-circuits **before** compression — conditional hits never pay the encode cost. A framework-generated `304` carries the current `Cache-Control`, `Content-Location`, `Date`, `Expires`, and `Vary` headers when present, including `Vary: Accept-Encoding` when the full response would vary by encoding.
 
 ## How they compose

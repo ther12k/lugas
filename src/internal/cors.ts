@@ -282,11 +282,11 @@ async function preflightResponse(policy: CompiledCorsPolicy, request: Request): 
  */
 export function corsWrapHandler(
   policy: CompiledCorsPolicy,
-  handler: (request: Request) => Response | Promise<Response>,
-): (request: Request) => Promise<Response> {
-  return (request: Request): Promise<Response> => {
+  handler: (request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response>,
+): (request: Request, server?: Bun.Server<unknown>) => Promise<Response> {
+  return (request: Request, server?: Bun.Server<unknown>): Promise<Response> => {
     if (isPreflight(request)) return preflightResponse(policy, request);
-    return Promise.resolve(handler(request)).then((response) => applyResponseHeaders(policy, request, response));
+    return Promise.resolve(handler(request, server)).then((response) => applyResponseHeaders(policy, request, response));
   };
 }
 

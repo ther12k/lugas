@@ -331,6 +331,34 @@ describe("etag", () => {
     }
   });
 
+  test("ranged responses carry no framework validator (Content-Range skip)", async () => {
+    const server = createTestServer(defineApp({
+      etag: true,
+      routes: {
+        "/slice": {
+          GET: route({
+            handler: () =>
+              new Response("hello", {
+                status: 206,
+                headers: { "content-range": "bytes 0-4/10" },
+              }),
+          }),
+        },
+      },
+    }));
+    try {
+      // A slice validates only itself, not the selected representation: the
+      // etag pass leaves ranged responses untouched (a wildcard must not
+      // turn one into a 304, and nothing is hashed into a validator).
+      const partial = await server.fetch("/slice", { headers: { "if-none-match": "*" } });
+      expect(partial.status).toBe(206);
+      expect(partial.headers.get("etag")).toBeNull();
+      expect(await partial.text()).toBe("hello");
+    } finally {
+      await server.stop();
+    }
+  });
+
   test("a bodyless success answers a wildcard conditional with 304", async () => {
     const server = createTestServer(defineApp({
       etag: true,

@@ -106,11 +106,26 @@ export function noteUpgradeServer(request: Request, server: Bun.Server<unknown>)
 }
 
 /**
+ * Whether the request carries the headers of a well-formed RFC 6455 opening
+ * handshake. Bun's `upgrade()` collapses "not a handshake" and "handshake
+ * failed server-side" into one `false`, so this decides which truth the
+ * client gets: a non-handshake is the client's mistake (`426`), while a
+ * well-formed handshake that cannot complete (listener stopping mid-flight)
+ * is the server's state (`503`).
+ */
+function isWebSocketHandshake(request: Request): boolean {
+  if ((request.headers.get("upgrade") ?? "").trim().toLowerCase() !== "websocket") return false;
+  if ((request.headers.get("sec-websocket-version") ?? "").trim() !== "13") return false;
+  return (request.headers.get("sec-websocket-key") ?? "").trim().length === 24; // base64 of 16 bytes
+}
+
+/**
  * The request-time upgrade decision, used as the synthetic route handler for
  * websocket descriptors. Validation and guards have already run (this is the
  * pipeline's "handler"); a successful upgrade hijacks the request and Bun
  * discards the returned Response, so the pipeline's Response contract is
- * satisfied with an unsent `204`. A non-upgrade request gets `426`.
+ * satisfied with an unsent `204`. A non-handshake request gets `426`; a
+ * well-formed handshake the server cannot complete gets `503`.
  */
 export function performUpgrade(hub: WebSocketHub, routeId: string, context: PipelineContext): Response {
   const server = UPGRADE_SERVERS.get(context.request) ?? hub.serverRef.current;
@@ -121,6 +136,9 @@ export function performUpgrade(hub: WebSocketHub, routeId: string, context: Pipe
     data: { [ROUTE_KEY]: routeId, [CONTEXT_KEY]: context },
   });
   if (upgraded) return new Response(null, { status: 204 });
+  if (isWebSocketHandshake(context.request)) {
+    return problem(503, { title: "Unavailable", status: 503, detail: "the receiving server could not complete the websocket handshake" });
+  }
   return problem(426, {
     title: "Upgrade Required",
     status: 426,

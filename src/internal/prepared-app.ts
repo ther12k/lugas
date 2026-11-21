@@ -456,11 +456,14 @@ export function prepareApp<TServices>(config: {
   // assets are not functions — they bypass the pipeline and carry no policy
   // headers, same truth as CORS and guards.
   if (config.secureHeaders !== undefined) {
-    const wrapHeaders = (handler: (request: Request) => Response | Promise<Response>): (request: Request) => Response | Promise<Response> => {
+    // The optional server argument is Bun's route-handler contract: it must
+    // survive every outer wrap, or websocket upgrades lose their receiving
+    // server (see compileWebSocketHandler's boundary note).
+    const wrapHeaders = (handler: (request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response>): ((request: Request, server?: Bun.Server<unknown>) => Promise<Response>) => {
       if (config.secureHeaders === undefined) return handler;
       const policy = config.secureHeaders;
-      return async (request: Request) => {
-        const response = await handler(request);
+      return async (request: Request, server?: Bun.Server<unknown>) => {
+        const response = await handler(request, server);
         return applySecureHeaders(policy, response);
       };
     };

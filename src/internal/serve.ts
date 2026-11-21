@@ -78,6 +78,12 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
             }
           }
           serverSockets.clear();
+          // This server must not outlive its role as the hub's fallback
+          // upgrade target: a stopped target turns unrecorded handshakes
+          // into failed upgrades for every other listener. Handshakes
+          // recorded per request (see websocket-hub) never consult it;
+          // only clear when this server owns the slot.
+          if (wsHub.serverRef.current === server) wsHub.serverRef.current = undefined;
         },
     onStartupFailure: (error) => {
       console.error(`[lugas] service initialization failed: ${error instanceof Error ? error.message : String(error)}`);
