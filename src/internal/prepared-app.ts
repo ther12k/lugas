@@ -459,7 +459,7 @@ export function prepareApp<TServices>(config: {
     // The optional server argument is Bun's route-handler contract: it must
     // survive every outer wrap, or websocket upgrades lose their receiving
     // server (see compileWebSocketHandler's boundary note).
-    const wrapHeaders = (handler: (request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response>): ((request: Request, server?: Bun.Server<unknown>) => Promise<Response>) => {
+    const wrapHeaders = (handler: (request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response>): ((request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response>) => {
       if (config.secureHeaders === undefined) return handler;
       const policy = config.secureHeaders;
       return async (request: Request, server?: Bun.Server<unknown>) => {
