@@ -80,10 +80,18 @@ independently (`7cafdf9`, `002dca0`). Findings and disposition:
   test fails (`304` over a slice); restored, it passes.
 - `bun test tests/lifecycle tests/websockets tests/compression tests/sse`:
   85 passed, 0 failed.
-- Full `bun run verify` in a clean clone with the starter set up and built
-  and strict flags (`LUGAS_REQUIRE_BROWSER=1 LUGAS_REQUIRE_STARTER=1`):
-  recorded in the follow-up docs commit alongside this revision, together
-  with the re-run package rehearsal binding to the final candidate commit.
+- Full `bun run verify` in a clean clone of the revised branch with the
+  starter set up and built and strict flags
+  (`LUGAS_REQUIRE_BROWSER=1 LUGAS_REQUIRE_STARTER=1`): exit 0 — 995
+  passed, 6 skipped, 0 failed across 1001 tests (the same six
+  platform-conditional skips as every prior round; the perf gate skips in
+  development mode without a benchmark archive). The declaration-emission
+  build in that clone caught one type-annotation error in the
+  `wrapHeaders` widening (`applySecureHeaders` is
+  `Response | Promise<Response>`); fixed in the next commit.
+- Package rehearsal re-run at the final candidate commit so the tarball
+  binds to it: 34/34 checks, `package-rehearsal.json` records
+  `packageSourceCommit` = `834c2c1`; publication still dry-run only.
 
 ## Boundaries and working tree
 
