@@ -195,14 +195,14 @@ export function prepareApp<TServices>(config: {
     // encoding-independent; a 304 never pays the encode cost) — both inside
     // logging/telemetry so those observe final statuses.
     let observed: (request: Request) => Response | Promise<Response> = inner;
+    const compressionPolicy = config.compression;
     if (config.etag !== undefined) {
       const etagPolicy = config.etag;
       const innerHandler = observed;
       observed = (request: Request): Response | Promise<Response> =>
-        Promise.resolve(innerHandler(request)).then((r) => applyEtag(etagPolicy, request, r));
+        Promise.resolve(innerHandler(request)).then((r) => applyEtag(etagPolicy, request, r, compressionPolicy));
     }
-    if (config.compression !== undefined) {
-      const compressionPolicy = config.compression;
+    if (compressionPolicy !== undefined) {
       const innerHandler = observed;
       observed = (request: Request): Response | Promise<Response> =>
         Promise.resolve(innerHandler(request)).then((r) => applyCompression(compressionPolicy, request, r));

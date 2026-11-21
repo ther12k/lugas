@@ -56,8 +56,9 @@ export default defineApp({
 - **Strong by default**: SHA-1 over the **uncompressed** body — encoding-independent, so the same validator matches a gzip-encoded response and a plain one, and survives proxy re-encoding.
 - **GET/HEAD only** (`If-None-Match` semantics); POST/PUT/PATCH carry no framework etag.
 - **`If-None-Match` per RFC 9110**: quoted tokens, comma lists, and `*` all match → **`304`** with the same `ETag` and no body.
+- **SSE is passed through without buffering**: `text/event-stream` responses do not get a framework-generated `ETag`, so events still arrive while the stream is open, even with both policies enabled.
 - **Application etags win** (fill-if-absent): a handler that sets its own `ETag` (version numbers, immutable-content hashes) is never overwritten.
-- A `304` short-circuits **before** compression — conditional hits never pay the encode cost.
+- A `304` short-circuits **before** compression — conditional hits never pay the encode cost. A framework-generated `304` carries the current `Cache-Control`, `Content-Location`, `Date`, `Expires`, and `Vary` headers when present, including `Vary: Accept-Encoding` when the full response would vary by encoding.
 
 ## How they compose
 

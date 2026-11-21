@@ -28,11 +28,10 @@ tags:
 | CORS middleware — shipped on `main` (M8-001, ADR-0022) | Available |
 | Server-Sent Events — shipped on `main` (M8-002, ADR-0023) | Available |
 | Structured request logging — shipped on `main` (M8-003, ADR-0024) | Available |
-| Drizzle ORM integration | Dispatched — [M9-001](https://github.com/ther12k/lugas/issues/357), ADR-0026/ODR-0010 |
 
-Planned capabilities are **not part of `v0.1.0-beta.1`** unless a later release explicitly documents them as available.
+Later batteries are listed below with their release status.
 
-## Planned first-party batteries
+## Shipped first-party batteries
 
 ### OpenAPI 3.1 and Scalar — shipped on `main` (M8-004, ADR-0025)
 
@@ -50,9 +49,9 @@ Delivered as the native response helper with the planned shape: correct `text/ev
 
 Delivered as the small sink contract and opt-in access log facility: structured JSON logs, scalar-only fields (redaction by construction), request IDs (`x-request-id`), method, path, route, response status, duration in milliseconds, stable diagnostic `LUGAS_LOG_001`, and configurable levels. Adapts cleanly to Pino, OpenTelemetry loggers, or any standard sink. Reference: [`docs/logging.md`](logging.md). Part of the attested `v0.1.0-beta.1` candidate regenerated on `3edaae9` (M8-GATE).
 
-### Drizzle ORM integration — dispatched (M9-001, ADR-0026)
+### Drizzle ORM integration — shipped in beta.3 (M9-001, ADR-0026)
 
-Accepted as a structural, application-owned service adapter under the new `lugas/drizzle` subpath: `drizzleService({ db, name, closeOnDispose? })` composes the existing `service()` lifecycle and typed `ctx.services` contract; handlers keep the exact Drizzle instance type. The adapter never imports drizzle-orm (structural validation with `LUGAS_DRIZZLE_001`/`002`), performs no implicit I/O or migrations, wraps no transactions, and stays driver-agnostic (integration tests on Bun SQLite). Reference: [ADR-0026](./okf/decisions/0026-drizzle-integration.md), dispatch [ODR-0010](./owner-decisions/m9-001-dispatch.md).
+Delivered as a structural, application-owned service adapter under the new `lugas/drizzle` subpath: `drizzleService({ db, name, closeOnDispose? })` composes the existing `service()` lifecycle and typed `ctx.services` contract; handlers keep the exact Drizzle instance type. The adapter never imports drizzle-orm (structural validation with `LUGAS_DRIZZLE_001`/`002`), performs no implicit I/O or migrations, wraps no transactions, and stays driver-agnostic (integration tests on Bun SQLite). Reference: [ADR-0026](./okf/decisions/0026-drizzle-integration.md), dispatch [ODR-0010](./owner-decisions/m9-001-dispatch.md).
 
 ## Post-beta.2 sequence (owner-directed, 2026-09-09)
 
@@ -67,7 +66,7 @@ Each battery requires its own issue, ADR, and ODR before implementation. **First
 
 ## Post-0.1.0 program: the application framework for Bun (ODR-0019, 2026-09-11)
 
-The owner adopted the post-0.1.0 product direction: Lugas turns Bun primitives and ecosystem tools into one explicit, typed, evidence-backed application model (pillars: Explicit, Typed, Integrated, Evidenced). The ODR-0018 stop-rule is **not** superseded — through 0.1.0, only design documentation and compatibility requirements may be prepared. On that basis [ADR-0035](okf/decisions/0035-application-fetch-interface.md) (Application Fetch Interface, `app.fetch`) is proposed with the owner's core pins: `fetch()` and `serve()` MUST execute the same route pipeline with equivalent HTTP semantics; the host owns lifecycle; standard `Request`/`Response` with `Request.url` authoritative (no prefix awareness, no `LugasRequest`); the WebSocket upgrade boundary is explicitly host-specific; bridge support claims require CI-generated per-capability evidence.
+The owner adopted the post-0.1.0 product direction: Lugas turns Bun primitives and ecosystem tools into one explicit, typed, evidence-backed application model (pillars: Explicit, Typed, Integrated, Evidenced). The ODR-0018 stop-rule is **not** superseded: work on this post-0.1.0 program is limited to design documentation and compatibility requirements until stabilization is complete. On that basis [ADR-0035](okf/decisions/0035-application-fetch-interface.md) (Application Fetch Interface, `app.fetch`) is proposed with the owner's core pins: `fetch()` and `serve()` MUST execute the same route pipeline with equivalent HTTP semantics; the host owns lifecycle; standard `Request`/`Response` with `Request.url` authoritative (no prefix awareness, no `LugasRequest`); the WebSocket upgrade boundary is explicitly host-specific; bridge support claims require CI-generated per-capability evidence.
 
 Intended post-0.1.0 sequence (milestone IDs assigned at dispatch): (1) fetch interface + TanStack Start and SvelteKit bridges + the certified compatibility matrix; (2) `create-lugas` (a second package on deployment-boundary grounds; ADR-0012 amendment) + official starters; (3) Bun-native structural service adapters (`sqlService`/`redisService`/`s3Service` — the ADR-0026 precedent: adapters, not backends, no wrapper API); (4) OpenTelemetry successor architecture (internal instrumentation surface investigated before any ADR; ADR-0032 non-goals amended explicitly). Reference: [ODR-0019](owner-decisions/post-010-program-adoption.md).
 
@@ -86,4 +85,8 @@ Once the planned integrations land, the intended defaults are:
 
 ## Release status
 
-The framework implementation, compatibility matrix, clean-room review, package rehearsal, and candidate attestation are complete through the M7-GATE (`ae4e29f`), M8-GATE (`3edaae9`), beta.3 release integration (`f3c72e6`), and the beta.4 attestation of the full M9 battery sequence (`373418f`). **`lugas@0.1.0-beta.2` is published under npm `beta`** (source commit `7f08b16`, npm README logo fix). **`lugas@0.1.0-beta.3` is published under npm `beta`** (source commit `f3c72e6`, tarball `11d7033e…`, gate PASS with zero blocking failures; carries the M9-001 Drizzle battery). **`lugas@0.1.0-beta.4` is published under npm `beta`** (source/attestation commit `373418f`, tarball `6c31b498…`, gate PASS with zero blocking failures; carries the M9-002–M9-008 batteries; the `v0.1.0-beta.4` tag and GitHub prerelease carry the attested assets). `latest` and `beta` both point at `0.1.0-beta.4` (owner dist-tag move completed 2026-09-11, ODR-0018). The owner's stop-rule is in effect (ODR-0018): through 0.1.0 stabilization, work is limited to fixes, documentation, evidence upkeep, and release engineering. The owner's re-attestation decision ([#330](https://github.com/ther12k/lugas/issues/330)) keeps the `2ed954d` set preserved unmodified as superseded history under [`releases/superseded/2ed954d/`](./releases/superseded/2ed954d/). npm publication, dist-tag moves, and new release candidates remain explicitly owner-controlled.
+- **Published:** npm's `beta` tag points to `0.1.0-beta.5`; `latest` points to `0.1.0-beta.4`. Beta.4 completed the M9 battery sequence; beta.5 corrected the packaged version stamp and consumer metadata. See the [changelog](../CHANGELOG.md) for release history.
+- **Beta.5 verification is closed:** [ODR-0021](owner-decisions/beta5-verification-discharge.md) records the quiet-host follow-up. The publication-time evidence still records the original deferral under ODR-0020; it is not rewritten.
+- **Next candidate: `0.1.0-beta.6`.** It is not yet attested or published. Qualify a clean committed source with a fresh package rehearsal, the quiet-host release performance gate, and the six-cell OS/Bun compatibility matrix. Beta.5 results do not qualify beta.6. Packet assembly, publication, and dist-tag moves remain owner-controlled.
+
+The [ODR-0018 stop-rule](owner-decisions/m9-gate-closure.md) remains in effect through 0.1.0 stabilization: fixes, documentation, evidence upkeep, and release engineering only. The owner's re-attestation decision ([#330](https://github.com/ther12k/lugas/issues/330)) keeps the `2ed954d` set preserved unmodified as superseded history under [`releases/superseded/2ed954d/`](./releases/superseded/2ed954d/).

@@ -54,12 +54,15 @@ function safeNotFound(
  */
 export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}): LugasServer {
   const userFetch = options.fetch;
+  const wsHub = prepared.websocketHub;
   const serverRef: { current: Bun.Server<unknown> | undefined } = { current: undefined };
   const lifecycle = startLifecycle({
     serverRef,
     services: prepared.lifecycleServices,
     serviceSlots: prepared.serviceSlots,
     options: options.shutdown,
+    // ADR-0028: close open sockets before draining; they do not finish on their own.
+    onStopAccepting: wsHub === null ? undefined : () => wsHub.closeAll(1001, "server shutting down"),
     onStartupFailure: (error) => {
       console.error(`[lugas] service initialization failed: ${error instanceof Error ? error.message : String(error)}`);
     },
@@ -130,7 +133,6 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
   // M9-003 (ADR-0028): one Bun websocket handler multiplexes every websocket
   // route through the upgrade data key. An application-supplied `websocket`
   // option would shadow the compiled routes, so the conflict fails closed.
-  const wsHub = prepared.websocketHub;
   if (wsHub !== null && options.websocket !== undefined) {
     throw diagnostic("LUGAS_WS_002", "serve(): custom 'websocket' option conflicts with declared websocket() routes", {
       hint: "websocket routes are served by Lugas; handle sockets in the route's message/open/close/drain handlers",
@@ -149,13 +151,7 @@ export function serveApp(prepared: PreparedApp, options: SafeServeOptions = {}):
 
   const lifecycleHandle: LugasLifecycle = {
     ready: lifecycle.ready,
-    shutdown: (reason?: string) => {
-      // ADR-0028 shutdown semantics: open sockets never "finish", so the
-      // drain contract for WebSockets is close-with-reason (1001 Going Away)
-      // before the deadline window; route close handlers run via Bun.
-      if (wsHub !== null) wsHub.closeAll(1001, "server shutting down");
-      return lifecycle.shutdown(reason);
-    },
+    shutdown: lifecycle.shutdown,
     // M9-006 (ADR-0032): track(task, request?) correlates detached work
     // with the request's telemetry state — request.end waits for it. The
     // drain still waits for every tracked task either way (ADR-0020).

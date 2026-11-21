@@ -94,7 +94,7 @@ Requests that reach the upgrade decision without WebSocket handshake headers ret
 
 ## Shutdown semantics
 
-Long-lived sockets never "finish", so the graceful-drain contract for WebSockets is **close with a reason**, not wait-forever. When `server.lugasLifecycle.shutdown()` runs, every open Lugas-tracked socket is closed with code `1001` (Going Away, reason `"server shutting down"`) before the drain deadline starts; your `close` handlers run, and clients see the close frame:
+Long-lived sockets never "finish", so the graceful-drain contract for WebSockets is **close with a reason**, not wait-forever. Calling `server.lugasLifecycle.shutdown()` or receiving `SIGINT`/`SIGTERM` with `shutdown.signals` enabled runs the same path. It closes every open Lugas-tracked socket with code `1001` (Going Away, reason `"server shutting down"`) before the drain deadline starts; your `close` handlers run, and clients see the close frame:
 
 ```ts
 const server = app.serve({ port: 3000, shutdown: { signals: true } });

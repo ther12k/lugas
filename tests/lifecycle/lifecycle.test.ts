@@ -334,32 +334,48 @@ describe("M7-004 service lifecycle", () => {
     expect(capture(() => service({ name: "x", value: 1, init: 42 as never }))).toBe("LUGAS_LIFECYCLE_001");
   });
 
-  test("opt-in SIGTERM drives the same shutdown path (subprocess)", async () => {
+  test.skipIf(process.platform === "win32")("SIGTERM closes WebSockets and disposes services once (subprocess)", async () => {
     const child = Bun.spawn([process.execPath, join(ROOT, "tests/lifecycle/fixtures/signal-child.ts")], {
       stdout: "pipe",
-      stderr: "pipe",
+      stderr: "inherit",
     });
-    const reader = (child.stdout as ReadableStream<Uint8Array>).getReader();
+    const reader = child.stdout.getReader();
     const decoder = new TextDecoder();
+    const deadline = setTimeout(() => child.kill("SIGKILL"), 5_000);
     let stdout = "";
-    const deadline = Date.now() + 15_000;
-    while (!stdout.includes("READY") && Date.now() < deadline) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      stdout += decoder.decode(chunk.value, { stream: true });
+    let ws: WebSocket | undefined;
+    try {
+      let ready: RegExpExecArray | null = null;
+      while (ready === null) {
+        const chunk = await reader.read();
+        if (chunk.done) throw new Error(`signal child exited before readiness: ${stdout}`);
+        stdout += decoder.decode(chunk.value, { stream: true });
+        ready = /^READY (\d+)\r?\n/m.exec(stdout);
+      }
+      const socket = new WebSocket(`ws://127.0.0.1:${ready[1]}/socket`);
+      ws = socket;
+      const closed = new Promise<CloseEvent>((resolve) => socket.addEventListener("close", resolve, { once: true }));
+      await new Promise<void>((resolve, reject) => {
+        socket.addEventListener("open", () => resolve(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("signal child WebSocket failed to open")), { once: true });
+      });
+
+      child.kill("SIGTERM");
+      const event = await closed;
+      expect({ code: event.code, reason: event.reason }).toEqual({ code: 1001, reason: "server shutting down" });
+      expect(await child.exited).toBe(0);
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        stdout += decoder.decode(chunk.value, { stream: true });
+      }
+      expect(stdout.split(/\r?\n/).filter((line) => line === "DISPOSED")).toHaveLength(1);
+    } finally {
+      clearTimeout(deadline);
+      ws?.close();
+      if (child.exitCode === null) child.kill("SIGKILL");
+      await child.exited;
+      reader.releaseLock();
     }
-    expect(stdout).toContain("READY");
-    child.kill("SIGTERM");
-    const exit = await child.exited;
-    const rest = decoder.decode((await reader.read()).value ?? new Uint8Array());
-    stdout += rest;
-    expect(exit).toBe(0);
-    expect(stdout).toContain("SIGNAL-OUTCOME");
-    const payload = JSON.parse(stdout.split("SIGNAL-OUTCOME")[1]!.trim()) as {
-      cooperated: boolean;
-      disposalCompleted: boolean;
-    };
-    expect(payload.cooperated).toBe(true);
-    expect(payload.disposalCompleted).toBe(true);
-  });
+  }, 10_000);
 });

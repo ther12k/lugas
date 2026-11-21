@@ -9,7 +9,7 @@
  * secureHeaders composition, and both config diagnostics.
  */
 import { describe, expect, test } from "bun:test";
-import { defineApp, json, route, sse } from "../../src/index";
+import { defineApp, json, route, sse, type SseWriter } from "../../src/index";
 import { createTestServer } from "../../src/testing";
 
 const REPEAT = "lugas compression battery. ".repeat(80); // >1024 bytes, compressible
@@ -154,6 +154,50 @@ describe("compression", () => {
 });
 
 describe("etag", () => {
+  test("SSE sends an event while the writer is open with both policies enabled", async () => {
+    let writer: SseWriter | undefined;
+    const server = createTestServer(defineApp({
+      etag: true,
+      compression: true,
+      routes: {
+        "/events": {
+          GET: route({
+            handler: () =>
+              sse({
+                start: (stream) => {
+                  writer = stream;
+                  stream.send({ data: "first" });
+                },
+              }),
+          }),
+        },
+      },
+    }));
+    try {
+      const res = await server.fetch("/events", {
+        headers: { "accept-encoding": "gzip", "if-none-match": "*" },
+        signal: AbortSignal.timeout(2_000),
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/event-stream");
+      expect(res.headers.get("etag")).toBeNull();
+      expect(res.headers.get("content-encoding")).toBeNull();
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let frame = "";
+      while (!frame.endsWith("\n\n")) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        frame += decoder.decode(value, { stream: true });
+      }
+      expect(frame).toBe("data: first\n\n");
+    } finally {
+      writer?.close();
+      await server.stop();
+    }
+  });
+
   test("strong etag on GET; stable across encodings; If-None-Match → 304 empty", async () => {
     const server = createTestServer(app({ etag: true, compression: true }));
     try {
@@ -176,6 +220,75 @@ describe("etag", () => {
 
       const star = await server.fetch("/data", { headers: { "if-none-match": "*" } });
       expect(star.status).toBe(304);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("304 preserves current cache metadata without copying body headers", async () => {
+    let maxAge = 60;
+    const server = createTestServer(defineApp({
+      etag: true,
+      compression: true,
+      routes: {
+        "/data": {
+          GET: route({ handler: () => new Response(REPEAT, { headers: {
+            "cache-control": `max-age=${maxAge}`,
+            "content-location": "/data",
+            "content-type": "text/plain",
+            "content-length": String(REPEAT.length),
+            date: "Wed, 21 Oct 2015 07:28:00 GMT",
+            expires: "Wed, 21 Oct 2015 07:30:00 GMT",
+            vary: "Accept-Language",
+          } }) }),
+        },
+      },
+    }));
+    try {
+      const first = await server.fetch("/data", { headers: { "accept-encoding": "identity" } });
+      expect(first.status).toBe(200);
+      expect(first.headers.get("cache-control")).toBe("max-age=60");
+      expect(first.headers.get("vary")).toBe("Accept-Language, Accept-Encoding");
+      await first.text();
+
+      maxAge = 120;
+      const conditional = await server.fetch("/data", {
+        headers: { "accept-encoding": "gzip", "if-none-match": first.headers.get("etag")! },
+      });
+      expect(conditional.status).toBe(304);
+      expect(conditional.headers.get("cache-control")).toBe("max-age=120");
+      for (const header of ["etag", "vary", "content-location", "date", "expires"]) {
+        expect(conditional.headers.get(header)).toBe(first.headers.get(header));
+      }
+      expect(conditional.headers.get("content-type")).toBeNull();
+      expect(conditional.headers.get("content-length")).toBeNull();
+      expect(conditional.headers.get("content-encoding")).toBeNull();
+      expect(await conditional.text()).toBe("");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test.each([
+    ["compression is disabled", false, "text/plain", "Accept-Language"],
+    ["the type is not compressible", true, "application/octet-stream", "Accept-Language"],
+    ["Accept-Encoding is already present", true, "text/plain", "Accept-Language, accept-encoding"],
+    ["Vary is a wildcard", true, "text/plain", "*"],
+  ] as const)("304 preserves Vary when %s", async (_reason, compression, contentType, vary) => {
+    const server = createTestServer(defineApp({
+      etag: true,
+      ...(compression ? { compression: true } : {}),
+      routes: {
+        "/data": { GET: route({ handler: () => new Response("unchanged", { headers: { "content-type": contentType, vary } }) }) },
+      },
+    }));
+    try {
+      const full = await server.fetch("/data");
+      expect(full.headers.get("vary")).toBe(vary);
+      await full.text();
+      const conditional = await server.fetch("/data", { headers: { "if-none-match": full.headers.get("etag")! } });
+      expect(conditional.status).toBe(304);
+      expect(conditional.headers.get("vary")).toBe(vary);
     } finally {
       await server.stop();
     }

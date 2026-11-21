@@ -69,6 +69,7 @@ export type CoordinatorInput = {
   /** Slot map handlers read from; entries are filled as each init resolves. */
   readonly serviceSlots: Record<string, unknown>;
   readonly options: ShutdownOptions | undefined;
+  readonly onStopAccepting: (() => void) | undefined;
   readonly onStartupFailure: (error: unknown) => void;
 };
 
@@ -119,7 +120,10 @@ export function startLifecycle(input: CoordinatorInput): LugasLifecycle {
 
     shutdown(_reason?: string): Promise<ShutdownOutcome> {
       if (shutdownPromise !== undefined) return shutdownPromise;
-      shutdownPromise = (async (): Promise<ShutdownOutcome> => {
+      // Reserve the shared promise before transport close callbacks can re-enter shutdown.
+      const shutdown = Promise.withResolvers<ShutdownOutcome>();
+      shutdownPromise = shutdown.promise;
+      void (async (): Promise<ShutdownOutcome> => {
         // Opt-in signal listeners ride the same path; remove them at shutdown.
         if (input.options?.signals === true) {
           process.off("SIGINT", signalHandler);
@@ -127,6 +131,7 @@ export function startLifecycle(input: CoordinatorInput): LugasLifecycle {
         }
         // Phase 1: stop accepting new work.
         input.serverRef.current?.stop();
+        input.onStopAccepting?.();
         const connectionsClosed = true;
 
         // Never dispose while initialization is still in flight; a startup
@@ -180,7 +185,7 @@ export function startLifecycle(input: CoordinatorInput): LugasLifecycle {
           disposalFailures: Object.freeze(disposalFailures),
         });
         return outcome;
-      })();
+      })().then(shutdown.resolve, shutdown.reject);
       return shutdownPromise;
     },
   };

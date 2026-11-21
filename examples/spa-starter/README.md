@@ -28,8 +28,9 @@ bun run start:built
 
 `bun run verify` runs the whole chain (setup → build → typecheck → tests →
 distribution-mode parity). The tests skip when the starter is not set up;
-`LUGAS_REQUIRE_STARTER=1` turns that skip into an explicit failure (CI
-posture).
+`LUGAS_REQUIRE_STARTER=1` turns that skip into an explicit failure. The
+browser smoke also needs a Chromium-family executable; set
+`LUGAS_REQUIRE_BROWSER=1` to fail rather than skip when none is available.
 
 ## Your first feature: a task list
 
@@ -80,11 +81,12 @@ automatically on same-origin requests (log in via `POST /api/login` first).
 ```ts
 type App = ReturnType<typeof createApp>;
 type API = AppContract<App>;
-const api = createClient<API>({ baseUrl: "" });   // same-origin, no header plumbing
+const api = createClient<API>({ baseUrl: window.location.origin });
 ```
 
-Parameterized routes keep their `:pattern` key at the call site — actual
-values travel in the `params` slot, typed against the route:
+`window.location.origin` provides the absolute, same-origin URL the client
+requires. Parameterized routes keep their `:pattern` key at the call site —
+actual values travel in the `params` slot, typed against the route:
 
 ```ts
 await api.post("/api/tasks/:id/complete", { params: { id: task.id } });

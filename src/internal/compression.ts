@@ -51,8 +51,13 @@ const DEFAULT_TYPES: ReadonlyArray<string> = [
   "image/svg+xml",
 ];
 
-function isCompressibleType(contentType: string, types: ReadonlySet<string>): boolean {
-  const mediaType = contentType.split(";")[0]!.trim().toLowerCase();
+const SSE_MEDIA_TYPE = "text/event-stream";
+
+function mediaTypeOf(contentType: string): string {
+  return contentType.split(";")[0]!.trim().toLowerCase();
+}
+
+function isCompressibleType(mediaType: string, types: ReadonlySet<string>): boolean {
   if (types.has(mediaType)) return true;
   return mediaType.startsWith("text/") || (mediaType.startsWith("application/") && mediaType.endsWith("+json"));
 }
@@ -132,6 +137,24 @@ function parseAcceptEncoding(header: string | null): ReadonlyArray<EncodingPrefe
 
 const BODYLESS_STATUSES = new Set([204, 205, 304]);
 
+function variesByEncoding(compiled: CompiledCompression, response: Response): boolean {
+  if (BODYLESS_STATUSES.has(response.status)) return false;
+  if (response.headers.has("content-encoding") || response.headers.has("content-range")) return false;
+  const contentType = response.headers.get("content-type");
+  if (contentType === null) return false;
+  const mediaType = mediaTypeOf(contentType);
+  return mediaType !== SSE_MEDIA_TYPE && isCompressibleType(mediaType, compiled.types);
+}
+
+function addEncodingVary(headers: Headers): void {
+  const vary = headers.get("vary");
+  if (vary?.split(",").some((field) => {
+    const name = field.trim().toLowerCase();
+    return name === "*" || name === "accept-encoding";
+  })) return;
+  headers.append("vary", "Accept-Encoding");
+}
+
 function encode(encoding: CompressionEncoding, bytes: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
   // Bun's gzip/deflate return a fresh buffer over a plain ArrayBuffer; the
   // default ArrayBufferLike type is wider than the runtime fact, and DOM-lib
@@ -148,19 +171,12 @@ export async function applyCompression(
   request: Request,
   response: Response,
 ): Promise<Response> {
-  if (BODYLESS_STATUSES.has(response.status)) return response;
-  if (response.headers.has("content-encoding")) return response;
-  const contentType = response.headers.get("content-type");
-  if (contentType === null) return response;
-  const mediaType = contentType.split(";")[0]!.trim().toLowerCase();
-  if (mediaType === "text/event-stream") return response; // SSE must not be buffered
-  if (!isCompressibleType(contentType, compiled.types)) return response;
-  if (response.headers.has("content-range")) return response;
+  if (!variesByEncoding(compiled, response)) return response;
 
   // Vary always applies to compressible responses: the encoding variant
   // depends on the request header whether or not this response compressed.
   const headers = new Headers(response.headers);
-  headers.append("vary", "Accept-Encoding");
+  addEncodingVary(headers);
 
   if (response.body === null) {
     return new Response(null, { status: response.status, statusText: response.statusText, headers });
@@ -217,22 +233,28 @@ function ifNoneMatchMatches(header: string | null, etag: string): boolean {
   });
 }
 
+// RFC 9110 §15.4.5 and RFC 9111 §4.3.4: update caches with current metadata,
+// not the discarded body's framing headers. ETag is generated below.
+const NOT_MODIFIED_HEADERS = ["cache-control", "content-location", "date", "expires", "vary"] as const;
+
 /**
  * Applies the etag policy: computes a strong (or configured-weak) validator
  * over the uncompressed body of GET/HEAD responses and short-circuits a
- * matching If-None-Match with 304. Bodies are buffered once — the same cost
- * compression would pay — and skipped responses pass through untouched.
+ * matching If-None-Match with 304. Skipped responses pass through untouched.
  */
 export async function applyEtag(
   compiled: CompiledEtag,
   request: Request,
   response: Response,
+  compression?: CompiledCompression,
 ): Promise<Response> {
   const method = request.method.toUpperCase();
   if (method !== "GET" && method !== "HEAD") return response;
   if (BODYLESS_STATUSES.has(response.status)) return response;
   if (response.headers.has("etag")) return response; // application validator wins
   if (response.body === null) return response;
+  const contentType = response.headers.get("content-type");
+  if (contentType !== null && mediaTypeOf(contentType) === SSE_MEDIA_TYPE) return response;
 
   let bytes: Uint8Array<ArrayBuffer>;
   try {
@@ -246,7 +268,13 @@ export async function applyEtag(
 
   if (ifNoneMatchMatches(request.headers.get("if-none-match"), etag)) {
     const headers = new Headers();
+    for (const name of NOT_MODIFIED_HEADERS) {
+      const value = response.headers.get(name);
+      if (value !== null) headers.set(name, value);
+    }
     headers.set("etag", etag);
+    // Compression skips the 304 itself, but caches still need its variant key.
+    if (compression !== undefined && variesByEncoding(compression, response)) addEncodingVary(headers);
     return new Response(null, { status: 304, headers });
   }
   const headers = new Headers(response.headers);
