@@ -53,9 +53,14 @@ encoding-shared-validator question remains (above).
   a 2s race guard that would report `HUNG` against the unbounded code.
 - `bun test tests/telemetry tests/logging tests/lifecycle tests/openapi tests/sse`:
   79 passed, 0 failed. `tsc --noEmit`: zero errors under `src/`.
-- Full `bun run verify` (strict starter/browser flags) in a clean clone of
-  the revised branch, plus the re-run package rehearsal binding to the
-  final candidate commit: recorded in the follow-up docs commit.
+- Full `bun run verify` in a clean clone of `9eddaab` with the starter set
+  up and built and strict flags
+  (`LUGAS_REQUIRE_BROWSER=1 LUGAS_REQUIRE_STARTER=1`): exit 0 — 1001
+  passed, 6 skipped, 0 failed across 1007 tests (the same six
+  platform-conditional skips as every prior round; the development
+  perf-gate skip without a benchmark archive is expected).
+- Package rehearsal re-run at `9eddaab`: 34/34 checks,
+  `packageSourceCommit` = `9eddaab`; publication still dry-run only.
 
 ## Boundaries and working tree
 
