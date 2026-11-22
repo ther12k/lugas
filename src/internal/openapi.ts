@@ -108,20 +108,46 @@ export function compileOpenApiConfig(config: OpenApiConfig): CompiledOpenApi {
   });
 }
 
+/**
+ * Converts a Standard-Schema validator into a JSON Schema for documentation.
+ * Two vendor shapes are honored: the converter object (`~standard.jsonSchema`
+ * with `input()`/`output()` — zod 4, and the shape the standard defines) and
+ * the earlier proposal form (a function returning the schema or a
+ * `{ jsonSchema, dialect }` wrapper). All documented slots are request-side,
+ * so `input()` — the schema of what a client sends — is preferred.
+ *
+ * Document generation is synchronous; a vendor whose converter is async
+ * returns a Promise here, which degrades to the presence-only fallback
+ * rather than blocking. A converter that throws is never a request failure.
+ */
 function extractJsonSchema(schema: unknown): Record<string, unknown> | null {
   if (typeof schema !== "object" || schema === null) return null;
   const standard = (schema as { "~standard"?: { jsonSchema?: unknown } })["~standard"];
-  if (typeof standard === "object" && standard !== null && typeof standard.jsonSchema === "function") {
-    try {
-      const result = standard.jsonSchema();
-      if (typeof result === "object" && result !== null) {
-        return result as Record<string, unknown>;
-      }
-    } catch {
+  if (typeof standard !== "object" || standard === null) return null;
+  let candidate: unknown;
+  try {
+    if (typeof standard.jsonSchema === "function") {
+      candidate = standard.jsonSchema();
+    } else if (typeof standard.jsonSchema === "object" && standard.jsonSchema !== null) {
+      const converters = standard.jsonSchema as { input?: unknown; output?: unknown };
+      const converter = typeof converters.input === "function" ? converters.input : typeof converters.output === "function" ? converters.output : undefined;
+      if (converter === undefined) return null;
+      candidate = (converter as () => unknown)();
+    } else {
       return null;
     }
+  } catch {
+    return null;
   }
-  return null;
+  if (typeof candidate !== "object" || candidate === null) return null;
+  // Unwrap the proposal's { jsonSchema, dialect } envelope when present —
+  // the dialect marker distinguishes it from a schema that merely has a
+  // top-level "jsonSchema" property.
+  const envelope = candidate as { jsonSchema?: unknown; dialect?: unknown };
+  if ("dialect" in envelope && typeof envelope.jsonSchema === "object" && envelope.jsonSchema !== null) {
+    return envelope.jsonSchema as Record<string, unknown>;
+  }
+  return candidate as Record<string, unknown>;
 }
 
 /** Standard Problem Details schema component (RFC 9457) */

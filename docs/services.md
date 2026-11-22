@@ -98,12 +98,14 @@ export default defineApp({
 `server.lugasLifecycle.shutdown()` is idempotent and runs three phases:
 
 1. **Stop accepting** new connections.
-2. **Drain** in-flight requests and work registered through `track()` — bounded by a deadline (`serve({ shutdown: { drainDeadlineMs } })`, default 10 seconds).
+2. **Drain** in-flight requests and work registered through `track()`.
 3. **Dispose** services in reverse declaration order.
 
 Three outcomes are reported distinctly (`connectionsClosed`, `trackedWorkCompleted`, `disposalCompleted`, plus `disposalFailures`) — the outcome object is honest rather than boolean.
 
-**Deadline invariant:** when the deadline expires with work still running, the outcome is explicitly unsuccessful (`cooperated: false`, `deadlineExpired: true`); connections are force-closed but services that may still be in use are **not disposed** — continuing work observes an intact resource, never fabricated success. Work you detach from `track()` is yours.
+**One budget over the whole shutdown** (`serve({ shutdown: { drainDeadlineMs } })`, default 10 seconds): the deadline covers waiting for a still-running service `init` to settle, the drain, and disposal. A phase that never settles still returns — `shutdown()` never hangs indefinitely.
+
+**Deadline invariant:** when the deadline expires with work still running, the outcome is explicitly unsuccessful (`cooperated: false`, `deadlineExpired: true`); connections are force-closed but services that may still be in use are **not disposed** — continuing work observes an intact resource, never fabricated success. The same applies to a never-settling initializer (a half-initialized set is not honestly disposable) and to a never-settling `dispose` (it is reported in `disposalFailures`, and the services after it are recorded as not attempted rather than falsely disposed). Work you detach from `track()` is yours.
 
 ```ts
 const server = app.serve({

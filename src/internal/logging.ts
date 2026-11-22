@@ -100,7 +100,14 @@ function defaultSink(entry: LugasLogEntry): void {
 
 function emit(logging: CompiledLogging, level: LugasLogLevel, message: string, fields: LugasLogFields): void {
   if (LEVEL_ORDER[level] < LEVEL_ORDER[logging.level]) return;
-  logging.sink({ time: new Date().toISOString(), level, message, fields });
+  // Observability must not become an availability dependency: a throwing
+  // sink is reported to stderr once and dropped — the wrapped request keeps
+  // its otherwise valid response (ADR-0024 isolation).
+  try {
+    logging.sink({ time: new Date().toISOString(), level, message, fields });
+  } catch (error) {
+    console.error(`[lugas] logging sink failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**

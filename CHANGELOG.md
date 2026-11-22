@@ -13,6 +13,11 @@ Changes intended for `0.1.0-beta.6`. The candidate is not yet attested or publis
 
 ### Fixed
 
+- OpenAPI schema documentation reads the Standard JSON Schema converter object (`~standard.jsonSchema` with `input()`/`output()` — the shape zod 4 and the standard define) in addition to the earlier proposal function form; real zod schemas no longer degrade to presence-only documentation (verified against zod 4.4.3, not only hand-built mocks).
+- `server.lugasLifecycle.shutdown()` is bounded by one budget over the whole sequence — waiting for a still-running service `init`, draining, and disposal. A never-settling initializer or `dispose` no longer hangs shutdown forever; the outcome reports the expiry honestly and never marks un-attempted services as disposed.
+- Throwing telemetry callbacks (`onRequestStart`/`onRequestEnd`) and throwing logging sinks are isolated: the failure is reported to stderr once and the wrapped request keeps its otherwise valid response instead of a 500.
+- The SSE backpressure recipe closes the writer explicitly on both producer failure and terminal completion instead of leaving a detached rejection unhandled.
+- The guards documentation now states the implemented ordering (guards run after all validation slots, including body) instead of claiming guards precede body validation.
 - The built SPA starter uses the browser's origin for its typed client, so the app mounts and can submit tasks on both the root and deep links.
 - ETag generation no longer buffers server-sent events; the first event can arrive while the stream is still open.
 - Opt-in `SIGINT` and `SIGTERM` handling now closes Lugas-managed WebSockets with code `1001` before draining, just like explicit shutdown.

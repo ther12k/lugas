@@ -102,10 +102,24 @@ function errorClassFor(status: number): TelemetryErrorClass | undefined {
   return "handler";
 }
 
+/**
+ * Observability must not become an availability dependency: a throwing
+ * callback is reported to stderr once and dropped — the wrapped request
+ * continues with its otherwise valid response (ADR-0032 isolation).
+ */
+function safeEmit<T>(callback: ((event: T) => void) | undefined, event: T): void {
+  if (callback === undefined) return;
+  try {
+    callback(event);
+  } catch (error) {
+    console.error(`[lugas] telemetry callback failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 function tryFinish(compiled: CompiledTelemetry, state: TelemetryRequestState): void {
   if (state.ended || state.response === undefined || state.tracked > 0) return;
   state.ended = true;
-  compiled.onRequestEnd?.({
+  safeEmit(compiled.onRequestEnd, {
     kind: "request.end",
     method: state.method,
     path: state.path,
@@ -158,11 +172,11 @@ export function wrapTelemetryHandler(
       ended: false,
     };
     registry.set(request, state);
-    compiled.onRequestStart?.({
+    safeEmit(compiled.onRequestStart, {
       kind: "request.start",
       method: state.method,
       path: state.path,
-      route: state.route,
+      route,
       requestId,
     });
     return Promise.resolve(handler(request, server)).then((response) => {
@@ -206,7 +220,7 @@ export function wrapTelemetryFallback(
       ended: false,
     };
     registry.set(request, state);
-    compiled.onRequestStart?.({
+    safeEmit(compiled.onRequestStart, {
       kind: "request.start",
       method: state.method,
       path: state.path,

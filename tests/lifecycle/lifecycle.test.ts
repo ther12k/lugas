@@ -321,6 +321,71 @@ describe("M7-004 service lifecycle", () => {
     }
   });
 
+  test("shutdown bounds a never-settling initializer and reports the expiry honestly", async () => {
+    const never = new Promise<never>(() => {});
+    const app = defineApp({
+      services: { stuck: service({ name: "stuck", value: 1, init: () => never }) },
+      routes: { "/ok": { GET: route({ handler: () => json(200, { fine: true }) }) } },
+    });
+    const server: LugasServer = app.serve({ port: 0, shutdown: { drainDeadlineMs: 150 } });
+    try {
+      // Pre-fix, shutdown() awaited the initializer before its deadline clock
+      // started and never returned. The race guard fails the test fast if the
+      // budget is not honored.
+      const outcome = await Promise.race([
+        server.lugasLifecycle.shutdown(),
+        Bun.sleep(2_000).then(() => "HUNG" as const),
+      ]);
+      expect(outcome).not.toBe("HUNG");
+      const o = outcome as ShutdownOutcome;
+      expect(o.deadlineExpired).toBe(true);
+      expect(o.disposalCompleted).toBe(false); // a half-initialized set is not honestly disposable
+      expect(o.cooperated).toBe(false);
+    } finally {
+      await server.stop(true);
+    }
+  });
+
+  test("shutdown bounds a never-settling disposer; remaining services are reported, not disposed", async () => {
+    const never = new Promise<never>(() => {});
+    const disposed: string[] = [];
+    const app = defineApp({
+      services: {
+        // Declaration order first, healthy — reverse disposal reaches it last.
+        healthy: service({
+          name: "healthy",
+          value: 1,
+          dispose: () => {
+            disposed.push("healthy");
+          },
+        }),
+        stuck: service({
+          name: "stuck",
+          value: 1,
+          dispose: () => never,
+        }),
+      },
+      routes: { "/ok": { GET: route({ handler: () => json(200, { fine: true }) }) } },
+    });
+    const server: LugasServer = app.serve({ port: 0, shutdown: { drainDeadlineMs: 150 } });
+    try {
+      const outcome = await Promise.race([
+        server.lugasLifecycle.shutdown(),
+        Bun.sleep(2_000).then(() => "HUNG" as const),
+      ]);
+      expect(outcome).not.toBe("HUNG");
+      const o = outcome as ShutdownOutcome;
+      expect(o.deadlineExpired).toBe(true);
+      expect(o.disposalCompleted).toBe(false);
+      expect(o.trackedWorkCompleted).toBe(true); // the drain itself finished
+      expect(o.disposalFailures).toContainEqual({ service: "stuck", message: "dispose did not settle within the shutdown deadline" });
+      expect(o.disposalFailures).toContainEqual({ service: "healthy", message: "dispose not attempted: shutdown deadline expired" });
+      expect(disposed).toEqual([]); // never falsely reported as disposed
+    } finally {
+      await server.stop(true);
+    }
+  });
+
   test("service() rejects invalid descriptors with a stable diagnostic", () => {
     const capture = (run: () => unknown): string => {
       try {

@@ -58,6 +58,32 @@ function pendingRequestCount(server: Bun.Server<unknown> | undefined): number {
   return typeof count === "number" ? count : 0;
 }
 
+/**
+ * Races `promise` against an absolute deadline timestamp. On timeout the
+ * result is `onDeadline()` and the underlying operation is left running —
+ * a race only stops waiting, it does not terminate work; the process
+ * supervisor remains the final boundary. The timer is cleared when the
+ * promise settles first, so no dangling timer outlives the race.
+ */
+function raceDeadline<T>(promise: PromiseLike<T>, deadline: number, onDeadline: () => T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    const timer = setTimeout(() => resolve(onDeadline()), Math.max(0, deadline - Date.now()));
+    const settle = (value: T): void => {
+      clearTimeout(timer);
+      resolve(value);
+    };
+    Promise.resolve(promise).then(settle, (error: unknown) => {
+      // Both call sites pre-map rejections into values; reaching here means
+      // that mapping has a bug. Resolve the race (never leave it pending)
+      // and re-surface the error asynchronously so it is not swallowed.
+      settle(onDeadline());
+      queueMicrotask(() => {
+        throw error;
+      });
+    });
+  });
+}
+
 export type CoordinatorInput = {
   /**
    * Mutable reference to the Bun server. `serveApp()` fills it immediately
@@ -134,12 +160,36 @@ export function startLifecycle(input: CoordinatorInput): LugasLifecycle {
         input.onStopAccepting?.();
         const connectionsClosed = true;
 
+        // The deadline is ONE budget over the whole shutdown: waiting for
+        // initialization, draining, and disposal. A hanging initializer or
+        // disposer must still produce an honest outcome instead of a
+        // shutdown that never returns (ADR-0020 deadline invariant).
+        const deadline = Date.now() + deadlineMs;
+
         // Never dispose while initialization is still in flight; a startup
         // failure surfaces through `ready` (and its rollback disposal).
-        await initPromise.then(() => undefined, () => undefined);
+        const initSettled = await raceDeadline(
+          initPromise.then(() => true, () => true),
+          deadline,
+          () => false,
+        );
+        if (!initSettled) {
+          // Initialization never settled within the budget: force-close and
+          // report — a half-initialized service set cannot be disposed
+          // honestly (which services finished is unknowable).
+          input.serverRef.current?.stop(true);
+          outcome = Object.freeze({
+            connectionsClosed,
+            trackedWorkCompleted: false,
+            disposalCompleted: false,
+            cooperated: false,
+            deadlineExpired: true,
+            disposalFailures: [],
+          });
+          return outcome;
+        }
 
         // Phase 2: drain in-flight requests and tracked tasks under the deadline.
-        const deadline = Date.now() + deadlineMs;
         let drained = false;
         for (;;) {
           const requestsDone = pendingRequestCount(input.serverRef.current) === 0;
@@ -166,22 +216,41 @@ export function startLifecycle(input: CoordinatorInput): LugasLifecycle {
           return outcome;
         }
 
-        // Phase 3: reverse-order disposal; report every failure.
+        // Phase 3: reverse-order disposal; report every failure. Each
+        // dispose runs against whatever budget remains; one that never
+        // settles is reported, remaining services are recorded as not
+        // disposed, and the outcome stays honest.
         const disposalFailures: Array<{ service: string; message: string }> = [];
+        let disposalExpired = false;
         for (let i = initialized.length - 1; i >= 0; i -= 1) {
           const svc = initialized[i]!;
-          try {
-            await svc.dispose?.(svc.value);
-          } catch (error) {
-            disposalFailures.push({ service: svc.name, message: error instanceof Error ? error.message : String(error) });
+          if (disposalExpired) {
+            disposalFailures.push({ service: svc.name, message: "dispose not attempted: shutdown deadline expired" });
+            continue;
           }
+          const result = await raceDeadline(
+            Promise.resolve(svc.dispose?.(svc.value)).then(
+              () => ({ expired: false, failure: null as { service: string; message: string } | null }),
+              (error: unknown) => ({
+                expired: false,
+                failure: { service: svc.name, message: error instanceof Error ? error.message : String(error) },
+              }),
+            ),
+            deadline,
+            () => ({
+              expired: true,
+              failure: { service: svc.name, message: "dispose did not settle within the shutdown deadline" },
+            }),
+          );
+          if (result.failure !== null) disposalFailures.push(result.failure);
+          if (result.expired) disposalExpired = true;
         }
         outcome = Object.freeze({
           connectionsClosed,
           trackedWorkCompleted: true,
-          disposalCompleted: true,
-          cooperated: true,
-          deadlineExpired: false,
+          disposalCompleted: !disposalExpired,
+          cooperated: !disposalExpired,
+          deadlineExpired: disposalExpired,
           disposalFailures: Object.freeze(disposalFailures),
         });
         return outcome;

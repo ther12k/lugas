@@ -2,6 +2,7 @@
  * M8-004 — OpenAPI 3.1 generation and Scalar reference UI tests (ADR-0025).
  */
 import { afterAll, describe, expect, test } from "bun:test";
+import { z } from "zod";
 import { defineApp, json, route } from "../../src";
 
 const servers: Array<ReturnType<ReturnType<typeof defineApp>["serve"]>> = [];
@@ -161,5 +162,34 @@ describe("M8-004 OpenAPI generation and serving", () => {
     expect(queryParam).toBeDefined();
     expect(queryParam.name).toBe("query");
     expect(queryParam.description).toBe("Declared query parameters");
+  });
+
+  test("real zod 4 schemas document through the ~standard.jsonSchema converter object", async () => {
+    // zod 4 exposes `~standard.jsonSchema` as { input(), output() } — the
+    // object shape the standard defines, not a function. Hand-built mocks
+    // with the function form previously left this path untested, and the
+    // flagship validator silently degraded to presence-only documentation.
+    const { url } = start({
+      openapi: { document: { title: "Zod Test", version: "1.0.0" } },
+      routes: {
+        "/tasks": {
+          POST: route({
+            body: z.object({ title: z.string(), done: z.boolean().optional() }),
+            query: z.object({ page: z.number().optional() }),
+            handler: () => json(201, { ok: true }),
+          }),
+        },
+      },
+    });
+
+    const doc = await (await fetch(`${url}/openapi.json`)).json() as Record<string, any>;
+    const bodySchema = doc.paths["/tasks"].post.requestBody.content["application/json"].schema;
+    expect(bodySchema.type).toBe("object");
+    expect(bodySchema.properties.title.type).toBe("string");
+    expect(bodySchema.properties.done.type).toBe("boolean");
+
+    const pageParam = doc.paths["/tasks"].post.parameters.find((p: any) => p.in === "query" && p.name === "page");
+    expect(pageParam).toBeDefined(); // not the presence-only "query" fallback
+    expect(pageParam.schema.type).toBe("number");
   });
 });
