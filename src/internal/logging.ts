@@ -100,21 +100,31 @@ function defaultSink(entry: LugasLogEntry): void {
 
 function emit(logging: CompiledLogging, level: LugasLogLevel, message: string, fields: LugasLogFields): void {
   if (LEVEL_ORDER[level] < LEVEL_ORDER[logging.level]) return;
-  logging.sink({ time: new Date().toISOString(), level, message, fields });
+  // Observability must not become an availability dependency: a throwing
+  // sink is reported to stderr once and dropped — the wrapped request keeps
+  // its otherwise valid response (ADR-0024 isolation).
+  try {
+    logging.sink({ time: new Date().toISOString(), level, message, fields });
+  } catch (error) {
+    console.error(`[lugas] logging sink failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**
  * Outermost-per-request concern after CORS: times the wrapped pipeline
  * (traffic gate and error policy included), attaches `x-request-id` when
  * enabled, and emits the access entry. Never alters response semantics.
+ * The optional server argument is Bun's route-handler contract and must
+ * reach the wrapped handler (websocket upgrades resolve the receiving
+ * server through it); fallbacks use `wrapLogFallback` instead.
  */
 export function wrapLogHandler(
   logging: CompiledLogging,
   route: string,
-  handler: (request: Request) => Response | Promise<Response>,
-): (request: Request) => Response | Promise<Response> {
+  handler: (request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response>,
+): (request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response> {
   if (!logging.access && !logging.requestIds) return handler;
-  return (request: Request): Response | Promise<Response> => {
+  return (request: Request, server?: Bun.Server<unknown>): Response | Promise<Response> => {
     const started = performance.now();
     const finish = (status: number, requestId: string | undefined): void => {
       if (!logging.access) return;
@@ -127,7 +137,7 @@ export function wrapLogHandler(
         ...(requestId !== undefined ? { requestId } : {}),
       });
     };
-    return Promise.resolve(handler(request)).then((response) => {
+    return Promise.resolve(handler(request, server)).then((response) => {
       if (response instanceof Response) {
         // One identity source (ADR-0032): reuse an id a wrapper closer to
         // the handler already stamped (telemetry), else mint one here.

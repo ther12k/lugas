@@ -300,3 +300,44 @@ describe("serve-time conflict", () => {
     }
   });
 });
+
+describe("performUpgrade error semantics", () => {
+  const hub = wsHubModule.createWebSocketHub();
+  // upgrade() collapses "not a handshake" and "handshake failed
+  // server-side" into one false — the request's own RFC 6455 handshake
+  // shape decides which truth the client gets (the
+  // listener-stopping-mid-flight case).
+  hub.serverRef.current = { upgrade: () => false } as unknown as Bun.Server<unknown>;
+  const context = (request: Request): Parameters<typeof wsHubModule.performUpgrade>[2] =>
+    ({ request }) as Parameters<typeof wsHubModule.performUpgrade>[2];
+  const handshake = (overrides: Record<string, string> = {}, method = "GET"): Request =>
+    new Request("http://localhost/ws", {
+      method,
+      headers: {
+        upgrade: "websocket",
+        "sec-websocket-version": "13",
+        "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==", // 24 chars: base64 of 16 bytes
+        ...overrides,
+      },
+    });
+
+  test("426 for a non-handshake request, carrying the mandatory Upgrade header", () => {
+    const plain = wsHubModule.performUpgrade(hub, "GET /ws", context(new Request("http://localhost/ws")));
+    expect(plain.status).toBe(426); // no handshake headers → the client's mistake
+    expect(plain.headers.get("upgrade")).toBe("websocket"); // RFC 9110 §10.2.1
+  });
+
+  test("503 only for a well-formed handshake; malformed shapes stay 426", () => {
+    expect(wsHubModule.performUpgrade(hub, "GET /ws", context(handshake())).status).toBe(503);
+    // The unpadded 22-char encoding of the same 16-byte key is well-formed.
+    expect(
+      wsHubModule.performUpgrade(hub, "GET /ws", context(handshake({ "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ" }))).status,
+    ).toBe(503);
+    // 24 base64 chars that do NOT decode to 16 bytes are not a handshake key.
+    expect(
+      wsHubModule.performUpgrade(hub, "GET /ws", context(handshake({ "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQyy" }))).status,
+    ).toBe(426);
+    // RFC 6455 requires GET.
+    expect(wsHubModule.performUpgrade(hub, "GET /ws", context(handshake({}, "POST"))).status).toBe(426);
+  });
+});

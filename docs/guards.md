@@ -71,7 +71,7 @@ export default defineApp({
 });
 ```
 
-Ordering is the contract: `requireAdmin` runs only if `authenticate` enriched (not short-circuited), and it can read `ctx.user`. The same guard list syntax works inside modules, and guards compose with validation — guards run after param/query/header validation and before body validation/handler execution in the compiled pipeline.
+Ordering is the contract: `requireAdmin` runs only if `authenticate` enriched (not short-circuited), and it can read `ctx.user`. The same guard list syntax works inside modules, and guards compose with validation — guards run after **all** validation slots (params, query, headers, and body) and immediately before the handler in the compiled pipeline. A guard therefore never sees an invalid body first: cheap rejection of unauthenticated traffic before body parsing is a deployment concern (front it with a proxy or declare the route without a body slot), not a guard-ordering guarantee.
 
 ## Typed enrichment
 

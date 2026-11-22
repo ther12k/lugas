@@ -102,10 +102,24 @@ function errorClassFor(status: number): TelemetryErrorClass | undefined {
   return "handler";
 }
 
+/**
+ * Observability must not become an availability dependency: a throwing
+ * callback is reported to stderr once and dropped — the wrapped request
+ * continues with its otherwise valid response (ADR-0032 isolation).
+ */
+function safeEmit<T>(callback: ((event: T) => void) | undefined, event: T): void {
+  if (callback === undefined) return;
+  try {
+    callback(event);
+  } catch (error) {
+    console.error(`[lugas] telemetry callback failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 function tryFinish(compiled: CompiledTelemetry, state: TelemetryRequestState): void {
   if (state.ended || state.response === undefined || state.tracked > 0) return;
   state.ended = true;
-  compiled.onRequestEnd?.({
+  safeEmit(compiled.onRequestEnd, {
     kind: "request.end",
     method: state.method,
     path: state.path,
@@ -133,16 +147,19 @@ export function createTelemetryRegistry(): TelemetryRegistry {
  * Wraps a compiled handler with telemetry events. Outermost of the policy
  * wraps (inside CORS): start fires before anything else observes the
  * request; end fires when the response exists and tracked work settled.
+ * The optional server argument is Bun's route-handler contract and must
+ * reach the wrapped handler (websocket upgrades resolve the receiving
+ * server through it).
  */
 export function wrapTelemetryHandler(
   compiled: CompiledTelemetry,
   registry: TelemetryRegistry,
   route: string,
   makeRequestId: (() => string | undefined) | undefined,
-  handler: (request: Request) => Response | Promise<Response>,
-): (request: Request) => Response | Promise<Response> {
+  handler: (request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response>,
+): (request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response> {
   if (compiled.onRequestStart === undefined && compiled.onRequestEnd === undefined) return handler;
-  return (request: Request): Response | Promise<Response> => {
+  return (request: Request, server?: Bun.Server<unknown>): Response | Promise<Response> => {
     const requestId = makeRequestId !== undefined ? makeRequestId() : undefined;
     const state: TelemetryRequestState = {
       started: performance.now(),
@@ -155,14 +172,14 @@ export function wrapTelemetryHandler(
       ended: false,
     };
     registry.set(request, state);
-    compiled.onRequestStart?.({
+    safeEmit(compiled.onRequestStart, {
       kind: "request.start",
       method: state.method,
       path: state.path,
-      route: state.route,
+      route,
       requestId,
     });
-    return Promise.resolve(handler(request)).then((response) => {
+    return Promise.resolve(handler(request, server)).then((response) => {
       state.response = response instanceof Response ? response : new Response(null, { status: 500 });
       // Stamp the id before the access-log wrapper reads it (one identity
       // source, ADR-0032): logging prefers an existing x-request-id.
@@ -203,7 +220,7 @@ export function wrapTelemetryFallback(
       ended: false,
     };
     registry.set(request, state);
-    compiled.onRequestStart?.({
+    safeEmit(compiled.onRequestStart, {
       kind: "request.start",
       method: state.method,
       path: state.path,

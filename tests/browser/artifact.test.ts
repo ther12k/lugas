@@ -67,6 +67,9 @@ describe("M7-005 prebuilt browser artifact", () => {
     }
     const out = mkdtempSync(join(tmpdir(), "lugas-artifact-node-"));
     try {
+      // The published .js artifact lives inside an ESM package. Recreate
+      // that scope rather than depending on Node's syntax detection.
+      await Bun.write(join(out, "package.json"), JSON.stringify({ type: "module" }));
       await buildBrowserClient(out);
       const entry = join(out, "node-smoke.mjs");
       await Bun.write(

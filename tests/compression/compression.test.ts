@@ -9,7 +9,7 @@
  * secureHeaders composition, and both config diagnostics.
  */
 import { describe, expect, test } from "bun:test";
-import { defineApp, json, route, sse } from "../../src/index";
+import { defineApp, json, route, sse, type SseWriter } from "../../src/index";
 import { createTestServer } from "../../src/testing";
 
 const REPEAT = "lugas compression battery. ".repeat(80); // >1024 bytes, compressible
@@ -154,6 +154,252 @@ describe("compression", () => {
 });
 
 describe("etag", () => {
+  test("SSE sends an event while the writer is open with both policies enabled", async () => {
+    let writer: SseWriter | undefined;
+    const server = createTestServer(defineApp({
+      etag: true,
+      compression: true,
+      routes: {
+        "/events": {
+          GET: route({
+            handler: () =>
+              sse({
+                start: (stream) => {
+                  writer = stream;
+                  stream.send({ data: "first" });
+                },
+              }),
+          }),
+        },
+      },
+    }));
+    try {
+      const res = await server.fetch("/events", {
+        headers: { "accept-encoding": "gzip", "if-none-match": '"no-such-tag"' },
+        signal: AbortSignal.timeout(2_000),
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/event-stream");
+      expect(res.headers.get("etag")).toBeNull();
+      expect(res.headers.get("content-encoding")).toBeNull();
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let frame = "";
+      while (!frame.endsWith("\n\n")) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        frame += decoder.decode(value, { stream: true });
+      }
+      expect(frame).toBe("data: first\n\n");
+    } finally {
+      writer?.close();
+      await server.stop();
+    }
+  });
+
+  test("wildcard conditional on an open SSE stream answers 304 without buffering; cleanup runs once", async () => {
+    let writer: SseWriter | undefined;
+    let cleanups = 0;
+    const server = createTestServer(defineApp({
+      etag: true,
+      compression: true,
+      routes: {
+        "/events": {
+          GET: route({
+            handler: () =>
+              sse({
+                start: (stream) => {
+                  writer = stream;
+                  stream.send({ data: "first" });
+                  return () => {
+                    cleanups += 1;
+                  };
+                },
+              }),
+          }),
+        },
+      },
+    }));
+    try {
+      const res = await server.fetch("/events", { headers: { "if-none-match": "*" }, signal: AbortSignal.timeout(2_000) });
+      expect(res.status).toBe(304); // the stream exists — answered without hashing it
+      expect(await res.text()).toBe("");
+      expect(res.headers.get("etag")).toBeNull(); // never hashed, so no framework validator
+      expect(res.headers.get("cache-control")).toBe("no-cache"); // metadata still updates caches
+      await Bun.sleep(50);
+      expect(cleanups).toBe(1); // discarding the stream runs its exactly-once cleanup
+      writer?.close();
+      await Bun.sleep(50);
+      expect(cleanups).toBe(1);
+    } finally {
+      writer?.close();
+      await server.stop();
+    }
+  });
+
+  test("wildcard conditional never masks a failure status", async () => {
+    const missing = defineApp({
+      etag: true,
+      routes: {
+        "/gone": { GET: route({ handler: () => json(404, { error: "missing" }) }) },
+      },
+    });
+    const server = createTestServer(missing);
+    try {
+      const plain = await server.fetch("/gone");
+      expect(plain.status).toBe(404);
+
+      const conditional = await server.fetch("/gone", { headers: { "if-none-match": "*" } });
+      expect(conditional.status).toBe(404); // no current representation → the wildcard does not match
+      expect(((await conditional.json()) as { error: string }).error).toBe("missing");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("failure responses carry no framework validator and can never be masked by one", async () => {
+    const server = createTestServer(defineApp({
+      etag: { weak: true },
+      routes: {
+        "/gone": { GET: route({ handler: () => json(404, { error: "missing" }) }) },
+      },
+    }));
+    try {
+      // The selected representation exists only for a success (RFC 9110 §3.2):
+      // error payloads cross untouched, so no validator is minted over them
+      // and replaying any conditional keeps the full failure response.
+      const first = await server.fetch("/gone");
+      expect(first.status).toBe(404);
+      expect(first.headers.get("etag")).toBeNull();
+
+      const conditional = await server.fetch("/gone", { headers: { "if-none-match": '"any-tag"' } });
+      expect(conditional.status).toBe(404);
+      expect(((await conditional.json()) as { error: string }).error).toBe("missing");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("a quoted tag containing commas is never mistaken for the wildcard", async () => {
+    let writer: SseWriter | undefined;
+    const server = createTestServer(defineApp({
+      etag: true,
+      routes: {
+        "/data": { GET: route({ handler: () => json(200, { payload: REPEAT }) }) },
+        "/events": {
+          GET: route({
+            handler: () =>
+              sse({
+                start: (stream) => {
+                  writer = stream;
+                  stream.send({ data: "first" });
+                },
+              }),
+          }),
+        },
+      },
+    }));
+    try {
+      // RFC 9110 §13.1.2: `*` is the condition only as the ENTIRE field value.
+      // "\"rev,*,next\"" is one quoted opaque tag whose bytes contain a comma
+      // and an asterisk — not a wildcard, so nothing matches and nothing is
+      // discarded.
+      const conditional = await server.fetch("/data", { headers: { "if-none-match": '"rev,*,next"' } });
+      expect(conditional.status).toBe(200); // unknown tag → full response with a fresh validator
+      expect(conditional.headers.get("etag")).toMatch(/^"[0-9a-f]{40}"$/);
+      await conditional.arrayBuffer();
+
+      const streamed = await server.fetch("/events", {
+        headers: { "if-none-match": '"rev,*,next"' },
+        signal: AbortSignal.timeout(2_000),
+      });
+      expect(streamed.status).toBe(200); // the stream is live, not cancelled into a 304
+      expect(streamed.headers.get("content-type")).toContain("text/event-stream");
+      const reader = streamed.body!.getReader();
+      const decoder = new TextDecoder();
+      let frame = "";
+      while (!frame.endsWith("\n\n")) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        frame += decoder.decode(value, { stream: true });
+      }
+      expect(frame).toBe("data: first\n\n");
+    } finally {
+      writer?.close();
+      await server.stop();
+    }
+  });
+
+  test("ranged responses carry no framework validator (Content-Range skip)", async () => {
+    const server = createTestServer(defineApp({
+      etag: true,
+      routes: {
+        "/slice": {
+          GET: route({
+            handler: () =>
+              new Response("hello", {
+                status: 206,
+                headers: { "content-range": "bytes 0-4/10" },
+              }),
+          }),
+        },
+      },
+    }));
+    try {
+      // A slice validates only itself, not the selected representation: the
+      // etag pass leaves ranged responses untouched (a wildcard must not
+      // turn one into a 304, and nothing is hashed into a validator).
+      const partial = await server.fetch("/slice", { headers: { "if-none-match": "*" } });
+      expect(partial.status).toBe(206);
+      expect(partial.headers.get("etag")).toBeNull();
+      expect(await partial.text()).toBe("hello");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("a bodyless success answers a wildcard conditional with 304", async () => {
+    const server = createTestServer(defineApp({
+      etag: true,
+      routes: {
+        "/head-style": {
+          GET: route({
+            handler: () => new Response(null, { status: 200, headers: { "cache-control": "max-age=60" } }),
+          }),
+        },
+      },
+    }));
+    try {
+      // The route answered successfully, so a current representation exists
+      // even though this response carries no body: the wildcard is evaluated
+      // before the nothing-to-hash guard.
+      const conditional = await server.fetch("/head-style", { headers: { "if-none-match": "*" } });
+      expect(conditional.status).toBe(304);
+      expect(await conditional.text()).toBe("");
+      expect(conditional.headers.get("etag")).toBeNull(); // nothing was hashed
+      expect(conditional.headers.get("cache-control")).toBe("max-age=60"); // metadata still updates caches
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("weak validators compare opaquely: replaying the generated W/\"…\" returns 304", async () => {
+    const server = createTestServer(app({ etag: { weak: true }, compression: true }));
+    try {
+      const first = await server.fetch("/data");
+      const etag = first.headers.get("etag");
+      expect(etag).toMatch(/^W\/"[0-9a-f]{40}"$/);
+      await first.text();
+
+      const conditional = await server.fetch("/data", { headers: { "if-none-match": etag! } });
+      expect(conditional.status).toBe(304);
+      expect(conditional.headers.get("etag")).toBe(etag); // the weak form is echoed, not strengthened
+    } finally {
+      await server.stop();
+    }
+  });
+
   test("strong etag on GET; stable across encodings; If-None-Match → 304 empty", async () => {
     const server = createTestServer(app({ etag: true, compression: true }));
     try {
@@ -176,6 +422,75 @@ describe("etag", () => {
 
       const star = await server.fetch("/data", { headers: { "if-none-match": "*" } });
       expect(star.status).toBe(304);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("304 preserves current cache metadata without copying body headers", async () => {
+    let maxAge = 60;
+    const server = createTestServer(defineApp({
+      etag: true,
+      compression: true,
+      routes: {
+        "/data": {
+          GET: route({ handler: () => new Response(REPEAT, { headers: {
+            "cache-control": `max-age=${maxAge}`,
+            "content-location": "/data",
+            "content-type": "text/plain",
+            "content-length": String(REPEAT.length),
+            date: "Wed, 21 Oct 2015 07:28:00 GMT",
+            expires: "Wed, 21 Oct 2015 07:30:00 GMT",
+            vary: "Accept-Language",
+          } }) }),
+        },
+      },
+    }));
+    try {
+      const first = await server.fetch("/data", { headers: { "accept-encoding": "identity" } });
+      expect(first.status).toBe(200);
+      expect(first.headers.get("cache-control")).toBe("max-age=60");
+      expect(first.headers.get("vary")).toBe("Accept-Language, Accept-Encoding");
+      await first.text();
+
+      maxAge = 120;
+      const conditional = await server.fetch("/data", {
+        headers: { "accept-encoding": "gzip", "if-none-match": first.headers.get("etag")! },
+      });
+      expect(conditional.status).toBe(304);
+      expect(conditional.headers.get("cache-control")).toBe("max-age=120");
+      for (const header of ["etag", "vary", "content-location", "date", "expires"]) {
+        expect(conditional.headers.get(header)).toBe(first.headers.get(header));
+      }
+      expect(conditional.headers.get("content-type")).toBeNull();
+      expect(conditional.headers.get("content-length")).toBeNull();
+      expect(conditional.headers.get("content-encoding")).toBeNull();
+      expect(await conditional.text()).toBe("");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test.each([
+    ["compression is disabled", false, "text/plain", "Accept-Language"],
+    ["the type is not compressible", true, "application/octet-stream", "Accept-Language"],
+    ["Accept-Encoding is already present", true, "text/plain", "Accept-Language, accept-encoding"],
+    ["Vary is a wildcard", true, "text/plain", "*"],
+  ] as const)("304 preserves Vary when %s", async (_reason, compression, contentType, vary) => {
+    const server = createTestServer(defineApp({
+      etag: true,
+      ...(compression ? { compression: true } : {}),
+      routes: {
+        "/data": { GET: route({ handler: () => new Response("unchanged", { headers: { "content-type": contentType, vary } }) }) },
+      },
+    }));
+    try {
+      const full = await server.fetch("/data");
+      expect(full.headers.get("vary")).toBe(vary);
+      await full.text();
+      const conditional = await server.fetch("/data", { headers: { "if-none-match": full.headers.get("etag")! } });
+      expect(conditional.status).toBe(304);
+      expect(conditional.headers.get("vary")).toBe(vary);
     } finally {
       await server.stop();
     }

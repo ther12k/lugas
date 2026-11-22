@@ -4,7 +4,34 @@ All notable changes to Lugas are documented here. The project is pre-1.0 and the
 
 ## [Unreleased]
 
-> Prepared for `0.1.0-beta.5` — a verification release with **no new framework features**: it exists to prove the corrected release pipeline from the npm registry (stamped `frameworkVersion`, consumer metadata) after the CF-1 finding. See `docs/reports/consumer-smoke-2026-09-12.md` and `docs/reports/release-readiness-sweep-2026-09-12.md`.
+Changes intended for `0.1.0-beta.6`. The candidate is not yet attested or published.
+
+### Changed
+
+- On Bun, the installed package resolves to TypeScript source by default. Use `bun --conditions=lugas-dist` to select pre-transpiled JavaScript. The browser artifact and Bun-only server support are unchanged ([CA-20](docs/reports/issues/CA-20.md)).
+- The [SPA starter](examples/spa-starter/README.md) now guides users through one typed task-list feature and shows how to compare both package modes against the same installed build ([CA-22](docs/reports/issues/CA-22.md)).
+
+### Fixed
+
+- OpenAPI schema documentation reads the Standard JSON Schema converter object (`~standard.jsonSchema` with `input()`/`output()` — the shape zod 4 and the standard define) in addition to the earlier proposal function form; real zod schemas no longer degrade to presence-only documentation (verified against zod 4.4.3, not only hand-built mocks).
+- `server.lugasLifecycle.shutdown()` is bounded by one budget over the whole sequence — waiting for a still-running service `init`, draining, and disposal. A never-settling initializer or `dispose` no longer hangs shutdown forever; the outcome reports the expiry honestly and never marks un-attempted services as disposed.
+- Throwing telemetry callbacks (`onRequestStart`/`onRequestEnd`) and throwing logging sinks are isolated: the failure is reported to stderr once and the wrapped request keeps its otherwise valid response instead of a 500.
+- The SSE backpressure recipe closes the writer explicitly on both producer failure and terminal completion instead of leaving a detached rejection unhandled.
+- The guards documentation now states the implemented ordering (guards run after all validation slots, including body) instead of claiming guards precede body validation.
+- The built SPA starter uses the browser's origin for its typed client, so the app mounts and can submit tasks on both the root and deep links.
+- ETag generation no longer buffers server-sent events; the first event can arrive while the stream is still open.
+- Opt-in `SIGINT` and `SIGTERM` handling now closes Lugas-managed WebSockets with code `1001` before draining, just like explicit shutdown.
+- Generated `304 Not Modified` responses retain current cache metadata and the relevant `Vary` fields without carrying a body or running compression.
+- `If-None-Match` comparison is weak per RFC 9110: replaying a generated `W/"…"` validator matches, failure-status responses carry no framework validator (so no conditional can mask an error with `304`), and a wildcard counts only when `*` is the entire field value — a quoted tag containing commas is never mistaken for one.
+- A wildcard conditional on an open event stream or a bodyless success answers `304` without buffering or hashing.
+- Shutting down one listener of a multiply-served app closes only that listener's WebSocket sockets, and new handshakes keep working on the surviving listener (each listener performs its own upgrades) — including when CORS, secure headers, logging, or telemetry are configured, whose wrappers now forward Bun's receiving-server argument instead of dropping it.
+- A well-formed WebSocket handshake that the server cannot complete (listener stopping mid-flight) answers `503`; requests without a valid RFC 6455 handshake (GET, version 13, 16-byte key) keep the honest `426`, now carrying the RFC-required `Upgrade` header.
+- Ranged (`Content-Range`) responses carry no framework `ETag`, so a conditional can never bless a slice with `304`.
+- The browser-test harness skips cleanly when no Chromium executable exists instead of crashing at import time (`LUGAS_REQUIRE_BROWSER=1` still fails with the documented message), and a `LUGAS_BROWSER_EXECUTABLE` command name is still resolved through `PATH`.
+
+## [0.1.0-beta.5] — published 2026-09-13
+
+Verification release with no new framework features, built from source commit `6943f88`. Its performance gate was deferred at publication under ODR-0020 and passed separately afterward; [ODR-0021](docs/owner-decisions/beta5-verification-discharge.md) closes that follow-up without changing the published evidence.
 
 ### Changed
 
@@ -82,7 +109,8 @@ Attested release candidate, frozen at `2ed954deb648cdb8e40d7b05e6c0cb0d116f050b`
 - End-to-end typed client (`lugas/client`) — explicit calls over `fetch`, no Proxy, no code generation, browser-safe bundle.
 - Test-server helpers (`lugas/testing`) and a route-inspection CLI emitting `lugas-manifest-v1`.
 
-[Unreleased]: https://github.com/ther12k/lugas/compare/v0.1.0-beta.4...HEAD
+[Unreleased]: https://github.com/ther12k/lugas/compare/v0.1.0-beta.5...HEAD
+[0.1.0-beta.5]: https://www.npmjs.com/package/lugas/v/0.1.0-beta.5
 [0.1.0-beta.4]: https://www.npmjs.com/package/lugas/v/0.1.0-beta.4
 [0.1.0-beta.3]: https://www.npmjs.com/package/lugas/v/0.1.0-beta.3
 [0.1.0-beta.2]: https://www.npmjs.com/package/lugas/v/0.1.0-beta.2

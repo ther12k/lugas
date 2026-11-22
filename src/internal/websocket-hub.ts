@@ -29,12 +29,12 @@ export type WsRouteEntry = {
 export type WebSocketHub = {
   /** routeId (`"${method} ${path}"`) → raw event handlers. Registered at prepare time. */
   readonly routes: Map<string, WsRouteEntry>;
-  /** Filled by serveApp once `Bun.serve` returns; the compiled upgrade handler resolves the server lazily. */
+  /** Filled by serveApp once `Bun.serve` returns; fallback upgrade target for requests whose receiving server was not recorded (see `noteUpgradeServer`). */
   readonly serverRef: { current: Bun.Server<unknown> | undefined };
   /** Open Lugas sockets, for shutdown close-1001. */
   readonly sockets: Set<Bun.ServerWebSocket<unknown>>;
   /** The single Bun `websocket` handler object dispatching per route. */
-  readonly bunHandler: () => Bun.WebSocketHandler<WsData>;
+  readonly bunHandler: (serverSockets?: Set<Bun.ServerWebSocket<unknown>>) => Bun.WebSocketHandler<WsData>;
   /** Close every tracked socket; returns how many were open. */
   readonly closeAll: (code: number, reason: string) => number;
 };
@@ -47,18 +47,23 @@ export function createWebSocketHub(): WebSocketHub {
   const resolve = (ws: Bun.ServerWebSocket<WsData>): WsRouteEntry | undefined =>
     routes.get(ws.data?.[ROUTE_KEY] ?? "");
 
-  const bunHandler = (): Bun.WebSocketHandler<WsData> => ({
+  // serverSockets (when given) is the calling server's own socket view: every
+  // serve() of one prepared app shares this hub's route table, but graceful
+  // close must reach only the stopping server's connections.
+  const bunHandler = (serverSockets?: Set<Bun.ServerWebSocket<unknown>>): Bun.WebSocketHandler<WsData> => ({
     message: (ws, message) => {
       const route = resolve(ws);
       return route?.message(ws, message as string | Uint8Array, ws.data[CONTEXT_KEY]);
     },
     open: (ws) => {
       sockets.add(ws);
+      serverSockets?.add(ws as Bun.ServerWebSocket<unknown>);
       const route = resolve(ws);
       return route?.open?.(ws, ws.data[CONTEXT_KEY]);
     },
     close: (ws, code, reason) => {
       sockets.delete(ws);
+      serverSockets?.delete(ws as Bun.ServerWebSocket<unknown>);
       const route = resolve(ws);
       return route?.close?.(ws, code, reason, ws.data[CONTEXT_KEY]);
     },
@@ -86,14 +91,54 @@ export function createWebSocketHub(): WebSocketHub {
 }
 
 /**
+ * The receiving server for each in-flight upgrade request. Bun hands the
+ * native route handler the server that actually accepted the connection as
+ * its second argument; compiled routes are app-level and shared by every
+ * `serve()` of one prepared app, so the upgrade must resolve the receiving
+ * server per request — a hub-level `serverRef` would always point at the
+ * most recent listener and its `upgrade()` fails once that listener stops.
+ */
+const UPGRADE_SERVERS = new WeakMap<Request, Bun.Server<unknown>>();
+
+/** Records the server that received `request` (called by the compiled route boundary). */
+export function noteUpgradeServer(request: Request, server: Bun.Server<unknown>): void {
+  UPGRADE_SERVERS.set(request, server);
+}
+
+/**
+ * Whether the request carries a well-formed RFC 6455 §4.2.1 opening
+ * handshake: GET, `Upgrade: websocket`, version `13`, and a `Sec-WebSocket-
+ * Key` that base64-decodes to exactly 16 bytes (padding-normalized, so the
+ * unpadded 22-char form validates too). Bun's `upgrade()` collapses "not a
+ * handshake" and "handshake failed server-side" into one `false`, so this
+ * decides which truth the client gets: a non-handshake is the client's
+ * mistake (`426`), while a well-formed handshake that cannot complete
+ * (listener stopping mid-flight) is the server's state (`503`).
+ */
+function isWebSocketHandshake(request: Request): boolean {
+  if (request.method.toUpperCase() !== "GET") return false;
+  if ((request.headers.get("upgrade") ?? "").trim().toLowerCase() !== "websocket") return false;
+  if ((request.headers.get("sec-websocket-version") ?? "").trim() !== "13") return false;
+  const raw = (request.headers.get("sec-websocket-key") ?? "").trim();
+  if (raw.length === 0 || raw.length % 4 === 1) return false;
+  try {
+    return atob(raw + "=".repeat((4 - (raw.length % 4)) % 4)).length === 16;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The request-time upgrade decision, used as the synthetic route handler for
  * websocket descriptors. Validation and guards have already run (this is the
  * pipeline's "handler"); a successful upgrade hijacks the request and Bun
  * discards the returned Response, so the pipeline's Response contract is
- * satisfied with an unsent `204`. A non-upgrade request gets `426`.
+ * satisfied with an unsent `204`. A non-handshake request gets `426` with
+ * the RFC 9110 §10.2.1 `Upgrade` header; a well-formed handshake the server
+ * cannot complete gets `503`.
  */
 export function performUpgrade(hub: WebSocketHub, routeId: string, context: PipelineContext): Response {
-  const server = hub.serverRef.current;
+  const server = UPGRADE_SERVERS.get(context.request) ?? hub.serverRef.current;
   if (server === undefined) {
     return problem(503, { title: "Unavailable", status: 503, detail: "server is not accepting upgrades" });
   }
@@ -101,9 +146,12 @@ export function performUpgrade(hub: WebSocketHub, routeId: string, context: Pipe
     data: { [ROUTE_KEY]: routeId, [CONTEXT_KEY]: context },
   });
   if (upgraded) return new Response(null, { status: 204 });
+  if (isWebSocketHandshake(context.request)) {
+    return problem(503, { title: "Unavailable", status: 503, detail: "the receiving server could not complete the websocket handshake" });
+  }
   return problem(426, {
     title: "Upgrade Required",
     status: 426,
     detail: "websocket routes accept only WebSocket handshake requests (GET with Upgrade: websocket)",
-  });
+  }, { headers: { upgrade: "websocket" } });
 }

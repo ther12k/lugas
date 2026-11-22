@@ -35,7 +35,7 @@ import { applySecureHeaders, type CompiledHealth, type CompiledSecureHeaders } f
 import { createTelemetryRegistry, wrapTelemetryHandler, type CompiledTelemetry, type TelemetryRegistry } from "./telemetry";
 import { applyCompression, applyEtag, type CompiledCompression, type CompiledEtag } from "./compression";
 import type { LifecycleService, ShutdownOptions } from "./lifecycle";
-import { createWebSocketHub, performUpgrade, type WebSocketHub, type WsRouteEntry } from "./websocket-hub";
+import { createWebSocketHub, noteUpgradeServer, performUpgrade, type WebSocketHub, type WsRouteEntry } from "./websocket-hub";
 import type { PipelineContext } from "./compile-pipeline";
 import { problem } from "../core/response";
 import type { ModuleDescriptor } from "../core/types";
@@ -195,14 +195,14 @@ export function prepareApp<TServices>(config: {
     // encoding-independent; a 304 never pays the encode cost) — both inside
     // logging/telemetry so those observe final statuses.
     let observed: (request: Request) => Response | Promise<Response> = inner;
+    const compressionPolicy = config.compression;
     if (config.etag !== undefined) {
       const etagPolicy = config.etag;
       const innerHandler = observed;
       observed = (request: Request): Response | Promise<Response> =>
-        Promise.resolve(innerHandler(request)).then((r) => applyEtag(etagPolicy, request, r));
+        Promise.resolve(innerHandler(request)).then((r) => applyEtag(etagPolicy, request, r, compressionPolicy));
     }
-    if (config.compression !== undefined) {
-      const compressionPolicy = config.compression;
+    if (compressionPolicy !== undefined) {
       const innerHandler = observed;
       observed = (request: Request): Response | Promise<Response> =>
         Promise.resolve(innerHandler(request)).then((r) => applyCompression(compressionPolicy, request, r));
@@ -246,7 +246,16 @@ export function prepareApp<TServices>(config: {
       headers: descriptor.headers,
       handler: (context: PipelineContext): Response => performUpgrade(hub, routeId, context),
     };
-    return compileLugasHandler(routeId, synthetic);
+    const inner = compileLugasHandler(routeId, synthetic);
+    // Bun passes the receiving server as the route handler's second argument.
+    // The compiled routes object is shared by every serve() of this app, so
+    // the upgrade resolves the server that actually accepted the connection
+    // per request (websocket-hub); a hub-level ref would go stale once a
+    // later listener stops.
+    return (request: Request, server?: Bun.Server<unknown>): Response | Promise<Response> => {
+      if (server !== undefined) noteUpgradeServer(request, server);
+      return inner(request);
+    };
   };
 
   // Collect declarations per path, in declaration order (root first, then
@@ -447,11 +456,14 @@ export function prepareApp<TServices>(config: {
   // assets are not functions — they bypass the pipeline and carry no policy
   // headers, same truth as CORS and guards.
   if (config.secureHeaders !== undefined) {
-    const wrapHeaders = (handler: (request: Request) => Response | Promise<Response>): (request: Request) => Response | Promise<Response> => {
+    // The optional server argument is Bun's route-handler contract: it must
+    // survive every outer wrap, or websocket upgrades lose their receiving
+    // server (see compileWebSocketHandler's boundary note).
+    const wrapHeaders = (handler: (request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response>): ((request: Request, server?: Bun.Server<unknown>) => Response | Promise<Response>) => {
       if (config.secureHeaders === undefined) return handler;
       const policy = config.secureHeaders;
-      return async (request: Request) => {
-        const response = await handler(request);
+      return async (request: Request, server?: Bun.Server<unknown>) => {
+        const response = await handler(request, server);
         return applySecureHeaders(policy, response);
       };
     };

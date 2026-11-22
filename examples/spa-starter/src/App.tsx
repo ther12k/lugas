@@ -10,7 +10,7 @@ type API = AppContract<App>;
 
 // Same-origin typed client: the browser bundle talks to the API served by
 // the same Bun process (ADR-0037 hosting contract).
-const api = createClient<API>({ baseUrl: "" });
+const api = createClient<API>({ baseUrl: window.location.origin });
 
 type ProjectView = { kind: "home" } | { kind: "project"; id: string };
 

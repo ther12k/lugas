@@ -239,3 +239,46 @@ describe("telemetry events", () => {
     }
   });
 });
+
+describe("observability isolation", () => {
+  test("throwing telemetry callbacks never change the response", async () => {
+    const server = createTestServer(defineApp({
+      telemetry: {
+        onRequestStart() {
+          throw new Error("start exploded");
+        },
+        onRequestEnd() {
+          throw new Error("end exploded");
+        },
+      },
+      routes: { "/ok": { GET: route({ handler: () => json(200, { fine: true }) }) } },
+    }));
+    try {
+      const res = await server.fetch("/ok");
+      expect(res.status).toBe(200); // previously: the throwing start escaped to Bun's 500 page
+      expect(((await res.json()) as { fine: boolean }).fine).toBe(true);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  test("a throwing logging sink never changes the response", async () => {
+    const server = createTestServer(defineApp({
+      logging: {
+        access: true,
+        requestIds: true,
+        sink() {
+          throw new Error("sink exploded");
+        },
+      },
+      routes: { "/ok": { GET: route({ handler: () => json(200, { fine: true }) }) } },
+    }));
+    try {
+      const res = await server.fetch("/ok");
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { fine: boolean }).fine).toBe(true);
+    } finally {
+      await server.stop();
+    }
+  });
+});

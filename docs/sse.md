@@ -87,9 +87,18 @@ sse({
   heartbeatMs: 15_000,
   start: (writer) => {
     void (async () => {
-      for await (const event of bus.events()) {
-        if (!(await writer.sendAwait({ data: event.payload }))) break; // ended or overloaded
+      try {
+        for await (const event of bus.events()) {
+          if (!(await writer.sendAwait({ data: event.payload }))) break; // ended or overloaded
+        }
+      } catch {
+        // Producer failure: end the stream deliberately so cleanup runs and
+        // the client reconnects per its retry policy — never leave a
+        // detached rejection unhandled.
+        writer.close();
+        return;
       }
+      writer.close(); // terminal completion is explicit, not accidental
     })();
   },
 });

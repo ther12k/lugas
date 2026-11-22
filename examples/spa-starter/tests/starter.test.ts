@@ -14,6 +14,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { browserAvailable, requireBrowser } from "../../../tests/browser/browser-env";
+import { CdpBrowser } from "../../../tests/browser/cdp";
 
 const STARTER = join(import.meta.dir, "..");
 type App = ReturnType<(typeof import("../server/app"))["createApp"]>;
@@ -300,6 +302,41 @@ describe.skipIf(GATE.skip)("spa-starter: installed package, built server", () =>
     expect(after.status).toBe(200);
     if (after.ok) expect(after.data.tasks.map((task) => task.id)).not.toContain(id);
   });
+
+  test.skipIf(!browserAvailable)("browser: deep link renders the task list and submits a new task", async () => {
+    const browser = await CdpBrowser.launch(requireBrowser());
+    try {
+      const title = "write a task in the browser";
+      const created = await browser.evaluateInNewPage(
+        `${origin}/app/projects/42`,
+        `(async () => {
+          async function waitFor(find, description) {
+            const deadline = Date.now() + 5000;
+            for (;;) {
+              const value = find();
+              if (value) return value;
+              if (Date.now() >= deadline) throw new Error('Starter did not show ' + description);
+              await new Promise(resolve => setTimeout(resolve, 25));
+            }
+          }
+          const input = await waitFor(() => document.querySelector('input[aria-label="Task title"]'), 'the task form');
+          const section = input.closest('section');
+          await waitFor(() => section.textContent.includes('No tasks yet'), 'the empty task list');
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(title)});
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.form.requestSubmit();
+          const task = await waitFor(
+            () => [...section.querySelectorAll('li span')].find(item => item.textContent === ${JSON.stringify(title)}),
+            'the created task',
+          );
+          return task.textContent;
+        })()`,
+      );
+      expect(created).toBe(title);
+    } finally {
+      await browser.close();
+    }
+  }, 120_000);
 
   test("graceful shutdown: SIGTERM drains to exit 0 (ADR-0020)", async () => {
     proc!.kill("SIGTERM");
