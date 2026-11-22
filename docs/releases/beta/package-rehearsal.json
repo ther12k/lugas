@@ -1,12 +1,12 @@
 {
   "format": "lugas-package-rehearsal-v1",
-  "packageSourceCommit": "9eddaabcd5ac15b47714189f04048308d1f05bc0",
-  "tarballSha256": "d32293f321e6b9a8c6305688157e2fab32f06d9c541b2d2321a09a48dbf22458",
+  "packageSourceCommit": "8de2da488ae9dedd0a4428653944597e2f6c3429",
+  "tarballSha256": "91621e479db1bbea4d1a5a9fb8e5a8cd5cf992db9e21bf96a264874c7f079612",
   "checksPassed": 34,
   "checksTotal": 34,
   "entryCount": 222,
   "noticePresent": true,
   "licensePresent": true,
   "dryRunPublishPassed": true,
-  "generatedAt": "2026-11-22T16:41:40.025Z"
+  "generatedAt": "2026-11-22T18:00:21.445Z"
 }

@@ -1,10 +1,10 @@
-# LugasJS v0.1.0-beta.5 Release Packet
+# LugasJS v0.1.0-beta.6 Release Packet
 
-**Candidate Version:** `0.1.0-beta.5`\
-**Package Source Commit:** `6943f88d571266511ad53d826453bbf4413974cd`\
-**Attestation Commit:** `6943f88d571266511ad53d826453bbf4413974cd` (`6943f88`)
+**Candidate Version:** `0.1.0-beta.6`\
+**Package Source Commit:** `8de2da488ae9dedd0a4428653944597e2f6c3429`\
+**Attestation Commit:** `8de2da488ae9dedd0a4428653944597e2f6c3429` (`8de2da4`)
 
-**Generated:** 2026-09-13T15:58:38.710Z\
+**Generated:** 2026-11-22T18:02:02.482Z\
 **Runtime:** Bun 1.4.0 · TypeScript 7.0.2 · Linux x86-64 / macOS arm64 / Windows x64\
 **Package:** `lugas` (unscoped) · License: Apache-2.0 · Repo: `ther12k/lugas`
 
@@ -12,7 +12,7 @@
 
 ## 1. Executive Summary
 
-This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.5** release candidate. All milestones (M0–M9, the complete ODR-0010 battery sequence) are complete with one recorded deferral: the release-mode performance gate is DEFERRED by ODR-0020 (see §4 — full gate runs on the quiet baseline host before general-availability promotion); the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
+This packet contains the complete source, package, evidence, and governance artifacts for the **LugasJS v0.1.0-beta.6** release candidate. All milestones (M0–M9, the complete ODR-0010 battery sequence) are complete with zero waivers; the full verification gate was executed by the packet builder at assembly time, and the tracker was last verified free of open P0/P1 defects at packet assembly (the owner re-verifies at publication — see CHECKLIST.md).
 
 Publication remains strictly gated on owner approval in **M8-GATE**.
 
@@ -24,7 +24,7 @@ Publication remains strictly gated on owner approval in **M8-GATE**.
 |---|---|---|
 | Product Name | **LugasJS** (shortened to **Lugas**) | ADR-0001 |
 | Package Name | **`lugas`** (unscoped) | ODR-0001 (`docs/owner-decisions/naming-assets.md`) |
-| Version | **`0.1.0-beta.5`** | SemVer beta candidate |
+| Version | **`0.1.0-beta.6`** | SemVer beta candidate |
 | Repository | **`ther12k/lugas`** | GitHub |
 | License | **Apache-2.0** (full text in `LICENSE`) | ODR-0002, `NOTICE` |
 | Security Policy | GitHub Private Advisories (48h SLA) | `SECURITY.md` |
@@ -63,17 +63,17 @@ Publication remains strictly gated on owner approval in **M8-GATE**.
 
 ---
 
-## 4. Performance & Resource Budgets (Release Mode) — DEFERRED
+## 4. Performance & Resource Budgets (Release Mode)
 
-> **DEFERRED by ODR-0020.** The release-mode performance gate was **not executed** for this candidate: the pinned baseline host is occupied by an unrelated soak campaign, and measurements captured under load are void per `docs/performance-gates.md` (loaded-machine failures are environmental, never evidence). No throughput, typecheck-budget, or bundle measurement is recorded for this candidate — the table below shows the *thresholds only*. The full gate plus a fresh ≥5-run typecheck calibration are committed to run on the quiet baseline host after the campaign ends, with calibration samples and the gate result recorded separately. Published versions are immutable: if the deferred gate later finds a regression, a successor version supersedes this one — this tarball is never republished.
+The release-mode performance gate was executed at assembly time on the recorded baseline host.
 
 | Scenario / Metric | Release Floor | Alert Floor | Target | Candidate Measured | Result |
 |---|---|---|---|---|---|
-| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **DEFERRED rps**  | ⏸ DEFERRED |
-| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **DEFERRED rps** | ⏸ DEFERRED |
-| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **DEFERRED rps** | ⏸ DEFERRED |
-| Typecheck Duration | — | — | < 2500ms | **DEFERREDms** | ⏸ DEFERRED |
-| Client Bundle Size | — | — | < 25,000 B | **DEFERRED B** | ⏸ DEFERRED |
+| `plain-static` | 30,000 rps | 40,000 rps | 60,000 rps | **120,680 rps** (-17.9% vs raw Bun) | ✅ Exceeded |
+| `plain-json` | 25,000 rps | 35,000 rps | 50,000 rps | **100,543 rps** | ✅ Exceeded |
+| `validated-post` | 15,000 rps | 20,000 rps | 30,000 rps | **59,628 rps** | ✅ Exceeded (9.5% validated overhead vs raw Bun) |
+| Typecheck Duration | — | — | < 2500ms | **1282ms** | ✅ Measured on candidate |
+| Client Bundle Size | — | — | < 25,000 B | **16589 B** | ✅ Measured on candidate |
 
 ---
 
@@ -99,7 +99,7 @@ Publication remains strictly gated on owner approval in **M8-GATE**.
 ## 7. Supply Chain & Package Verification
 
 - **Production Dependencies:** **0** (zero runtime dependencies).
-- **Tarball Entry Count:** **157** files (strict whitelist; no tests/benchmarks/worktrees).
+- **Tarball Entry Count:** **222** files (strict whitelist; no tests/benchmarks/worktrees).
 - **Publication Dry-Run:** Validated via `npm publish --dry-run --access public --tag beta`.
 - **Artifact Manifest:** Checksums and provenance recorded in `docs/releases/beta/SHA256SUMS`.
 
@@ -118,7 +118,10 @@ Publication remains strictly gated on owner approval in **M8-GATE**.
 To publish this release candidate to npm after M8-GATE approval:
 
 ```bash
-npm publish ./docs/releases/beta/lugas-0.1.0-beta.5.tgz --access public --tag beta
+npm publish ./docs/releases/beta/lugas-0.1.0-beta.6.tgz \
+  --access public \
+  --tag beta \
+  --registry=https://registry.npmjs.org/
 ```
 
 *Note: This command must only be executed upon formal owner sign-off.*

@@ -231,11 +231,11 @@
     {
       "path": "build/lugas-client.esm.js",
       "bytes": 16344,
-      "sha256": "2133fae0527498538ede220672b6eb5f375108d980321b0b9da729e02594741b",
+      "sha256": "cff099020de2c24219c88545e66646244e7d45431c63287864547f53b7f8f6da",
       "entrypoint": "src/client/index.ts",
       "target": "browser",
       "format": "esm"
     }
   ],
-  "generatedAt": "2026-11-22T16:41:39.996Z"
+  "generatedAt": "2026-11-22T18:00:21.437Z"
 }
