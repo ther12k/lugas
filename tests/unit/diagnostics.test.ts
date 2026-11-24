@@ -68,9 +68,30 @@ describe("golden: thrown shape per family (json formatting)", () => {
       expect(golden).toEqual({
         code: "LUGAS_APP_002",
         message: "defineApp(): unknown config key 'bogus'",
-        hint: "allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, openapi, notFound, onError",
+        hint: "allowed keys: services, routes, modules, assets, spa, bodyBudget, cors, logging, openapi, secureHeaders, health, telemetry, compression, etag, notFound, onError",
         context: { key: "bogus" },
       });
+      // #445: the catalog entry must not drift from the actual throw site.
+      expect(DIAGNOSTIC_CATALOG.find((entry) => entry.code === "LUGAS_APP_002")?.hint).toBe(golden.hint as string | undefined);
+    }
+  });
+
+  test("#445: every accepted top-level key escapes the unknown-key rejection", () => {
+    const acceptedKeys = [
+      "services", "routes", "modules", "assets", "spa", "bodyBudget", "cors",
+      "logging", "openapi", "secureHeaders", "health", "telemetry",
+      "compression", "etag", "notFound", "onError",
+    ];
+    expect(acceptedKeys.length).toBe(16);
+    for (const key of acceptedKeys) {
+      try {
+        defineApp({ [key]: undefined } as never);
+      } catch (error) {
+        // A later diagnostic for a different concern is out of scope here;
+        // an unknown-key rejection for an accepted key is the drift this
+        // assertion exists to catch.
+        expect((error as LugasDiagnosticErrorLike).code).not.toBe("LUGAS_APP_002");
+      }
     }
   });
 

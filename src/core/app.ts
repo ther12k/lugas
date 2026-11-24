@@ -119,6 +119,11 @@ export type AppConfig<TServices, TRoutes = Readonly<Record<string, unknown>>> = 
 
 const APP_KEYS = new Set(["services", "routes", "modules", "assets", "spa", "bodyBudget", "cors", "logging", "openapi", "secureHeaders", "health", "telemetry", "compression", "etag", "notFound", "onError"]);
 
+// #445: the unknown-key hint is derived from the accepted-key set — a
+// hand-maintained list drifted as spa/secureHeaders/health/telemetry/
+// compression/etag landed and misdirected correction attempts.
+const APP_KEYS_HINT = `allowed keys: ${[...APP_KEYS].join(", ")}`;
+
 export type AppInternals<TServices = unknown> = {
   readonly composition: Composition;
   /** Frozen runtime-truth manifest (lugas-manifest-v1) — reading starts no server. */
@@ -168,7 +173,7 @@ export function defineApp<
   }
   for (const key of Object.keys(config)) {
     if (!APP_KEYS.has(key)) {
-      throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: "allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, openapi, notFound, onError", context: { key } });
+      throw diagnostic("LUGAS_APP_002", `defineApp(): unknown config key '${key}'`, { hint: APP_KEYS_HINT, context: { key } });
     }
   }
   if (config.bodyBudget !== undefined && (typeof config.bodyBudget !== "number" || !Number.isInteger(config.bodyBudget) || config.bodyBudget <= 0)) {
