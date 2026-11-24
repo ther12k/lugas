@@ -21,7 +21,7 @@ Client-side codes `LUGAS_CLIENT_001`–`010` are defined in
 | Code | Thrown by | Meaning | Hint |
 |---|---|---|---|
 | LUGAS_APP_001 | defineApp() | config must be an object | pass defineApp({ routes }) with an object literal |
-| LUGAS_APP_002 | defineApp() | unknown config key | allowed keys: services, routes, modules, assets, bodyBudget, cors, logging, openapi, notFound, onError |
+| LUGAS_APP_002 | defineApp() | unknown config key | allowed keys: services, routes, modules, assets, spa, bodyBudget, cors, logging, openapi, secureHeaders, health, telemetry, compression, etag, notFound, onError |
 | LUGAS_APP_003 | defineApp() | 'modules' must be an array | wrap modules: modules: [defineModule(...)] |
 | LUGAS_APP_004 | defineApp() | modules entry is not a descriptor | create modules with defineModule({ name, routes }) |
 | LUGAS_APP_005 | defineApp() | duplicate module name | module names must be unique within an app |

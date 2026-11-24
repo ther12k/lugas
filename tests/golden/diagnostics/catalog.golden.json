@@ -9,7 +9,7 @@
     "code": "LUGAS_APP_002",
     "thrownBy": "defineApp()",
     "meaning": "unknown config key",
-    "hint": "allowed keys: services, routes, modules, assets, bodyBudget, cors, notFound, onError"
+    "hint": "allowed keys: services, routes, modules, assets, spa, bodyBudget, cors, logging, openapi, secureHeaders, health, telemetry, compression, etag, notFound, onError"
   },
   {
     "code": "LUGAS_APP_003",
