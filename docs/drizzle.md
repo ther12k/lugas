@@ -52,6 +52,25 @@ export default defineApp({
 
 Handlers reach the instance through `ctx.services.<name>` — the typed services contract — with the **exact Drizzle instance type** preserved: `select()`, `query`, and `$client` all typecheck. Any driver works the same way (`drizzle-orm/node-postgres`, `drizzle-orm/mysql2`, `drizzle-orm/bun-sqlite`, …); the adapter contains no driver branches.
 
+## Result shapes on bun-sqlite
+
+Drizzle's `bun-sqlite` driver is a thin wrapper over Bun's synchronous SQLite client, and its result shapes bite the natural single-row patterns (dogfood finding RF-2):
+
+- **`.get()` returns a values-array, not a row object.** The `SELECT … WHERE id = ?`-shaped code you would expect to hand back one row returns an array of values. Reading it as a row silently produces arrays where objects were expected.
+- **`.run()` resolves `void`.** Mutations give no way to read back what changed — there is no inserted id, no affected row.
+
+The reliable single-row read/mutation path is **`RETURNING` through `.all()`**, which keeps its type argument:
+
+```ts
+// Insert and read the generated id back — one statement, one typed row.
+const [row] = await database.all<{ id: number }>(
+  sql`INSERT INTO users (name, email) VALUES (${name}, ${email}) RETURNING id`,
+);
+const id = row?.id; // undefined => the insert returned no row
+```
+
+This is Drizzle/bun-sqlite behavior, not something Lugas introduces or can smooth over — the adapter deliberately passes the instance through untouched (see [What the adapter guarantees](#what-the-adapter-guarantees)). Multi-row reads are unaffected: `.all()` returns the full typed array. The end-to-end patterns live in [`examples/realworld/`](https://github.com/ther12k/lugas/blob/main/examples/realworld/) (`app.ts`, mutations through `RETURNING` + `.all()`).
+
 ## What the adapter guarantees
 
 - **Startup validation** — a value missing the structural CRUD surface (`select`, `insert`, `update`, `delete` functions) fails at declaration time with `LUGAS_DRIZZLE_001`, not at first request.
