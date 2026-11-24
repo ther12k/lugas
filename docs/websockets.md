@@ -76,6 +76,7 @@ Requests that reach the upgrade decision without WebSocket handshake headers ret
 ## What Lugas does not do
 
 - **No wrapper class.** The socket is Bun's `ServerWebSocket`. Sub-protocol negotiation, `binaryType`, backpressure (`bufferedAmount`, `drain`), and pub/sub channels (`ws.subscribe`/`ws.publish`/`ws.publishText`) are native API — used directly.
+- **`ws.publish` does not echo to the sender** (Bun's pub/sub semantics, dogfood finding RF-7). A published message reaches every *other* subscriber of the channel — the publishing socket itself does not receive it. Presence code written against "broadcast includes me" hangs silently: the sender's own state must be set locally (`ws.send` for the sender, `publish` for the room). The worked pattern is in [`examples/realworld/`](https://github.com/ther12k/lugas/blob/main/examples/realworld/).
 - **No message codec.** Messages are `string | Uint8Array`; JSON parsing is `JSON.parse` in your handler (see the revisit trigger in ADR-0028 before expecting a helper).
 - **No CORS on handshakes.** The WebSocket handshake is not subject to browser CORS, so the first-party [CORS](./cors.md) policy cannot protect it. **Check the `Origin` header in a guard** for browser-facing sockets:
 
