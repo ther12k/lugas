@@ -10,7 +10,7 @@ bun add lugas@beta
 
 Lugas requires [Bun](https://bun.sh) 1.4.x. TypeScript 7.0.2 is the verified toolchain for the full compile-time contract experience.
 
-> `lugas@0.1.0-beta.4` is published under npm `beta` and `latest`.
+> Pre-release builds are published under npm `beta`; `latest` intentionally lags at the newest stable-marked build. The newest attested candidate (`0.1.0-beta.6`) is tagged in the repository but not yet on the registry — `bun add lugas@beta` installs the newest **published** prerelease. Check [npm](https://www.npmjs.com/package/lugas) for the current resolution.
 
 ## Type checking
 

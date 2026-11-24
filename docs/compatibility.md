@@ -1,6 +1,6 @@
 ---
 type: Compatibility Statement
-title: Lugas v0.1.0-beta.1 Supported Combinations
+title: Lugas v0.1.0-beta.6 Supported Combinations
 status: current
 tags:
 - compatibility
@@ -10,9 +10,10 @@ tags:
 
 # Compatibility
 
-This table is generated from CI results (`compatibility.yml`) run against the
-beta candidate commit. Unsupported combinations are explicit; support is not
-implied by broad semver ranges.
+This table is generated from CI results (`compatibility.yml`) run against
+`main`, which carries the attested `v0.1.0-beta.6` candidate content — the
+six-cell matrix was green on both at attestation. Unsupported combinations are
+explicit; support is not implied by broad semver ranges.
 
 ## Runtime (server core + CLI + testing helpers)
 

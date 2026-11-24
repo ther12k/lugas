@@ -2,9 +2,9 @@
 
 All notable changes to Lugas are documented here. The project is pre-1.0 and the public API may still evolve based on beta feedback.
 
-## [Unreleased]
+## [0.1.0-beta.6] — attested 2026-11-23, tagged, not yet published
 
-Changes intended for `0.1.0-beta.6`. The candidate is not yet attested or published.
+Changes for `0.1.0-beta.6`. The candidate packet is attested and committed at `ecafad9` ([RELEASE_PACKET.md](docs/releases/beta/RELEASE_PACKET.md)); both identities bind to `8de2da4`, and the tag `v0.1.0-beta.6` is pushed. npm publication is owner-controlled and still pending — the `beta` dist-tag resolves `0.1.0-beta.5` until the owner publication sequence runs.
 
 ### Changed
 
