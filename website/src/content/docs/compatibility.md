@@ -2,9 +2,10 @@
 title: "Compatibility"
 description: "Supported Bun, TypeScript, validator, and platform combinations."
 ---
-This table is generated from CI results (`compatibility.yml`) run against the
-beta candidate commit. Unsupported combinations are explicit; support is not
-implied by broad semver ranges.
+This table is generated from CI results (`compatibility.yml`) run against
+`main`, which carries the attested `v0.1.0-beta.6` candidate content — the
+six-cell matrix was green on both at attestation. Unsupported combinations are
+explicit; support is not implied by broad semver ranges.
 
 ## Runtime (server core + CLI + testing helpers)
 

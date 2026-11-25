@@ -10,13 +10,14 @@ description: "Public API reference."
 | `defineModule(config)` | function | stable |
 | `route(config)` | function | stable |
 | `guard(config)` | function | stable |
+| `bindServices<TServices>()` | factory → `{ route, guard }` | new (RF-1) |
 | `service(config)` | function | stable (M7-004) |
 | `drizzleService(config)` | `lugas/drizzle` function | new (M9-001) |
 | `parseCookies(request)` | function | new (M9-002) |
 | `cookie(name, value, attrs?)` | function | new (M9-002) |
 | `websocket(config)` | function | new (M9-003) |
 | `secureHeaders` / `health` | `defineApp()` config | new (M9-004) |
-| `form(config)` | body codec function | new (M9-005) |
+| `form(config)` | body codec function (`repeated: "last-wins" \| "preserve"`) | new (M9-005; `repeated` new in RF-3) |
 | `telemetry` (`onRequestStart`/`onRequestEnd`) | `defineApp()` config | new (M9-006) |
 | `compression` / `etag` | `defineApp()` config | new (M9-007) |
 | `rateLimit(config)` / `createMemoryRateLimitStore()` | guard factory functions | new (M9-008) |
@@ -28,9 +29,15 @@ description: "Public API reference."
 | `problem(status, fields)` | function | stable |
 | `redirect(location)` | function | stable |
 
-Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `SseConfig`, `SseWriter`, `SseEventInput`, `CookieAttrs`, `WebSocketConfig`, `WebSocketEventContext`, `WebSocketMessage`, `ServerWebSocketLike`, `SecureHeadersConfig`, `HealthConfig`, `FormConfig`, `FormDescriptor`, `MultipartBody`, `TelemetryConfig`, `TelemetryRequestStart`, `TelemetryRequestEnd`, `TelemetryErrorClass`, `CompressionConfig`, `CompressionEncoding`, `EtagConfig`, `LoggingConfig`, `LugasLogEntry`, `LugasLogFields`, `LugasLogLevel`, `LogSink`, `OpenApiConfig`, `OpenApiDocumentInfo`, `OpenApiRouteMetadata`, `OpenApiUiConfig`, `CompiledOpenApi`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
+Types: `AppConfig`, `LugasAppInstance`, `ModuleConfig`, `RouteConfig`, `GuardConfig`, `ServiceBound`, `ServiceConfig`, `SpaConfig`, `ServiceDescriptor`, `LugasLifecycle`, `ShutdownOutcome`, `ShutdownOptions`, `CorsConfig`, `CorsOriginDecision`, `CorsOriginInput`, `SseConfig`, `SseWriter`, `SseEventInput`, `CookieAttrs`, `WebSocketConfig`, `WebSocketEventContext`, `WebSocketMessage`, `ServerWebSocketLike`, `SecureHeadersConfig`, `HealthConfig`, `FormConfig`, `FormDescriptor`, `MultipartBody`, `TelemetryConfig`, `TelemetryRequestStart`, `TelemetryRequestEnd`, `TelemetryErrorClass`, `CompressionConfig`, `CompressionEncoding`, `EtagConfig`, `LoggingConfig`, `LugasLogEntry`, `LugasLogFields`, `LugasLogLevel`, `LogSink`, `OpenApiConfig`, `OpenApiDocumentInfo`, `OpenApiRouteMetadata`, `OpenApiUiConfig`, `CompiledOpenApi`, `ProblemFields`, `RedirectStatus`, `TypedResponse`, `AppContract`
 
-`defineApp()` also accepts `assets` (opt-in, ADR-0018): `{ files: { "/robots.txt": "./public/robots.txt" }, dirs: { "/assets/*": "./public/assets" } }`. File mappings are literal exact paths; directory mounts are explicit prefixes ending in `/*`. Native directory mounts (`assets.dirs`) are supported on Linux only (relying on kernel `openat2(RESOLVE_IN_ROOT)` for symlink containment); configuring `dirs` on macOS or Windows fails closed before startup (`LUGAS_ASSET_004`). File mappings (`assets.files`) are supported across all platforms. Assets are served natively by Bun through GET/HEAD; other methods reach the app's not-found policy (no 405). Ownership conflicts with API routes are rejected at startup (`LUGAS_ASSET_002`). Asset routes are outside the manifest and the request pipeline (no guards, no `onError`).
+`defineApp()` also accepts `assets` (opt-in, ADR-0018): `{ files: { "/robots.txt": "./public/robots.txt" }, dirs: { "/assets/*": "./public/assets" } }`. File mappings are literal exact paths; directory mounts are explicit prefixes ending in `/*`. Native directory mounts (`assets.dirs`) are supported on Linux only (relying on kernel `openat2(RESOLVE_IN_ROOT)` for symlink containment); configuring `dirs` on macOS or Windows fails closed before startup (`LUGAS_ASSET_004`). File mappings (`assets.files`) are supported across all platforms. Assets are served natively by Bun through GET/HEAD; other methods reach the app's not-found policy (no 405). Ownership conflicts with API routes are rejected at startup (`LUGAS_ASSET_002`). Asset routes are outside the manifest and the request pipeline (no guards, no `onError`). A file mapping may also be `{ path, cacheControl }` (ADR-0037): an explicitly identified content-hashed asset served as a lazy file-backed pipeline handler carrying the cache header.
+
+`defineApp()` also accepts `spa` (opt-in, ADR-0037): `{ shell: "./dist/index.html", navigations: ["/", "/app/*"] }` serves an already-built frontend from the same process. The shell is a policy-capable file-backed handler at every declared navigation (secure headers/CORS/logging apply; revalidation cache policy); ownership is application-declared and fail-closed — navigations overlapping routes, assets, health, OpenAPI paths, or each other reject at startup (`LUGAS_SPA_001/002`); HEAD serves headers only; other methods never receive the shell. Details: [`docs/spa.md`](https://github.com/ther12k/lugas/blob/main/docs/spa.md).
+
+### SPA hosting (ADR-0037)
+
+Opt-in same-origin hosting of a built frontend: explicit navigation ownership, a pipeline-capable shell, and long-lived caching for explicitly identified content-hashed assets. No SSR, no runtime build, no catch-alls. See [`docs/spa.md`](https://github.com/ther12k/lugas/blob/main/docs/spa.md).
 
 ### Body budgets (ADR-0019)
 
@@ -117,6 +124,7 @@ defineApp({
 | `serializeQuery(query)` | function | stable |
 | `appendQuery(path, qs)` | function | stable |
 | `buildRequestInit(opts)` | function | stable |
+| `formBody(values)` | function — multipart body wrapper for `form()` routes | new (RF-3) |
 | `normalizeBaseUrl(url)` | function | stable |
 | `joinUrl(base, path)` | function | stable |
 | `CLIENT_HTTP_METHODS` | const | stable |
@@ -125,7 +133,7 @@ defineApp({
 | `ClientRequestError` | class | stable |
 | `ClientDecodeError` | class | stable |
 
-Types: `LugasClient`, `ClientConfig`, `MethodCallInput`, `ClientCallResult`, `ClientSuccess`, `ClientFailure`, etc.
+Types: `LugasClient`, `ClientConfig`, `MethodCallInput`, `ClientCallResult`, `ClientSuccess`, `ClientFailure`, `FrameworkProblemBody`, `FormBodyInput`, `FormBodyValue`, `FormBodyValues`, etc.
 
 ## Testing subpath (`lugas/testing`)
 

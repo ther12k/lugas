@@ -70,7 +70,7 @@ route({ headers: cookieHeader, guards: [session], /* … */ });
 const me = await api.get("/me", { headers: { cookie: "session=…" } });
 ```
 
-The client has **no built-in cookie jar**: `Set-Cookie` capture is a plain `fetch` concern (read `response.headers.get("set-cookie")`, then pass the pair back through the declared `cookie` header), and a browser holds its own jar. The end-to-end pattern — plain-fetch login, cookie forwarded through typed calls — is exercised in [`examples/realworld/`](https://github.com/ther12k/lugas/blob/main/examples/realworld/) (`app.ts` declares the header, `client.ts` drives it). For WebSocket handshakes, where the browser API cannot set `Cookie` headers at all, see the query-token pattern in [websockets](/lugas/websockets/).
+The client has **no built-in cookie jar**: `Set-Cookie` capture is a plain `fetch` concern (read `response.headers.get("set-cookie")`, then pass the pair back through the declared `cookie` header), and a browser holds its own jar. The end-to-end pattern — plain-fetch login, cookie forwarded through typed calls — is exercised in [`examples/realworld/`](https://github.com/ther12k/lugas/blob/main/examples/realworld/) (`app.ts` declares the header, `client.ts` drives it). For WebSocket handshakes, where the browser API cannot set `Cookie` headers at all, see the query-token pattern in [`websockets.md`](/lugas/websockets/).
 
 ## The result type
 
@@ -91,6 +91,44 @@ if (result.ok) {
 ```
 
 What `result.data` says is **wire truth**, derived from the server handler's `json()` body type: `Date` fields are `string`, non-finite numbers are `number | null`, possibly-dropped members are optional. See [`wire-honest-types.md`](/lugas/wire-honest-types/) for the full model.
+
+### Framework-generated failures in the union
+
+The union is not only handler and guard outcomes. Routes that **declare schemas** can be rejected by the framework before any handler runs, and those outcomes are part of the contract:
+
+| Route declares… | Added to the union |
+|---|---|
+| any schema slot (`params`, `query`, `headers`, `body`) | `422` `VALIDATION_FAILED` |
+| a `body` schema (JSON) | `415` `UNSUPPORTED_MEDIA_TYPE`, `400` `MALFORMED_JSON` |
+| a [`form()`](/lugas/uploads/) body | `415` `UNSUPPORTED_MEDIA_TYPE`, `400` `MALFORMED_MULTIPART`, `413` `FORM_LIMIT_EXCEEDED`/`BODY_BUDGET_EXCEEDED` (Problem body) |
+
+Each failure branch carries the Problem Details document the framework emits (`code` is the literal failure kind, `issues` the normalized validation issues). Routes that declare no schemas gain nothing.
+
+Two honest boundaries:
+
+- **413 is not in the union for JSON-schema routes.** Whether a body budget applies (route `budget`, app default, serve ceiling) is runtime configuration, and an out-of-union status still arrives safely: the runtime branch follows the actual response, and the result always carries `status`, the decoded payload slot, and `response`.
+- **The transport ceiling can bare-413 `form()` routes too.** Lugas-level 413s (`FORM_LIMIT_EXCEEDED`, `BODY_BUDGET_EXCEEDED`) always carry a Problem body, but Bun's `maxRequestBodySize` can reject the same request before the framework sees it — empty body, no Problem document. The multipart `413` branch therefore types its payload as **absentable** (`…ProblemBody | undefined`): narrow before reading Problem fields, and never assume `status: 413` alone identifies the rejection's origin. The decoder never manufactures a body.
+
+### Multipart uploads through the typed client
+
+Routes whose body is [`form()`](/lugas/uploads/) take a `formBody()` wrapper — the explicit runtime discriminator that selects the multipart encoder (the contract is erased at dispatch, so generics alone cannot pick the encoder):
+
+```ts
+import { formBody } from "lugas/client";
+
+const res = await api.post("/upload", {
+  body: formBody({
+    note: "quarterly report",
+    attachments: [new File([bytes], "q3.pdf", { type: "application/pdf" }), new File([bytes], "q4.pdf")],
+  }),
+});
+if (res.ok) res.data;          // the handler's typed json() body
+if (!res.ok) res.error.code;   // "FORM_LIMIT_EXCEEDED" | "BODY_BUDGET_EXCEEDED" | … (literal)
+```
+
+- Native `File`/`Blob` values are preserved as parts; scalars stringify; a flat array sends one part per element under the same field name (nested arrays are rejected).
+- The **platform generates the boundary**: the client never sets `content-type`, and a caller-supplied content type is a conflict (`LUGAS_CLIENT_008`).
+- Cancellation and every other platform option behave exactly as on JSON calls.
 
 ## Error classes
 

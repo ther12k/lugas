@@ -63,7 +63,7 @@ GET: websocket({
 })
 ```
 
-Requests that reach the upgrade decision without WebSocket handshake headers return **`426 Upgrade Required`** — honest HTTP for an honest mistake (a browser navigating to `ws://…`'s http twin, say), never a hang.
+Requests that reach the upgrade decision without WebSocket handshake headers return **`426 Upgrade Required`** — honest HTTP for an honest mistake (a browser navigating to `ws://…`'s http twin, say), never a hang. A well-formed handshake that the server cannot complete (a listener stopping mid-flight) answers **`503`** instead — a retryable server-side state, not a client mistake.
 
 ## What Lugas does not do
 
@@ -87,14 +87,14 @@ Requests that reach the upgrade decision without WebSocket handshake headers ret
 
 ## Shutdown semantics
 
-Long-lived sockets never "finish", so the graceful-drain contract for WebSockets is **close with a reason**, not wait-forever. When `server.lugasLifecycle.shutdown()` runs, every open Lugas-tracked socket is closed with code `1001` (Going Away, reason `"server shutting down"`) before the drain deadline starts; your `close` handlers run, and clients see the close frame:
+Long-lived sockets never "finish", so the graceful-drain contract for WebSockets is **close with a reason**, not wait-forever. Calling `server.lugasLifecycle.shutdown()` or receiving `SIGINT`/`SIGTERM` with `shutdown.signals` enabled runs the same path. It closes every open Lugas-tracked socket with code `1001` (Going Away, reason `"server shutting down"`) before the drain deadline starts; your `close` handlers run, and clients see the close frame:
 
 ```ts
 const server = app.serve({ port: 3000, shutdown: { signals: true } });
 // on shutdown, every client observes: close 1001 "server shutting down"
 ```
 
-New upgrades are refused once shutdown begins (the server stops accepting), and the rest of the lifecycle — drain deadline, reverse-order disposal, distinct outcomes — behaves exactly as documented in [services](/lugas/services/).
+New upgrades are refused once shutdown begins (the server stops accepting), and the rest of the lifecycle — drain deadline, reverse-order disposal, distinct outcomes — behaves exactly as documented in [services](/lugas/services/). Close is scoped per listener: serving the same app from two `serve()` calls and shutting one down leaves the other listener's sockets untouched, and new handshakes keep working on the surviving listener — each listener performs its own upgrades regardless of which response policies (CORS, secure headers, logging, telemetry) are configured, so a stopped sibling never leaves a stale upgrade target behind.
 
 ## Manifest and CLI
 

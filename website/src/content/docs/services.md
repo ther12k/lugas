@@ -6,23 +6,31 @@ description: "Named dependencies, the init traffic gate, and drain-ordered shutd
 
 ## Plain services
 
-Any value in the map is available as-is. Handler access to `ctx.services` is typed explicitly: pass a services type parameter to `route()` (`route<{ db: typeof db }>({ … })`) when the route declares nothing else, or use a narrow local cast when the route also declares schemas — schema slots occupy `route()`'s other type parameters (tracked as dogfood finding RF-1, `docs/reports/dogfood-realworld-findings.md`):
+Any value in the map is available as-is. Handler access to `ctx.services` is typed explicitly. Routes constructed independently of `defineApp()` (the common case for modules and multi-file apps) should bind the services type once with `bindServices()` — the returned `route`/`guard` infer every other slot (params, query, headers, body, guards, response statuses) per descriptor exactly like the plain factories, with no type arguments and no casts (closes dogfood finding RF-1, `docs/reports/dogfood-realworld-findings.md`):
 
 ```ts
-import { defineApp, route, json } from "lugas";
+import { bindServices, defineApp, json } from "lugas";
 
 const db = createDb();                 // your construction, your version
 const mailer = createMailer(process.env.SMTP_URL);
 
 type Services = { db: typeof db; mailer: ReturnType<typeof createMailer> };
 
+const { route, guard } = bindServices<Services>();
+
+const auth = guard({
+  name: "auth",
+  handler: () => ({ user: currentUser() }),
+});
+
 export default defineApp({
   services: { db, mailer },
   routes: {
     "/users/:id": {
       GET: route({
+        before: [auth],
         handler: async (ctx) => {
-          const { db } = ctx.services as Services;
+          const { db } = ctx.services;      // typed as Services — no cast
           const user = await db.users.find(ctx.params.id);
           return user ? json(200, user) : json(404, { error: "not found" });
         },
@@ -31,6 +39,10 @@ export default defineApp({
   },
 });
 ```
+
+`bindServices()` is compile-time only: the bound functions delegate to the plain `route()`/`guard()` factories, so validation and diagnostics are identical, and there is no container or runtime lookup.
+
+For a route that declares no schemas, `route<{ db: typeof db }>({ … })` also works — but supplying the services parameter pins every other generic slot to its default, which is why the cast-free pattern above is the recommended one.
 
 Plain values are **live references**: never initialized or disposed by the framework. That is the default on purpose — Lugas adds nothing you did not ask for.
 
@@ -78,12 +90,14 @@ export default defineApp({
 `server.lugasLifecycle.shutdown()` is idempotent and runs three phases:
 
 1. **Stop accepting** new connections.
-2. **Drain** in-flight requests and work registered through `track()` — bounded by a deadline (`serve({ shutdown: { drainDeadlineMs } })`, default 10 seconds).
+2. **Drain** in-flight requests and work registered through `track()`.
 3. **Dispose** services in reverse declaration order.
 
 Three outcomes are reported distinctly (`connectionsClosed`, `trackedWorkCompleted`, `disposalCompleted`, plus `disposalFailures`) — the outcome object is honest rather than boolean.
 
-**Deadline invariant:** when the deadline expires with work still running, the outcome is explicitly unsuccessful (`cooperated: false`, `deadlineExpired: true`); connections are force-closed but services that may still be in use are **not disposed** — continuing work observes an intact resource, never fabricated success. Work you detach from `track()` is yours.
+**One budget over the whole shutdown** (`serve({ shutdown: { drainDeadlineMs } })`, default 10 seconds): the deadline covers waiting for a still-running service `init` to settle, the drain, and disposal. A phase that never settles still returns — `shutdown()` never hangs indefinitely.
+
+**Deadline invariant:** when the deadline expires with work still running, the outcome is explicitly unsuccessful (`cooperated: false`, `deadlineExpired: true`); connections are force-closed but services that may still be in use are **not disposed** — continuing work observes an intact resource, never fabricated success. The same applies to a never-settling initializer (a half-initialized set is not honestly disposable) and to a never-settling `dispose` (it is reported in `disposalFailures`, and the services after it are recorded as not attempted rather than falsely disposed). Work you detach from `track()` is yours.
 
 ```ts
 const server = app.serve({
