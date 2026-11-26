@@ -23,9 +23,11 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+// #447 (2026-11-27): the literal "0.1.0-beta.1" drifted from the candidate
+// identity; stage from the single source of truth like the rehearsal does.
+import { CANDIDATE_VERSION as BETA_VERSION } from "../../../scripts/release/candidate-version";
 
 const ROOT = resolve(import.meta.dir, "../../..");
-const BETA_VERSION = "0.1.0-beta.1";
 // M7-005: the staged tarball carries the prebuilt browser artifact, mirroring
 // the rehearsal's Stage 1b, so consumers exercise the shipped bytes.
 const { buildBrowserClient } = await import("../../../scripts/release/build-browser-client");
