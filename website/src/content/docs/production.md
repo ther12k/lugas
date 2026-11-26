@@ -35,7 +35,7 @@ secureHeaders: {
 Semantics worth knowing:
 
 - **Fill-if-absent**: a handler's own header wins. The policy hardens negligence (a forgotten header on one error path) rather than fighting intent — `json(200, page, { headers: { "x-frame-options": "sameorigin" } })` keeps `sameorigin`.
-- **Coverage**: route responses, guard short-circuits, framework errors (Problem Details), and the not-found fallback all carry the policy. Static values (`Response`, `Bun.file`, `{ dir }`) and [`assets`](https://github.com/ther12k/lugas/tree/main/docs/getting-started.html) bypass the pipeline and carry none — serve policy-sensitive pages through the pipeline or a proxy.
+- **Coverage**: route responses, guard short-circuits, framework errors (Problem Details), the not-found fallback, health endpoints, the [`spa`](https://github.com/ther12k/lugas/blob/main/docs/spa.md) shell, and object-form asset mappings (`{ path, cacheControl }`) all carry the policy. Static route values (`Response`, `Bun.file`, `{ dir }`), string-form [`assets.files`](/lugas/getting-started/#serving-public-assets) mappings, and `assets.dirs` mounts bypass the pipeline and carry none — serve policy-sensitive pages through the pipeline or a proxy.
 - **CORS composes**: the policy applies inside the CORS wrapper (preflights skip it), so `cors` + `secureHeaders` is a normal combination.
 - Invalid configuration fails closed at startup (`LUGAS_HEADERS_001`): CSP must be a non-empty string, `hstsMaxAge` a positive integer.
 

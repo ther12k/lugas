@@ -56,29 +56,31 @@ Unsupported paths and methods are **compile errors** — `api.get("/nope")` does
 
 Two consequences of that design bite real code (dogfood findings RF-4/RF-5):
 
-**A route that declares a `headers` schema makes the options argument required.** The headers map is the only way to send headers, so the compiler insists you acknowledge it — even when you have nothing to send, the call needs an explicit empty object:
+**A route that declares a `headers` schema makes the options argument required.** The headers map is the only way to send headers, so the compiler insists you acknowledge it — even when every declared header is optional and you have nothing to send, the call needs an explicit empty object:
 
 ```ts
-// Route declares headers: z.object({ authorization: z.string() })
+// Route declares headers: z.object({ cookie: z.string().optional() })
 const r = await api.get("/me", { headers: {} }); // nothing to send — idiom, not noise
 ```
 
-**There is no way to send a header the route did not declare.** The typed call owns `method`, `body`, and `headers`; passing those through platform options (`init`) throws `LUGAS_CLIENT_007` at the call site rather than silently contradicting the contract. This is deliberate strictness — an undeclared header is invisible to the route's contract and to every consumer of its types.
+**The typed call has no input for undeclared headers.** This constraint applies to caller-supplied options, not headers the transport adds. The typed call owns `method`, `body`, and `headers`; passing those through platform options (`init`) throws `LUGAS_CLIENT_007` at the call site rather than silently contradicting the contract. This is deliberate strictness — an undeclared header is invisible to the route's contract and to every consumer of its types.
 
 ### Sending cookies
 
-The strictness means session cookies need their schema slot: declare the `cookie` header on guarded routes and the typed client accepts it as structured input.
+To forward a session cookie explicitly from server-side code, declare `cookie` in the route's header schema. A browser-managed cookie does not need a schema slot to travel on the wire.
 
 ```ts
 // Route side
 const cookieHeader = z.object({ cookie: z.string().optional() });
-route({ headers: cookieHeader, guards: [session], /* … */ });
+route({ headers: cookieHeader, before: [session], /* … */ });
 
-// Client side — forward the session cookie as a declared header
+// Client side (server runtimes) — forward the session cookie as a declared header
 const me = await api.get("/me", { headers: { cookie: "session=…" } });
 ```
 
-The client has **no built-in cookie jar**: `Set-Cookie` capture is a plain `fetch` concern (read `response.headers.get("set-cookie")`, then pass the pair back through the declared `cookie` header), and a browser holds its own jar. The end-to-end pattern — plain-fetch login, cookie forwarded through typed calls — is exercised in [`examples/realworld/`](https://github.com/ther12k/lugas/blob/main/examples/realworld/) (`app.ts` declares the header, `client.ts` drives it). For WebSocket handshakes, where the browser API cannot set `Cookie` headers at all, see the query-token pattern in [`websockets.md`](./websockets.md).
+The client has **no built-in cookie jar**. The Bun example (`examples/realworld/client.ts`) reads the single session cookie from the login response and forwards only its `name=value` pair to the same API, not the `Set-Cookie` attributes.
+
+In a browser, [`Cookie` is a forbidden request header](https://fetch.spec.whatwg.org/#forbidden-header-name). Let the browser attach eligible cookies. For the route above, a cross-origin call uses `api.get("/me", { headers: {}, init: { credentials: "include" } })`; the empty map does not clear the browser's jar. Cookie rules still apply, and the API must allow credentialed CORS for the caller to read the response. For browser WebSocket authentication, see [`websockets.md`](./websockets.md).
 
 ## The result type
 
@@ -115,7 +117,7 @@ Each failure branch carries the Problem Details document the framework emits (`c
 Two honest boundaries:
 
 - **413 is not in the union for JSON-schema routes.** Whether a body budget applies (route `budget`, app default, serve ceiling) is runtime configuration, and an out-of-union status still arrives safely: the runtime branch follows the actual response, and the result always carries `status`, the decoded payload slot, and `response`.
-- **The transport ceiling can bare-413 `form()` routes too.** Lugas-level 413s (`FORM_LIMIT_EXCEEDED`, `BODY_BUDGET_EXCEEDED`) always carry a Problem body, but Bun's `maxRequestBodySize` can reject the same request before the framework sees it — empty body, no Problem document. The multipart `413` branch therefore types its payload as **absentable** (`…ProblemBody | undefined`): narrow before reading Problem fields, and never assume `status: 413` alone identifies the rejection's origin. The decoder never manufactures a body.
+- **The transport ceiling can bare-413 `form()` routes too.** Lugas-level 413s (`FORM_LIMIT_EXCEEDED`, `BODY_BUDGET_EXCEEDED`) always carry a Problem body, but Bun's `maxRequestBodySize` can reject the same request before the framework sees it — empty body, no Problem document. The multipart `413` branch therefore types its payload as **absentable** (`…ProblemBody | undefined`): narrow before reading Problem fields, and never assume `status: 413` alone identifies the rejection's origin. The decoder never manufactures a body. That rejection is Bun's alone, so it carries no CORS headers either — a cross-origin browser caller cannot read it and gets a failed request rather than a `413`.
 
 ### Multipart uploads through the typed client
 
@@ -131,7 +133,7 @@ const res = await api.post("/upload", {
   }),
 });
 if (res.ok) res.data;          // the handler's typed json() body
-if (!res.ok) res.error.code;   // "FORM_LIMIT_EXCEEDED" | "BODY_BUDGET_EXCEEDED" | … (literal)
+if (!res.ok) res.error?.code;  // undefined for a bare transport 413
 ```
 
 - Native `File`/`Blob` values are preserved as parts; scalars stringify; a flat array sends one part per element under the same field name (nested arrays are rejected).
