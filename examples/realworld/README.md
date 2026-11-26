@@ -39,7 +39,7 @@ curl -sb /tmp/rw.jar localhost:3000/me
 curl -sb /tmp/rw.jar -N localhost:3000/events    # live SSE stream
 ```
 
-The typed-client smoke exercises the API the way a browser would (cookie captured by hand — the client has no cookie jar, by design):
+The Bun typed-client smoke captures and forwards the session cookie explicitly. In a browser, the browser manages the cookie jar:
 
 ```bash
 bun run examples/realworld/client.ts     # prints REALWORLD-CLIENT-OK
@@ -50,5 +50,5 @@ bun run examples/realworld/client.ts     # prints REALWORLD-CLIENT-OK
 - **Sessions are demo-grade**: an in-memory `Map<token, userId>`. Real apps bring their own session store or Better Auth — see [`docs/cookies.md`](../../docs/cookies.md).
 - **WebSocket auth uses a query token** (`/ws?session=…`) because the browser `WebSocket` API cannot set `Cookie` headers on the handshake; this mirrors the documented pattern in [`docs/websockets.md`](../../docs/websockets.md). Same session map, same lookup as the cookie guard.
 - **`ws.publish` does not echo to the sender** (Bun pub/sub semantics) — presence messages go to everyone else in the room.
-- **Mutations use `RETURNING` + `.all()`**: drizzle's bun-sqlite `.get()` returns a values-array rather than a row object, and `.run()` resolves `void` — `RETURNING` through `.all()` is the typed single-row path.
+- **Mutations use `RETURNING` + `.all()`**: on the raw `sql` path, drizzle's bun-sqlite `.get()` returns a values-array rather than a row object — `RETURNING` through `.all()` is the typed single-row path. `.all()` returns `[]` when nothing came back; `.run()` returns `{ changes, lastInsertRowid }`. See "Result shapes on bun-sqlite" in [`docs/drizzle.md`](../../docs/drizzle.md).
 - The app is exercised end-to-end by `bun test tests/integration/realworld.test.ts`.

@@ -1,16 +1,20 @@
 /**
- * HTTP Policy Composition Integration Suite (#449, LNR-08).
+ * HTTP policy composition (#449).
  *
- * Exercises cross-feature compositions across the documented wire contract:
- * - CORS (ADR-0022)
- * - Secure Headers (ADR-0029)
- * - Compression and ETag (ADR-0033)
- * - Rate Limiting & Guard Short-Circuits (ADR-0027, ADR-0034)
- * - Standard Schema Validation & Problem Details (ADR-0025, RFC 9457)
- * - SSE Streaming Non-Compression & Non-ETag (ADR-0028, ADR-0036)
- * - Multipart Uploads & Form Limits (ADR-0030)
- * - Static Assets and SPA Navigation Boundaries (ADR-0037)
- * - Intentionally Unsupported Configurations (LUGAS_CORS_004)
+ * Every policy on at once, over real sockets, to check the cross-feature
+ * contract that the per-feature suites (cors, compression, production, forms,
+ * static/spa) each see only one side of. Each group names the document its
+ * expectations come from, and says so where a fact is observed but not yet
+ * documented. Facts already pinned by a feature suite are not restated here.
+ *
+ * 1. CORS + secureHeaders + compression + etag on one response — docs/compression.md, docs/cors.md
+ * 2. Preflights — docs/cors.md; preflights skip secureHeaders — docs/production.md
+ * 3. Guard and validation rejections — no validator on failure statuses (docs/compression.md), policy on errors (docs/cors.md)
+ * 4. SSE and multipart ceilings — docs/compression.md, docs/uploads.md
+ * 5. Health, assets, SPA — docs/production.md, docs/spa.md
+ * 6. Native directory mounts — docs/spa.md, ADR-0037
+ * 7. Transport-owned vs framework-owned 413 — docs/client.md
+ * 8. Logging and telemetry see the final status — docs/telemetry.md, ADR-0032
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
@@ -23,7 +27,6 @@ import {
   problem,
   route,
   sse,
-  type LugasAppInstance,
 } from "../../src/index";
 import { createTestServer, type TestServer } from "../../src/testing";
 
@@ -64,7 +67,7 @@ const rateLimitGuard = guard({
   },
 });
 
-function createApiComposedApp(): LugasAppInstance<unknown, any> {
+function createApiComposedApp(): ReturnType<typeof defineApp> {
   return defineApp({
     cors: {
       origin: [ALLOWED_ORIGIN],
@@ -142,7 +145,7 @@ function createApiComposedApp(): LugasAppInstance<unknown, any> {
   });
 }
 
-function createSpaAndAssetsApp(): LugasAppInstance<unknown, any> {
+function createSpaAndAssetsApp(): ReturnType<typeof defineApp> {
   return defineApp({
     secureHeaders: {
       contentSecurityPolicy: "default-src 'self'",
@@ -156,10 +159,7 @@ function createSpaAndAssetsApp(): LugasAppInstance<unknown, any> {
           path: join(DIST, "assets", "app-4f8a1b.js"),
           cacheControl: "public, max-age=31536000, immutable",
         },
-        "/robots.txt": join(DIST, "robots.txt"),
-      },
-      dirs: {
-        "/static/*": join(DIST, "assets"),
+        "/robots.txt": join(DIST, "robots.txt"), // string form: served natively
       },
     },
     spa: {
@@ -238,7 +238,7 @@ describe("HTTP Policy Composition Matrix (#449)", () => {
       expect(data.payload).toBe(REPEAT);
     });
 
-    test("Conditional GET with matching If-None-Match yields 304 without body or compression cost", async () => {
+    test("Conditional GET with matching If-None-Match yields 304 without body or Content-Encoding", async () => {
       // Step 1: get initial etag
       const initial = await apiServer.fetch("/api/data");
       const etag = initial.headers.get("etag")!;
@@ -311,7 +311,11 @@ describe("HTTP Policy Composition Matrix (#449)", () => {
   });
 
   describe("2. CORS Preflights and Origin Boundaries", () => {
-    test("OPTIONS preflight returns 204 with methods, headers, and secure headers, bypassing compression/etag", async () => {
+    // docs/cors.md "Preflight interception": 204 before application handlers,
+    // full header set when allowed. docs/production.md "CORS composes": the
+    // secure-headers policy applies inside the CORS wrapper, so preflights
+    // skip it. This is the fallback path — /api/data declares no OPTIONS.
+    test("allowed preflight: 204, full CORS header set, no secureHeaders policy, no compression/etag", async () => {
       const preflight = await apiServer.fetch("/api/data", {
         method: "OPTIONS",
         headers: {
@@ -325,6 +329,9 @@ describe("HTTP Policy Composition Matrix (#449)", () => {
       expect(preflight.headers.get("access-control-allow-origin")).toBe(ALLOWED_ORIGIN);
       expect(preflight.headers.get("access-control-allow-credentials")).toBe("true");
 
+      expect(preflight.headers.get("access-control-max-age")).toBe("3600");
+      expect(preflight.headers.get("vary")?.toLowerCase().split(/\s*,\s*/)).toContain("origin");
+
       const allowMethods = preflight.headers.get("access-control-allow-methods") ?? "";
       expect(allowMethods).toContain("GET");
       expect(allowMethods).toContain("HEAD");
@@ -333,13 +340,15 @@ describe("HTTP Policy Composition Matrix (#449)", () => {
       expect(allowHeaders).toContain("authorization");
       expect(allowHeaders).toContain("x-client-id");
 
-      // Preflight is handled at the outermost CORS boundary before application response wrappers
+      // Preflights skip the secureHeaders policy (documented), and never
+      // reach etag or compression.
+      expect(preflight.headers.get("x-content-type-options")).toBeNull();
       expect(preflight.headers.get("content-encoding")).toBeNull();
       expect(preflight.headers.get("etag")).toBeNull();
       expect(await preflight.text()).toBe("");
     });
 
-    test("Unauthorized origin preflight gets 204 with Vary: Origin but no allow-origin", async () => {
+    test("denied-origin preflight: 204 with Vary only", async () => {
       const preflight = await apiServer.fetch("/api/data", {
         method: "OPTIONS",
         headers: {
@@ -350,7 +359,7 @@ describe("HTTP Policy Composition Matrix (#449)", () => {
 
       expect(preflight.status).toBe(204);
       expect(preflight.headers.get("vary")).toContain("Origin");
-      expect(preflight.headers.get("access-control-allow-origin")).toBeNull();
+      expect([...preflight.headers.keys()].filter((name) => name.startsWith("access-control-"))).toEqual([]);
     });
   });
 
@@ -376,7 +385,10 @@ describe("HTTP Policy Composition Matrix (#449)", () => {
       expect(prob.title).toBe("Unauthorized");
     });
 
-    test("429 Rate-limited guard short-circuit retains custom headers, CORS and secureHeaders without ETag", async () => {
+    // A guard that returns a 429 Response (not the rateLimit() guard of
+    // ADR-0034 — this row is about how a short-circuit composes, not about
+    // the limiter).
+    test("429 from a guard short-circuit keeps its own headers plus CORS and secureHeaders, no framework ETag", async () => {
       const res = await apiServer.fetch("/api/rate-limited", {
         headers: {
           origin: ALLOWED_ORIGIN,
@@ -462,8 +474,11 @@ describe("HTTP Policy Composition Matrix (#449)", () => {
     });
   });
 
-  describe("5. Health, Static Assets, and SPA Boundaries", () => {
-    test("Liveness endpoint /healthz responds with json { status: 'ok' }, secureHeaders, and CORS", async () => {
+  // docs/production.md "Health and readiness": `200 {"status":"ok"}` and, once
+  // init has settled, `200 {"status":"ready"}`. Health endpoints are mounted
+  // with logging → secureHeaders → CORS, so they carry the policies this app has on.
+  describe("5. Health, assets, and SPA boundaries", () => {
+    test("liveness: 200 { status: 'ok' } with CORS and secureHeaders", async () => {
       const res = await apiServer.fetch("/healthz", {
         headers: {
           origin: ALLOWED_ORIGIN,
@@ -478,7 +493,7 @@ describe("HTTP Policy Composition Matrix (#449)", () => {
       expect(body.status).toBe("ok");
     });
 
-    test("Readiness endpoint /ready responds with json { status: 'ready' }, secureHeaders, and CORS", async () => {
+    test("readiness: 200 { status: 'ready' } with CORS and secureHeaders", async () => {
       const res = await apiServer.fetch("/ready", {
         headers: {
           origin: ALLOWED_ORIGIN,
@@ -493,72 +508,189 @@ describe("HTTP Policy Composition Matrix (#449)", () => {
       expect(body.status).toBe("ready");
     });
 
-    test("Hashed static asset retains immutable cacheControl and secureHeaders", async () => {
+    // Which static responses a policy reaches is the cross-feature question.
+    // docs/production.md "Coverage" and docs/spa.md: the { path, cacheControl }
+    // object form and the SPA shell are pipeline handlers and carry the
+    // secure-headers policy; string-form mappings and `dirs` mounts stay
+    // native and carry no pipeline headers. (The forms themselves are pinned
+    // in tests/static/spa.test.ts; these rows run them with every policy on.)
+    test("object-form asset: immutable cacheControl and the secure-headers policy", async () => {
       const res = await spaServer.fetch("/assets/app-4f8a1b.js");
 
       expect(res.status).toBe(200);
       expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
       expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(await res.text()).toBe(await Bun.file(join(DIST, "assets", "app-4f8a1b.js")).text());
     });
 
-    test("Unmatched asset path does NOT fall back to SPA shell, returning 404 with secureHeaders", async () => {
-      const res = await spaServer.fetch("/assets/non-existent.js");
+    test("string-form asset: served natively, no secure-headers policy", async () => {
+      const res = await spaServer.fetch("/robots.txt");
 
-      expect(res.status).toBe(404);
-      expect(res.headers.get("x-content-type-options")).toBe("nosniff");
-      const text = await res.text();
-      expect(text).not.toContain("<html>");
+      expect(res.status).toBe(200);
+      expect(res.headers.get("x-content-type-options")).toBeNull();
+      expect(await res.text()).toBe(await Bun.file(join(DIST, "robots.txt")).text());
     });
 
-    test("SPA navigation route returns HTML shell with secureHeaders and no-cache", async () => {
+    test("SPA navigation: the shell carries the secure-headers policy and revalidation caching", async () => {
       const res = await spaServer.fetch("/app/dashboard");
 
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toContain("text/html");
       expect(res.headers.get("cache-control")).toBe("no-cache");
       expect(res.headers.get("x-content-type-options")).toBe("nosniff");
-      const html = await res.text();
-      expect(html).toContain("<!doctype html>");
+      expect(await res.text()).toBe(await Bun.file(join(DIST, "index.html")).text());
+    });
+
+    test("a path that is neither asset nor navigation: the app's not-found Problem, not the shell", async () => {
+      const res = await spaServer.fetch("/nothing-here");
+
+      expect(res.status).toBe(404);
+      expect(res.headers.get("content-type")).toContain("application/problem+json");
+      expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(await res.text()).not.toBe(await Bun.file(join(DIST, "index.html")).text());
     });
   });
 
-  describe("6. Intentionally Unsupported Configurations (LUGAS_CORS_004)", () => {
-    test("Combining cors with assets configuration fails closed at defineApp", () => {
-      expect(() => {
-        defineApp({
-          cors: { origin: "*" },
-          assets: {
-            files: { "/test.txt": join(DIST, "robots.txt") },
-          },
-          routes: {},
-        });
-      }).toThrow();
+  // Intentionally unsupported combinations (LUGAS_CORS_004: cors needs the
+  // pipeline) are owned by tests/cors/config.test.ts and are not restated here.
 
-      try {
+  // Native `dirs` mounts are Linux-only (ADR-0018 amendment). Bun evaluates
+  // even skipped describe callbacks, so build the app inside the test body.
+  describe("6. Native directory mount with response policies enabled", () => {
+    test.skipIf(process.platform !== "linux")("dir-mounted file is served natively: no secure-headers policy and no framework validator", async () => {
+      const server = createTestServer(
         defineApp({
-          cors: { origin: "*" },
-          assets: {
-            files: { "/test.txt": join(DIST, "robots.txt") },
-          },
-          routes: {},
-        });
-        expect.unreachable();
-      } catch (err) {
-        expect((err as { code?: string }).code).toBe("LUGAS_CORS_004");
+          secureHeaders: true,
+          compression: true,
+          etag: true,
+          assets: { dirs: { "/static/*": join(DIST, "assets") } },
+        }),
+      );
+      try {
+        const res = await server.fetch("/static/app-4f8a1b.js");
+
+        expect(res.status).toBe(200);
+        expect(res.headers.get("x-content-type-options")).toBeNull();
+        expect(await res.text()).toBe(await Bun.file(join(DIST, "assets", "app-4f8a1b.js")).text());
+        // Bun may stamp its own weak validator on a file it serves. A framework
+        // validator is a strong quoted SHA-1 and must never reach a native mount.
+        const etag = res.headers.get("etag");
+        if (etag !== null) expect(etag).not.toMatch(/^"[0-9a-f]{40}"$/);
+      } finally {
+        await server.stop();
       }
     });
+  });
 
-    test("Combining cors with static Response route values fails closed at defineApp", () => {
-      try {
-        defineApp({
-          cors: { origin: "*" },
-          routes: {
-            "/static-val": new Response("static"),
+  // docs/client.md "Two honest boundaries": Bun's `maxRequestBodySize` can
+  // reject a request before the framework sees it — empty body, no Problem
+  // document. The same request under the ceiling but over a route budget is a
+  // framework 413. The ceiling is a server option the test helper does not
+  // expose, hence `app.serve()` directly (as tests/security/body-budgets.test.ts).
+  describe("7. Transport-owned vs framework-owned 413", () => {
+    test("only the framework 413 is a Problem document that CORS and secureHeaders reach", async () => {
+      let handlerRuns = 0;
+      const app = defineApp({
+        cors: { origin: [ALLOWED_ORIGIN], credentials: true },
+        secureHeaders: true,
+        routes: {
+          "/api/echo": {
+            POST: route({
+              budget: 16,
+              body: z.object({ v: z.string() }),
+              handler: () => {
+                handlerRuns += 1;
+                return json(200, { ok: true });
+              },
+            }),
           },
+        },
+      });
+      const server = app.serve({ port: 0, development: false, maxRequestBodySize: 64 });
+      const base = new URL(server.url).origin;
+      const post = (padding: number): Promise<Response> =>
+        fetch(`${base}/api/echo`, {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: ALLOWED_ORIGIN },
+          body: JSON.stringify({ v: "x".repeat(padding) }),
         });
-        expect.unreachable();
-      } catch (err) {
-        expect((err as { code?: string }).code).toBe("LUGAS_CORS_004");
+      try {
+        // 48 bytes: over the route budget (16), under Bun's ceiling (64).
+        const framework = await post(40);
+        expect(framework.status).toBe(413);
+        expect(framework.headers.get("content-type")).toContain("application/problem+json");
+        expect(((await framework.json()) as { code: string }).code).toBe("BODY_BUDGET_EXCEEDED");
+        expect(framework.headers.get("access-control-allow-origin")).toBe(ALLOWED_ORIGIN);
+        expect(framework.headers.get("x-content-type-options")).toBe("nosniff");
+
+        // 108 bytes: above Bun's ceiling — answered by Bun before any Lugas policy runs.
+        const transport = await post(100);
+        expect(transport.status).toBe(413);
+        expect(await transport.text()).toBe("");
+        expect(transport.headers.get("content-type")).toBeNull();
+        // docs/client.md: even an allowed origin gets no CORS headers on Bun's 413.
+        expect(transport.headers.get("access-control-allow-origin")).toBeNull();
+        expect(transport.headers.get("vary")).toBeNull();
+        expect(transport.headers.get("x-content-type-options")).toBeNull();
+
+        expect(handlerRuns).toBe(0);
+      } finally {
+        server.stop(true);
+      }
+    });
+  });
+
+  // docs/telemetry.md: with `logging.requestIds` on, one id appears in the
+  // telemetry events, the `x-request-id` header, and the access log, and the
+  // end event carries the response status. This checks the observable ID
+  // and status, not the order of wrappers that preserve them.
+  describe("8. Logging and telemetry report the final response", () => {
+    test("a conditional 304 is logged and reported as 304, under one shared request id", async () => {
+      const access: Array<Record<string, unknown>> = [];
+      const ends: Array<{ status: number; requestId: string | undefined }> = [];
+      const server = createTestServer(
+        defineApp({
+          cors: { origin: [ALLOWED_ORIGIN] },
+          secureHeaders: true,
+          compression: true,
+          etag: true,
+          logging: {
+            access: true,
+            requestIds: true,
+            sink: (entry) => {
+              access.push(entry.fields as Record<string, unknown>);
+            },
+          },
+          telemetry: {
+            onRequestEnd: (event) => {
+              ends.push({ status: event.status, requestId: event.requestId });
+            },
+          },
+          routes: {
+            "/api/data": {
+              GET: route({ handler: () => json(200, { payload: REPEAT }) }),
+            },
+          },
+        }),
+      );
+      try {
+        const first = await server.fetch("/api/data");
+        const etag = first.headers.get("etag");
+        expect(etag).toMatch(/^"[0-9a-f]{40}"$/);
+        await first.text();
+        access.length = 0;
+        ends.length = 0;
+
+        const conditional = await server.fetch("/api/data", { headers: { "if-none-match": etag! } });
+        expect(conditional.status).toBe(304);
+        const requestId = conditional.headers.get("x-request-id");
+        if (!requestId) throw new Error("conditional response is missing a non-empty x-request-id");
+
+        expect(access).toHaveLength(1);
+        expect(access.at(-1)).toMatchObject({ status: 304, requestId });
+        expect(ends).toEqual([{ status: 304, requestId }]);
+      } finally {
+        await server.stop();
       }
     });
   });

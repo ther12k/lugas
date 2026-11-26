@@ -54,22 +54,39 @@ Handlers reach the instance through `ctx.services.<name>` — the typed services
 
 ## Result shapes on bun-sqlite
 
-Drizzle's `bun-sqlite` driver is a thin wrapper over Bun's synchronous SQLite client, and its result shapes bite the natural single-row patterns (dogfood finding RF-2):
+One read path on the `bun-sqlite` driver does not hand back row objects, and it is the one raw SQL reaches for (dogfood finding RF-2). Asking for a single row, on drizzle-orm `0.45.2` with Bun `1.4.0`:
 
-- **`.get()` returns a values-array, not a row object.** The `SELECT … WHERE id = ?`-shaped code you would expect to hand back one row returns an array of values. Reading it as a row silently produces arrays where objects were expected.
-- **`.run()` resolves `void`.** Mutations give no way to read back what changed — there is no inserted id, no affected row.
+| Read path | Matching row | No match |
+|---|---|---|
+| ``db.get(sql`SELECT …`)`` | **a values-array** — `[1, "ada"]` | `undefined` |
+| ``db.all(sql`SELECT …`)`` | an array of row objects | `[]` |
+| `db.select().from(users).where(…).get()` | a row object | `undefined` |
+| `await db.query.users.findFirst(…)` | a row object | `undefined` |
 
-The reliable single-row read/mutation path is **`RETURNING` through `.all()`**, which keeps its type argument:
+Only the first row is a trap: the `SELECT … WHERE id = ?` shape you would expect to return one row object returns an array of values, so `row.name` reads `undefined`. The query builder and the relational query API are unaffected.
+
+For raw SQL, read a typed single row through `.all()` and destructure. For mutations, `RETURNING` through `.all()` gives you the row the statement produced:
 
 ```ts
 // Insert and read the generated id back — one statement, one typed row.
 const [row] = await database.all<{ id: number }>(
   sql`INSERT INTO users (name, email) VALUES (${name}, ${email}) RETURNING id`,
 );
-const id = row?.id; // undefined => the insert returned no row
+const id = row?.id;
 ```
 
-This is Drizzle/bun-sqlite behavior, not something Lugas introduces or can smooth over — the adapter deliberately passes the instance through untouched (see [What the adapter guarantees](#what-the-adapter-guarantees)). Multi-row reads are unaffected: `.all()` returns the full typed array. The end-to-end patterns live in [`examples/realworld/`](https://github.com/ther12k/lugas/blob/main/examples/realworld/) (`app.ts`, mutations through `RETURNING` + `.all()`).
+`.all()` always answers an array — `[]` when nothing came back, never `undefined` — so test the array itself:
+
+```ts
+const updated = await database.all<{ id: number }>(
+  sql`UPDATE users SET name = ${name} WHERE id = ${id} RETURNING id`,
+);
+if (updated.length === 0) return problem(404, { title: "User not found" }); // `=== undefined` never fires
+```
+
+Mutations without `RETURNING` still report what they did: `.run()` returns Bun's `Changes` object (`{ changes, lastInsertRowid }`), not `void`.
+
+This is Drizzle/bun-sqlite behavior, not something Lugas introduces or can smooth over — the adapter deliberately passes the instance through untouched (see [What the adapter guarantees](#what-the-adapter-guarantees)). For the raw-`sql` mutation pattern, see `examples/realworld/app.ts`.
 
 ## What the adapter guarantees
 

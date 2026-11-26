@@ -62,7 +62,7 @@ export default defineApp({
 
 ## How they compose
 
-The response passes run innermost → outermost: handler → error policy → gate → **etag** → **compression** → logging → telemetry → [secure headers](./production.md) → [CORS](./cors.md). Both policies are skip-transparent: a response any rule excludes crosses the chain byte-identical. Combined with `secureHeaders`, one response can carry `content-encoding`, a matching `etag`, and the security baseline together.
+The response passes run innermost → outermost: handler → error policy → gate → **etag** → **compression** → telemetry → logging → [secure headers](./production.md) → [CORS](./cors.md). Both policies are skip-transparent: a response any rule excludes crosses the chain byte-identical. Combined with `secureHeaders`, one response can carry `content-encoding`, a matching `etag`, and the security baseline together.
 
 ## Deliberately not here (ADR-0033 non-goals)
 
