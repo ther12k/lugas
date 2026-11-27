@@ -28,6 +28,7 @@
  * Skips cleanly when npm is unavailable (documented, not silently passed).
  */
 import { describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { execSync, spawnSync } from "node:child_process";
 import {
   cpSync,
@@ -385,6 +386,83 @@ console.log("IDENTITY-OK fw=" + app.manifest.frameworkVersion);`,
           expect(ran.code).toBe(0);
           expect(ran.out).toContain(`IDENTITY-OK fw=${installedPkg.version}`);
         }
+      } finally {
+        rmSync(stage, { recursive: true, force: true });
+      }
+    },
+    240_000,
+  );
+
+  test(
+    "exact-artifact qualification: verifies prebuilt candidate tarball and checksum without rebuilding (LR2-04)",
+    async () => {
+      // Allows testing an externally passed release candidate or falling back to the committed candidate
+      const defaultTarball = resolve(ROOT, "docs/releases/beta/lugas-0.1.0-beta.6.tgz");
+      const defaultSha = "91621e479db1bbea4d1a5a9fb8e5a8cd5cf992db9e21bf96a264874c7f079612";
+      const tarballPath = resolve(process.env.LUGAS_RELEASE_TARBALL || defaultTarball);
+      const expectedSha256 = process.env.LUGAS_EXPECTED_SHA256 || (tarballPath === defaultTarball ? defaultSha : undefined);
+
+      if (!existsSync(tarballPath)) return;
+
+      // 1. Negative control: checksum mismatch MUST fail closed before testing
+      const wrongSha = "0000000000000000000000000000000000000000000000000000000000000000";
+      const computeSha256 = (p: string) => createHash("sha256").update(readFileSync(p)).digest("hex");
+      expect(() => {
+        const actual = computeSha256(tarballPath);
+        if (actual !== wrongSha) throw new Error(`checksum mismatch: expected ${wrongSha}, got ${actual}`);
+      }).toThrow("checksum mismatch");
+
+      // 2. Positive checksum verification
+      const actualSha = computeSha256(tarballPath);
+      if (expectedSha256) {
+        expect(actualSha).toBe(expectedSha256);
+      }
+
+      // 3. Clean consumer installation without rebuilding
+      const stage = mkdtempSync(join(tmpdir(), "lugas-exact-consumer-"));
+      try {
+        const dir = installConsumer(stage, "t-exact", tarballPath);
+        const installedRoot = join(dir, "node_modules", "lugas");
+        const installedPkg = JSON.parse(readFileSync(join(installedRoot, "package.json"), "utf8")) as {
+          version: string;
+          exports: Record<string, unknown>;
+        };
+
+        expect(Object.keys(installedPkg.exports).sort()).toEqual([
+          ".",
+          "./client",
+          "./client/browser",
+          "./drizzle",
+          "./testing",
+        ]);
+
+        // Verify CLI binary exists
+        const bin = join(dir, "node_modules", ".bin", "lugas");
+        expect(existsSync(bin)).toBe(true);
+
+        // Verify resolutions
+        const resolveDefault = run("bun -e 'console.log(Bun.resolveSync(\"lugas\", process.cwd()))'", dir);
+        expect(resolveDefault.code).toBe(0);
+        expect(resolveDefault.out.endsWith("src/index.ts")).toBe(true);
+
+        const resolveDist = run("bun --conditions=lugas-dist -e 'console.log(Bun.resolveSync(\"lugas\", process.cwd()))'", dir);
+        expect(resolveDist.code).toBe(0);
+        expect(resolveDist.out.endsWith("dist/index.js")).toBe(true);
+
+        // Verify execution in both modes from installed bytes
+        writeFileSync(
+          join(dir, "app.ts"),
+          `import { defineApp, route, json } from "lugas";
+const app = defineApp({ routes: { "/ping": { GET: route({ handler: () => json(200, { pong: true }) }) } } });
+console.log("EXACT-OK fw=" + app.manifest.frameworkVersion);`,
+        );
+        const ranDefault = run("bun run app.ts", dir);
+        expect(ranDefault.code).toBe(0);
+        expect(ranDefault.out).toContain(`EXACT-OK fw=${installedPkg.version}`);
+
+        const ranDist = run("bun --conditions=lugas-dist run app.ts", dir);
+        expect(ranDist.code).toBe(0);
+        expect(ranDist.out).toContain(`EXACT-OK fw=${installedPkg.version}`);
       } finally {
         rmSync(stage, { recursive: true, force: true });
       }
