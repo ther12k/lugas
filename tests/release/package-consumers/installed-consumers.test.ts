@@ -5,15 +5,21 @@
  * and the M6R7 consumer-types suite compiles fixtures — but against a
  * `bun pm pack` staging with the repository's own tsc and @types (its own
  * design note defers the release tarball). This suite closes the #447 gaps
- * against the RELEASE-staged tarball (same staging path as the rehearsal):
+ * against a rehearsal-style staged tarball: the working tree is copied and
+ * given the rehearsal's version/publishConfig/bin transformations — but
+ * NOT the rehearsal's `git archive HEAD` staging (uncommitted working-tree
+ * content ships here) and NOT its metadata injections (engines/repository/
+ * bugs/homepage/keywords). Working-tree consumer evidence, not
+ * committed-candidate attestation:
  *
  * 1. Clean-room typecheck — the consumer installs its OWN typescript,
  *    @types/bun and zod from the registry (no checkout leakage), compiles
  *    positive fixtures with the documented getting-started tsconfig, and a
  *    negative fixture proves contract violations fail compilation.
  * 2. Browser-safety scan — the bundled client output AND the prebuilt
- *    artifact must contain no bun:/node: server-runtime or framework
- *    dependency specifiers.
+ *    artifact must contain no quoted bun:/node: server-runtime specifiers
+ *    (dependency inlining is the bundler's job and is asserted only as the
+ *    absence of leftover external specifiers — see the scan's comment).
  * 3. Resolution containment — every declared subpath resolves inside the
  *    consumer's node_modules/lugas in both modes, never the checkout; the
  *    manifest framework version equals the installed package metadata
@@ -270,7 +276,7 @@ describe.skipIf(!npmAvailable())("release-staged installed consumers (#447)", ()
   );
 
   test(
-    "browser bundle and prebuilt artifact carry no server-runtime or dependency specifiers",
+    "browser bundle and prebuilt artifact carry no leftover server-runtime specifiers and run under Node",
     async () => {
       const staged = await stageReleaseTarball();
       if (!staged) throw new Error("stage failed (npm unavailable?)");
@@ -290,9 +296,16 @@ console.log("BROWSER-ENTRY-OK");`,
         const js = readdirSync(outDir).find((f) => f.endsWith(".js"));
         expect(js).toBeDefined();
 
-        // A quoted bun:/node: module specifier or a bare framework-dependency
-        // specifier means server/runtime coupling reached the browser output.
-        const forbidden = /["'](bun|node):[^"']*["']|["'](drizzle-orm|zod)["']/;
+        // What this scan can prove: no quoted bun:/node: specifier survived
+        // into the browser output — a server-runtime import left as an
+        // unresolved external would appear exactly here, and the Node run
+        // below would also fail on it. What it cannot prove: absent
+        // framework-dependency imports (drizzle-orm, zod). Both the prebuilt
+        // artifact and this bundle are produced without `external`, so the
+        // bundler inlines every resolvable import and a quoted bare
+        // specifier could only survive as an unresolved error — checked by
+        // bundle.success and the Node run, not by this text scan.
+        const forbidden = /["'](bun|node):[^"']*["']/;
         const bundled = readFileSync(join(outDir, js!), "utf8");
         expect(forbidden.test(bundled)).toBe(false);
         const prebuilt = readFileSync(join(dir, "node_modules", "lugas", "build", "lugas-client.esm.js"), "utf8");

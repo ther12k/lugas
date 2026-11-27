@@ -102,13 +102,18 @@ describe("deployment failure modes (#448)", () => {
     }
   });
 
-  test("a client disconnect mid-handler does not cancel the handler's work (documented limitation)", async () => {
+  test("on client disconnect the request signal aborts but an uncooperative handler runs to completion (documented limitation)", async () => {
     const events: string[] = [];
     const app = defineApp({
       routes: {
         "/work": {
           GET: route({
-            handler: async () => {
+            handler: async (ctx) => {
+              // Observe the disconnect the way Bun reports it: the request
+              // signal aborts. The handler itself never awaits or observes
+              // the signal, which is exactly the "uncooperative handler"
+              // shape the README's beta limitation describes.
+              ctx.request.signal.addEventListener("abort", () => events.push("SIGNAL-ABORTED"), { once: true });
               await Bun.sleep(300);
               events.push("WORK-COMPLETED");
               return json(200, { ok: true });
@@ -129,9 +134,12 @@ describe("deployment failure modes (#448)", () => {
       await Bun.sleep(50); // mid-handler: the 300ms handler has ~250ms left
       controller.abort();
       const clientResult = await pending;
-      // The demonstrated fact is the handler side: the work is not cancelled.
+      // The demonstrated facts: the platform surface reports the disconnect
+      // (signal aborts), and the handler side is NOT cancelled — a bare
+      // sleep + push would complete by language semantics alone, so the
+      // signal assertion is what gives this row its teeth.
       await Bun.sleep(450);
-      expect(events).toEqual(["WORK-COMPLETED"]); // handler ran to completion
+      expect(events).toEqual(["SIGNAL-ABORTED", "WORK-COMPLETED"]); // signal fired; handler ran on
       expect(clientResult).toBe("aborted:AbortError");
       const outcome = await server.lugasLifecycle.shutdown();
       expect(outcome.disposalCompleted).toBe(true);
