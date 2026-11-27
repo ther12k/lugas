@@ -11,11 +11,12 @@
  * fails honestly.
  *
  * Skips cleanly when Docker is unusable or the pinned oven/bun:1.4.0-alpine
- * image is unavailable (CI lanes without Docker; documented, not silently
- * passed — the skip reason states the missing prerequisite).
+ * image is unavailable. Note: the hosted verify job runs this suite and
+ * skips it (no Docker image there); the container rows execute only on a
+ * local Docker host (erratum, docs/reports/issues/448.md).
  */
 import { describe, expect, afterAll, test } from "bun:test";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const IMAGE = "oven/bun:1.4.0-alpine";

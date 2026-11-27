@@ -94,7 +94,7 @@ Two deployment facts that are easy to get wrong:
 
 Who owns what:
 
-- **The application owns** TLS (terminate it in a reverse proxy — the framework serves plain HTTP on its Bun listener), dependency probes (compose them as your own handlers — see [What is deliberately not here](#what-is-deliberately-not-here)), upload budgets (route `budget`, app `bodyBudget`, serve `maxRequestBodySize` — [body limits](./body-limits.md)), and the static-asset policy boundary (native mounts carry no pipeline headers — [SPA and assets](./spa.md)).
+- **The application owns** TLS (terminate it in a reverse proxy — recommended. `serve()` forwards unrecognized options to Bun's listener, so Bun's `tls` object is accepted and served, but Lugas does not type, document, or test TLS handling; prefer the proxy, or own the Bun TLS configuration yourself), dependency probes (compose them as your own handlers — see [What is deliberately not here](#what-is-deliberately-not-here)), upload budgets (route `budget`, app `bodyBudget`, serve `maxRequestBodySize` — [body limits](./body-limits.md)), and the static-asset policy boundary (native mounts carry no pipeline headers — [SPA and assets](./spa.md)).
 - **The framework owns** the init traffic gate and readiness states, the drain deadline with reverse-order disposal, SSE stream cleanup on close, WebSocket close-1001 on shutdown, and health endpoints that answer on every probe.
 - **The proxy owns** connection timeouts (set them **above** the drain deadline, or the proxy kills requests the framework is still draining), retry and backoff policy, and readiness-based traffic shifting (target `/ready`, not `/health` — liveness is intentionally always 200).
 
