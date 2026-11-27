@@ -41,4 +41,13 @@ const app = defineApp({
 const server = app.serve({ hostname: "127.0.0.1", port: 0, shutdown: { signals: true } });
 await server.lugasLifecycle.ready;
 console.log(`READY ${server.port}`);
+
+// Registered AFTER app.serve(), so the lifecycle's own SIGTERM handler has
+// already run its synchronous stop() by the time this prints (listeners run
+// in registration order). The smoke suite waits for this marker before
+// probing the draining state — "docker kill returned" alone does not prove
+// the in-container handler has stopped accepting.
+process.on("SIGTERM", () => {
+  console.log("SIGTERM-HANDLED");
+});
 // Never call shutdown here: the deployment environment drives it with SIGTERM.

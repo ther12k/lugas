@@ -78,25 +78,29 @@ Colliding with an existing route or asset fails closed (`LUGAS_HEALTH_002`); inv
 
 ## Deployment runbook
 
-Four observable states, each with what probes and the process report (pinned by the lifecycle and deployment-smoke suites):
+Observable states, each with what probes and the process report (pinned by the lifecycle and deployment-smoke suites):
 
 | State | `GET /health` | `GET /ready` | Ordinary routes | Process |
 |---|---|---|---|---|
 | Starting (init running) | `200 ok` | `503 unavailable` | held with 503 | booting |
 | Ready | `200 ok` | `200 ready` | serving | running |
-| Draining (SIGTERM) | — | — | — | port stops accepting immediately (probes fail to connect, not 5xx); in-flight requests and `track()`ed tasks finish within the drain deadline (default 10s) |
-| Stopped | — | — | — | exit 0 when the drain completed; **disposal is withheld if the deadline expired** — the process still exits 0, so the exit code alone does not surface it |
+| Draining (graceful shutdown) | — | — | — | port stops accepting immediately (probes fail to connect, not 5xx); in-flight requests and `track()`ed tasks get the rest of the shutdown budget (default 10s total), then connections are force-closed |
+| Stopped (drain completed) | — | — | — | exit 0; services disposed in reverse order |
+| Stopped (deadline expired) | — | — | — | exit 0 with **disposal withheld** — services are not disposed and the exit code alone does not surface it |
+| Failed startup | `200 ok` | `503 unavailable` | held with 503 | already-initialized services roll back in reverse; the process exits non-zero |
+
+**Graceful SIGTERM/SIGINT handling is opt-in.** By default `serve()` installs no signal handlers: SIGTERM terminates the process immediately — no drain, no disposal, no cleanup. Enable it with `shutdown: { signals: true }` ([services](./services.md)). Every drain behavior in this table assumes that option (the container smoke runs with it); without it, the only states are Starting, Ready, and abrupt termination.
 
 Two deployment facts that are easy to get wrong:
 
-- **Open streams hold the drain.** An SSE stream or WebSocket still open at SIGTERM is in-flight work: its deterministic cleanup runs, but if it never closes, the deadline expires and services are not disposed. Close clients before deploys, or keep streams short-lived.
-- **Client disconnects do not cancel handler work.** A client that aborts mid-handler cannot stop the handler; the work runs to completion (a documented beta limitation). Size handler work to be safe to complete, not safe to abandon.
+- **Open SSE streams hold the drain.** An SSE stream still open when shutdown starts is in-flight work: its deterministic cleanup runs, but if it never closes, the budget expires and services are not disposed. Close clients before deploys, or keep streams short-lived. WebSockets are different: the framework closes them itself (close 1001) when shutdown starts, so an open socket does not hold the drain.
+- **Client disconnects do not cancel handler work.** Bun aborts the request's `signal` on disconnect ([SSE](./sse.md) relies on this), but a handler that never reads that signal keeps running to completion and its response is discarded. This is a documented beta limitation: size handler work to be safe to complete, or cooperate with `ctx.request.signal`.
 
 Who owns what:
 
-- **The application owns** TLS (terminate it in a reverse proxy — the framework serves plain HTTP on its Bun listener), dependency probes (compose them as your own handlers — see [What is deliberately not here](#what-is-deliberately-not-here)), upload budgets (route `budget`, app `bodyBudget`, serve `maxRequestBodySize` — [body limits](./body-limits.md)), and the static-asset policy boundary (native mounts carry no pipeline headers — [SPA and assets](./spa.md)).
+- **The application owns** TLS (terminate it in a reverse proxy — recommended. `serve()` forwards unrecognized options to Bun's listener, so Bun's `tls` object is accepted and served, but Lugas does not type, document, or test TLS handling; prefer the proxy, or own the Bun TLS configuration yourself), dependency probes (compose them as your own handlers — see [What is deliberately not here](#what-is-deliberately-not-here)), upload budgets (route `budget`, app `bodyBudget`, serve `maxRequestBodySize` — [body limits](./body-limits.md)), and the static-asset policy boundary (native mounts carry no pipeline headers — [SPA and assets](./spa.md)).
 - **The framework owns** the init traffic gate and readiness states, the drain deadline with reverse-order disposal, SSE stream cleanup on close, WebSocket close-1001 on shutdown, and health endpoints that answer on every probe.
-- **The proxy owns** connection timeouts (set them **above** the drain deadline, or the proxy kills requests the framework is still draining), retry and backoff policy, and readiness-based traffic shifting (target `/ready`, not `/health` — liveness is intentionally always 200).
+- **The proxy owns** connection timeouts (the shutdown budget is **one** deadline covering init wait, drain, and disposal — default 10s from shutdown start; set proxy timeouts above it, or the proxy kills requests the framework is still draining), retry and backoff policy, and readiness-based traffic shifting (target `/ready`, not `/health` — liveness is intentionally always 200, and there is no separate "draining" answer: the listener stops accepting at shutdown start).
 
 ## What is deliberately not here
 
