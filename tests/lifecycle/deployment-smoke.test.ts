@@ -18,6 +18,7 @@
  */
 import { describe, expect, afterAll, test } from "bun:test";
 import { resolve } from "node:path";
+import { probeDrainSocket } from "./deployment-failures.test";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const IMAGE = "oven/bun:1.4.0-alpine";
@@ -158,12 +159,9 @@ describe.skipIf(!suiteEnabled)("deployment smoke: unprivileged container (#448)"
         // early could observe a still-accepting port and fail spuriously.
         await waitForOutput(run, /^SIGTERM-HANDLED\r?\n/m, 10_000);
 
-        // Now the port must have stopped accepting.
-        const drainProbe = await fetch(`${base}/ready`, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) }).then(
-          () => "answered",
-          () => "not-accepting",
-        );
-        expect(drainProbe).toBe("not-accepting");
+        // Now the port must have actively refused connections (refusal, not timeout).
+        const drainProbe = await probeDrainSocket(`${base}/ready`, PROBE_TIMEOUT_MS);
+        expect(drainProbe).toBe("connection-refused");
 
         // stopped: bounded termination window, exit code 0, dispose-once.
         const exitCode = await run.proc.exited;

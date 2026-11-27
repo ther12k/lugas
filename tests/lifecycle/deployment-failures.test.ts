@@ -17,8 +17,56 @@ import { describe, expect, test } from "bun:test";
 import { defineApp, json, route, service, sse } from "../../src";
 import type { LugasServer } from "../../src/internal/serve";
 
+/**
+ * Probes a socket during drain/shutdown, distinguishing actual socket closure
+ * (connection-refused) from timeouts and still-accepting servers.
+ *
+ * Catches the test-oracle flaw (LR2-05 / negative control) where an accepted
+ * but hanging request was collapsed into generic "not-accepting".
+ */
+export async function probeDrainSocket(
+  url: string,
+  timeoutMs: number = 2_000,
+): Promise<"answered" | "connection-refused" | "timeout" | string> {
+  try {
+    await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    return "answered";
+  } catch (err: any) {
+    if (err?.name === "TimeoutError") return "timeout";
+    if (
+      err?.code === "ConnectionRefused" ||
+      err?.cause?.code === "ECONNREFUSED" ||
+      (err?.name === "TypeError" &&
+        typeof err?.message === "string" &&
+        (err.message.includes("Unable to connect") ||
+          err.message.includes("ConnectionRefused") ||
+          err.message.includes("fetch failed")))
+    ) {
+      return "connection-refused";
+    }
+    return `error:${err?.name}:${err?.message}`;
+  }
+}
+
 describe("deployment failure modes (#448)", () => {
-  test("readiness answers 200 while ready; once shutdown starts the port stops accepting", async () => {
+  test("negative control: an accepted but hanging connection yields 'timeout' and fails the connection-refused check", async () => {
+    // Deliberately accept connections but never send an HTTP response.
+    const hangingServer = Bun.serve({
+      port: 0,
+      fetch() {
+        return new Promise(() => {});
+      },
+    });
+    try {
+      const res = await probeDrainSocket(`http://127.0.0.1:${hangingServer.port}/ready`, 100);
+      expect(res).toBe("timeout");
+      expect(res).not.toBe("connection-refused");
+    } finally {
+      hangingServer.stop(true);
+    }
+  });
+
+  test("readiness answers 200 while ready; once shutdown starts the port actively refuses connections", async () => {
     const app = defineApp({
       health: true,
       services: { db: service({ name: "db", value: {}, dispose: () => undefined }) },
@@ -33,11 +81,8 @@ describe("deployment failure modes (#448)", () => {
       expect(await before.json()).toEqual({ status: "ready" });
 
       const shutdown = server.lugasLifecycle.shutdown();
-      const duringDrain = await fetch(`${base}/ready`).then(
-        () => "answered",
-        () => "not-accepting",
-      );
-      expect(duringDrain).toBe("not-accepting");
+      const duringDrain = await probeDrainSocket(`${base}/ready`, 2_000);
+      expect(duringDrain).toBe("connection-refused");
       const outcome = await shutdown;
       expect(outcome.disposalCompleted).toBe(true);
     } finally {
