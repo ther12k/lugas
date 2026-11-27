@@ -87,6 +87,10 @@ By owner decision, the support contract is tightened: **native directory mounts 
 
 Lugas does not become Linux-only; this particular directory-serving capability does. Explicit `assets.files` mappings remain available across platforms under their own trust boundary: the application explicitly selects trusted files for publication (noting that file-backed responses read the filesystem during requests and do not constitute an immutable memory cache against subsequent disk mutations).
 
+### Kernel floor clarification (2026-11-28)
+
+`openat2(RESOLVE_IN_ROOT)` was introduced in Linux 5.6 (Linux man-pages). The containment evidence above comes from kernels ≥ 5.6; on older Linux kernels containment is **not guaranteed** — the historical maintainer report of outside-root symlink exposure on an old kernel was never reproduced, and remains maintainer-reported. Owner disposition (recorded on the qualification gate, 2026-11-28): the supported contract for `assets.dirs` is **Linux ≥ 5.6**; the existing `LUGAS_ASSET_004` non-Linux rejection stays as-is, and runtime capability enforcement (a startup check that containment is actually available) is a **tracked revisit trigger**, not implemented in this change. A version label documents the floor; it is not proof of enforcement on a given host.
+
 ## Release impact
 
 The approved target is the next release candidate after `v0.1.0-beta.1`; the attested beta.1 artifact set is preserved unmodified. New implementation and package bytes enter through the normal release pipeline and require their own applicable release evidence (attestation, checksums, consumer rehearsal) per the evidence-gated claims policy ([ADR-0016](0016-evidence-gated-claims.md)).
